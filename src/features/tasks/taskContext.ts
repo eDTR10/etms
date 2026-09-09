@@ -21,10 +21,12 @@ export interface TaskContextValue {
   editRemark: (id: number, remarkId: number, message: string) => Promise<void>;
   deleteRemark: (id: number, remarkId: number) => Promise<void>;
   reactToRemark: (id: number, remarkId: number, emoji: string) => Promise<void>;
+  addRemarkReply: (id: number, remarkId: number, message: string) => Promise<void>;
   addSubtaskRemark: (id: number, subtaskId: number, message: string, file?: File) => Promise<void>;
   editSubtaskRemark: (id: number, subtaskId: number, remarkId: number, message: string) => Promise<void>;
   deleteSubtaskRemark: (id: number, subtaskId: number, remarkId: number) => Promise<void>;
   reactToSubtaskRemark: (id: number, subtaskId: number, remarkId: number, emoji: string) => Promise<void>;
+  addSubtaskRemarkReply: (id: number, subtaskId: number, remarkId: number, message: string) => Promise<void>;
   setSubtaskStatus: (id: number, subtaskId: number, message: string, status: TaskStatus) => Promise<void>;
   addSubtask: (id: number, title: string, description?: string) => Promise<void>;
   editSubtask: (id: number, subtaskId: number, input: { title?: string; description?: string }) => Promise<void>;

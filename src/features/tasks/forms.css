@@ -287,6 +287,12 @@
 .etm-remark-form-actions select:focus { border-color: var(--etm-primary); box-shadow: 0 0 0 3px #087e8b12; }
 .etm-remark-form-actions select:disabled { opacity: .6; cursor: not-allowed; }
 .etm-remark-chip-attachments { display: block; margin-top: 4px; }
+.etm-remark-replies { display: block; margin-top: 4px; }
+.etm-remark-reply-list { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; padding-left: 14px; border-left: 2px solid var(--etm-border); }
+.etm-remark-reply-list .etm-remark-chip { padding: 6px 9px; border-radius: 10px; }
+.etm-remark-reply-list .etm-remark-chip-message { font-size: 12px; }
+.etm-remark-reply-composer { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; padding-left: 14px; border-left: 2px solid var(--etm-border); }
+.etm-remark-reply-composer-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .etm-rich-text { overflow: hidden; border: 1px solid var(--etm-border); border-radius: 8px; background: var(--etm-surface-alt); }
 .etm-rich-text { position: relative; }
 .etm-rich-text:focus-within { border-color: var(--etm-primary); box-shadow: 0 0 0 3px #087e8b12; }

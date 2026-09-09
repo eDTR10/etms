@@ -34,8 +34,8 @@ export default function MajorTasks() {
   const {
     tasks, members, projects, updateTask, listArchivedTasks,
     addProgress, editProgress, deleteProgress,
-    addRemark, editRemark, deleteRemark, reactToRemark,
-    addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion,
+    addRemark, editRemark, deleteRemark, reactToRemark, addRemarkReply,
+    addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion,
     addRemarkAttachment, deleteRemarkAttachment, addSubtaskRemarkAttachment, deleteSubtaskRemarkAttachment, markCompletionSeen, markViewed,
   } = useTasks();
   const confirmDelete = useDeleteTaskConfirm();
@@ -257,10 +257,12 @@ export default function MajorTasks() {
         onEditRemark={(remarkId, message) => editRemark(viewingTask.id, remarkId, message)}
         onDeleteRemark={remarkId => deleteRemark(viewingTask.id, remarkId)}
         onReactRemark={(remarkId, emoji) => reactToRemark(viewingTask.id, remarkId, emoji)}
+        onAddRemarkReply={(remarkId, message) => addRemarkReply(viewingTask.id, remarkId, message)}
         onAddSubtaskRemark={(subtaskId, message, file) => addSubtaskRemark(viewingTask.id, subtaskId, message, file)}
         onEditSubtaskRemark={(subtaskId, remarkId, message) => editSubtaskRemark(viewingTask.id, subtaskId, remarkId, message)}
         onDeleteSubtaskRemark={(subtaskId, remarkId) => deleteSubtaskRemark(viewingTask.id, subtaskId, remarkId)}
         onReactSubtaskRemark={(subtaskId, remarkId, emoji) => reactToSubtaskRemark(viewingTask.id, subtaskId, remarkId, emoji)}
+        onAddSubtaskRemarkReply={(subtaskId, remarkId, message) => addSubtaskRemarkReply(viewingTask.id, subtaskId, remarkId, message)}
         onSetSubtaskStatus={(subtaskId, message, status) => setSubtaskStatus(viewingTask.id, subtaskId, message, status)}
         onAddSubtask={(title, description) => addSubtask(viewingTask.id, title, description)}
         onEditSubtask={(subtaskId, input) => editSubtask(viewingTask.id, subtaskId, input)}

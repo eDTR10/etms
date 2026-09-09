@@ -43,6 +43,7 @@ export interface Remark {
   can_edit: boolean;
   attachments?: Attachment[];
   reactions: Reaction[];
+  replies?: Remark[];
 }
 
 export const REACTION_EMOJI = ["👍", "❤️", "😂", "😮", "😢", "🎉"];

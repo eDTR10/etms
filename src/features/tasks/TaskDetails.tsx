@@ -4,7 +4,7 @@ import { isAxiosError } from "axios";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
-import { AlertTriangle, Bold, CalendarDays, Check, CheckCheck, ChevronRight, Circle, ClipboardList, Clock3, Download, Edit3, Flag, Folder, History, Italic, List, Loader2, MessageSquare, Paperclip, Pencil, Plus, Send, SmilePlus, Trash2, Underline, User, Users, X } from "lucide-react";
+import { AlertTriangle, Bold, CalendarDays, Check, CheckCheck, ChevronRight, Circle, ClipboardList, Clock3, Download, Edit3, Flag, Folder, History, Italic, List, Loader2, MessageSquare, Paperclip, Pencil, Plus, Reply, Send, SmilePlus, Trash2, Underline, User, Users, X } from "lucide-react";
 import MentionField from "./MentionField";
 import { useAuth } from "../../screens/Auth/AuthContext";
 import { useTasks } from "./taskContext";
@@ -23,10 +23,12 @@ interface TaskDetailsProps {
   onEditRemark: (remarkId: number, message: string) => Promise<void>;
   onDeleteRemark: (remarkId: number) => Promise<void>;
   onReactRemark: (remarkId: number, emoji: string) => Promise<void>;
+  onAddRemarkReply: (remarkId: number, message: string) => Promise<void>;
   onAddSubtaskRemark: (subtaskId: number, message: string, file?: File) => Promise<void>;
   onEditSubtaskRemark: (subtaskId: number, remarkId: number, message: string) => Promise<void>;
   onDeleteSubtaskRemark: (subtaskId: number, remarkId: number) => Promise<void>;
   onReactSubtaskRemark: (subtaskId: number, remarkId: number, emoji: string) => Promise<void>;
+  onAddSubtaskRemarkReply: (subtaskId: number, remarkId: number, message: string) => Promise<void>;
   onSetSubtaskStatus: (subtaskId: number, message: string, status: TaskStatus) => Promise<void>;
   onAddSubtask: (title: string, description?: string) => Promise<void>;
   onEditSubtask: (subtaskId: number, input: { title?: string; description?: string }) => Promise<void>;
@@ -176,6 +178,11 @@ interface RemarkChipProps {
   subtasks?: SubTask[];
   onOpenSubtask?: (subtaskId: number) => void;
   onReact?: (emoji: string) => Promise<void>;
+  onReply?: (message: string) => Promise<void>;
+  onEditById?: (remarkId: number, message: string) => Promise<void>;
+  onDeleteById?: (remarkId: number) => Promise<void>;
+  onReactById?: (remarkId: number, emoji: string) => Promise<void>;
+  allowReply?: boolean;
 }
 
 function ReactionPicker({ onPick }: { onPick: (emoji: string) => void }) {
@@ -201,7 +208,7 @@ function ReactionPicker({ onPick }: { onPick: (emoji: string) => void }) {
   );
 }
 
-function RemarkChip({ remark, members, onEdit, onDelete, canUpload, onAddAttachment, onDeleteAttachment, showStatusField, currentStatus, canChangeStatus, subtasks, onOpenSubtask, onReact }: RemarkChipProps) {
+function RemarkChip({ remark, members, onEdit, onDelete, canUpload, onAddAttachment, onDeleteAttachment, showStatusField, currentStatus, canChangeStatus, subtasks, onOpenSubtask, onReact, onReply, onEditById, onDeleteById, onReactById, allowReply = true }: RemarkChipProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const taskMentions = [...remark.message.matchAll(/@Task #(\d+)/g)].map(match => Number(match[1]));
@@ -216,6 +223,10 @@ function RemarkChip({ remark, members, onEdit, onDelete, canUpload, onAddAttachm
   const [editStatus, setEditStatus] = useState<TaskStatus | undefined>(currentStatus);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [replying, setReplying] = useState(false);
+  const [replyDraft, setReplyDraft] = useState("");
+  const [replySaving, setReplySaving] = useState(false);
+  const [replyError, setReplyError] = useState("");
 
   function startEditing() {
     setDraft(displayMessage);
@@ -251,6 +262,30 @@ function RemarkChip({ remark, members, onEdit, onDelete, canUpload, onAddAttachm
       await onReact?.(emoji);
     } catch (caught) {
       void Swal.fire({ title: "Couldn't update reaction", text: remarkError(caught), icon: "error" });
+    }
+  }
+
+  async function submitReply() {
+    if (replySaving || !replyDraft.replace(/<[^>]*>/g, "").trim()) return;
+    setReplySaving(true);
+    setReplyError("");
+    try {
+      await onReply?.(replyDraft.trim());
+      setReplyDraft("");
+      setReplying(false);
+    } catch (caught) {
+      setReplyError(remarkError(caught));
+    } finally {
+      setReplySaving(false);
+    }
+  }
+
+  async function handleReplyDelete(replyId: number) {
+    if (!(await confirmDanger("reply"))) return;
+    try {
+      await onDeleteById?.(replyId);
+    } catch (caught) {
+      void Swal.fire({ title: "Couldn't delete reply", text: remarkError(caught), icon: "error" });
     }
   }
 
@@ -300,6 +335,7 @@ function RemarkChip({ remark, members, onEdit, onDelete, canUpload, onAddAttachm
         {!editing && (
           <span className="etm-remark-chip-actions">
             {onReact && <ReactionPicker onPick={emoji => void handleReact(emoji)} />}
+            {allowReply && onReply && <button type="button" className="etm-inline-link-button" onClick={() => setReplying(value => !value)}><Reply size={10} /> Reply</button>}
             {remark.can_edit && (<>
               <button type="button" className="etm-inline-link-button" onClick={startEditing}><Pencil size={10} /> Edit</button>
               <button type="button" className="etm-inline-link-button danger" onClick={() => void handleDelete()}><Trash2 size={10} /> Delete</button>
@@ -310,6 +346,37 @@ function RemarkChip({ remark, members, onEdit, onDelete, canUpload, onAddAttachm
       {onAddAttachment && onDeleteAttachment && !editing && (
         <span className="etm-remark-chip-attachments">
           <AttachmentsPanel attachments={remark.attachments ?? []} canUpload={!!canUpload} onAdd={onAddAttachment} onDelete={onDeleteAttachment} />
+        </span>
+      )}
+      {allowReply && onReply && onEditById && onDeleteById && (
+        <span className="etm-remark-replies">
+          {(remark.replies ?? []).length > 0 && (
+            <span className="etm-remark-reply-list">
+              {remark.replies!.map(reply => (
+                <RemarkChip
+                  key={reply.id}
+                  remark={reply}
+                  members={members}
+                  onEdit={message => onEditById(reply.id, message)}
+                  onDelete={() => handleReplyDelete(reply.id)}
+                  onReact={onReactById ? emoji => onReactById(reply.id, emoji) : undefined}
+                  subtasks={subtasks}
+                  onOpenSubtask={onOpenSubtask}
+                  allowReply={false}
+                />
+              ))}
+            </span>
+          )}
+          {replying && (
+            <div className="etm-remark-reply-composer">
+              <RichTextRemarkField value={replyDraft} onChange={setReplyDraft} disabled={replySaving} members={members} subtasks={subtasks} />
+              {replyError && <p className="etm-field-error">{replyError}</p>}
+              <div className="etm-remark-reply-composer-actions">
+                <button type="button" className="etm-button ghost small" disabled={replySaving} onClick={() => { setReplying(false); setReplyDraft(""); setReplyError(""); }}>Cancel</button>
+                <button type="button" className="etm-button primary small" disabled={replySaving || !replyDraft.replace(/<[^>]*>/g, "").trim()} onClick={() => void submitReply()}>{replySaving ? <Loader2 size={13} className="etm-form-spinner" /> : <Send size={13} />}Reply</button>
+              </div>
+            </div>
+          )}
         </span>
       )}
     </span>
@@ -334,6 +401,7 @@ interface RemarkListProps {
   subtasks?: SubTask[];
   onOpenSubtask?: (subtaskId: number) => void;
   onReact?: (remarkId: number, emoji: string) => Promise<void>;
+  onAddReply?: (remarkId: number, message: string) => Promise<void>;
 }
 
 function RichTextRemarkField({ value, onChange, disabled, members, subtasks }: { value: string; onChange: (value: string) => void; disabled?: boolean; members: Member[]; subtasks?: SubTask[] }) {
@@ -389,7 +457,7 @@ function RichTextRemarkField({ value, onChange, disabled, members, subtasks }: {
   return <div className="etm-rich-text" ref={containerRef}><div className="etm-rich-text-toolbar" aria-label="Text formatting"><button type="button" onMouseDown={event => event.preventDefault()} onClick={() => format("bold")} aria-label="Bold"><Bold size={14} /></button><button type="button" onMouseDown={event => event.preventDefault()} onClick={() => format("italic")} aria-label="Italic"><Italic size={14} /></button><button type="button" onMouseDown={event => event.preventDefault()} onClick={() => format("underline")} aria-label="Underline"><Underline size={14} /></button><button type="button" onMouseDown={event => event.preventDefault()} onClick={() => format("insertUnorderedList")} aria-label="Bullet list"><List size={14} /></button></div><div ref={ref} className="etm-rich-text-editor" contentEditable={!disabled} role="textbox" aria-multiline="true" aria-label="Add a rich-text remark" data-placeholder="Add a remark…" onInput={update} onBlur={() => setTimeout(() => setMentionActive(false), 150)} />{showMentionMenu && menuPos && createPortal(<div className="etm-rich-mention-menu" style={{ top: menuPos.top, left: menuPos.left, width: menuPos.width }}>{people.map(member => <button type="button" key={`person-${member.id}`} onMouseDown={event => { event.preventDefault(); insertMention(memberName(member).replace(/\s/g, "")); }}><User size={13} />{memberName(member)}<small>Person</small></button>)}{taskMatches.map(task => <button type="button" key={`task-${task.id}`} onMouseDown={event => { event.preventDefault(); insertMention(`Task #${task.id}`); }}><ClipboardList size={13} />{task.title}<small>Task #{task.id}</small></button>)}{subtaskMatches.map(subtask => <button type="button" key={`subtask-${subtask.id}`} onMouseDown={event => { event.preventDefault(); insertAtCaret(`@Subtask #${subtask.id} "${subtask.title}" `); }}><CheckCheck size={13} />{subtask.title}<small>Subtask</small></button>)}</div>, document.body)}</div>;
 }
 
-function RemarkList({ remarks, canComment, members, onAdd, onEdit, onDelete, emptyText, compact, showStatusField, currentStatus, canChangeStatus, incompleteSubtaskCount, onAddAttachment, onDeleteAttachment, subtasks, onOpenSubtask, onReact }: RemarkListProps) {
+function RemarkList({ remarks, canComment, members, onAdd, onEdit, onDelete, emptyText, compact, showStatusField, currentStatus, canChangeStatus, incompleteSubtaskCount, onAddAttachment, onDeleteAttachment, subtasks, onOpenSubtask, onReact, onAddReply }: RemarkListProps) {
   const [composing, setComposing] = useState(false);
   const [draft, setDraft] = useState("");
   const [status, setStatus] = useState<TaskStatus | undefined>(currentStatus);
@@ -464,6 +532,10 @@ function RemarkList({ remarks, canComment, members, onAdd, onEdit, onDelete, emp
                     subtasks={subtasks}
                     onOpenSubtask={onOpenSubtask}
                     onReact={onReact ? emoji => onReact(remark.id, emoji) : undefined}
+                    onReply={onAddReply ? message => onAddReply(remark.id, message) : undefined}
+                    onEditById={onEdit}
+                    onDeleteById={onDelete}
+                    onReactById={onReact}
                   />
                 </div>
               </div>
@@ -572,7 +644,7 @@ function ProgressHistoryItem({ log, onEdit, onDelete }: ProgressHistoryItemProps
   );
 }
 
-function SubtaskPanel({ task, subtask, members, canComment, onSetCompletion, onAddRemark, onEditRemark, onDeleteRemark, onSetStatus, onReactRemark, onEditSubtask, onDeleteSubtask, onAddRemarkAttachment, onDeleteRemarkAttachment, defaultOpen = false, jumpToSubtaskId }: {
+function SubtaskPanel({ task, subtask, members, canComment, onSetCompletion, onAddRemark, onEditRemark, onDeleteRemark, onSetStatus, onReactRemark, onAddReplyRemark, onEditSubtask, onDeleteSubtask, onAddRemarkAttachment, onDeleteRemarkAttachment, defaultOpen = false, jumpToSubtaskId }: {
   task: Task; subtask: SubTask; members: Member[]; canComment: boolean;
   onSetCompletion: (id: number, completed: boolean) => Promise<void>;
   onAddRemark: (id: number, message: string, file?: File) => Promise<void>;
@@ -580,6 +652,7 @@ function SubtaskPanel({ task, subtask, members, canComment, onSetCompletion, onA
   onDeleteRemark: (id: number, remarkId: number) => Promise<void>;
   onSetStatus: (id: number, message: string, status: TaskStatus) => Promise<void>;
   onReactRemark: (id: number, remarkId: number, emoji: string) => Promise<void>;
+  onAddReplyRemark: (id: number, remarkId: number, message: string) => Promise<void>;
   onEditSubtask: (id: number, input: { title?: string; description?: string }) => Promise<void>;
   onDeleteSubtask: (id: number) => Promise<void>;
   onAddRemarkAttachment: (subtaskId: number, remarkId: number, file: File) => Promise<void>;
@@ -685,6 +758,7 @@ function SubtaskPanel({ task, subtask, members, canComment, onSetCompletion, onA
         onEdit={editUpdateWithStatus}
         onDelete={remarkId => onDeleteRemark(id, remarkId)}
         onReact={(remarkId, emoji) => onReactRemark(id, remarkId, emoji)}
+        onAddReply={(remarkId, message) => onAddReplyRemark(id, remarkId, message)}
         onAddAttachment={(remarkId, file) => onAddRemarkAttachment(id, remarkId, file)}
         onDeleteAttachment={(remarkId, attachmentId) => onDeleteRemarkAttachment(id, remarkId, attachmentId)}
         subtasks={task.subtasks}
@@ -779,7 +853,7 @@ function AttachmentsPanel({ attachments, canUpload, onAdd, onDelete }: Attachmen
   );
 }
 
-function TaskDetailsContent({ task, onClose, onEdit, onProgress, onEditProgress, onDeleteProgress, onAddRemark, onEditRemark, onDeleteRemark, onReactRemark, onAddSubtaskRemark, onEditSubtaskRemark, onDeleteSubtaskRemark, onReactSubtaskRemark, onSetSubtaskStatus, onAddSubtask, onEditSubtask, onDeleteSubtask, onSetSubtaskCompletion, onAddRemarkAttachment, onDeleteRemarkAttachment, onAddSubtaskRemarkAttachment, onDeleteSubtaskRemarkAttachment, onMarkCompletionSeen, onMarkViewed, initialSubtaskId, page = false }: Omit<TaskDetailsProps, "open">) {
+function TaskDetailsContent({ task, onClose, onEdit, onProgress, onEditProgress, onDeleteProgress, onAddRemark, onEditRemark, onDeleteRemark, onReactRemark, onAddRemarkReply, onAddSubtaskRemark, onEditSubtaskRemark, onDeleteSubtaskRemark, onReactSubtaskRemark, onAddSubtaskRemarkReply, onSetSubtaskStatus, onAddSubtask, onEditSubtask, onDeleteSubtask, onSetSubtaskCompletion, onAddRemarkAttachment, onDeleteRemarkAttachment, onAddSubtaskRemarkAttachment, onDeleteSubtaskRemarkAttachment, onMarkCompletionSeen, onMarkViewed, initialSubtaskId, page = false }: Omit<TaskDetailsProps, "open">) {
   const fieldId = useId();
   const [taskInfoOpen, setTaskInfoOpen] = useState(false);
   const [activityLogOpen, setActivityLogOpen] = useState(false);
@@ -901,7 +975,7 @@ function TaskDetailsContent({ task, onClose, onEdit, onProgress, onEditProgress,
         {task.is_completed && incompleteSubtasks.length > 0 && <div className="etm-subtask-completion-warning" role="alert"><AlertTriangle size={17} /><span><strong>{incompleteSubtasks.length} subtask{incompleteSubtasks.length === 1 ? "" : "s"} still incomplete.</strong> Reopen this task, finish the remaining subtasks, then complete it again.</span></div>}
         {task.subtasks.length > 0 ? <>
           <div className="etm-details-progress-track" role="progressbar" aria-label="Task completion" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${percent}%` }} /></div>
-          <ul className="etm-details-subtasks">{task.subtasks.map((subtask, index) => <SubtaskPanel key={subtask.id ?? index} task={task} subtask={subtask} members={task.assignments} canComment={canComment} onSetCompletion={onSetSubtaskCompletion} onAddRemark={onAddSubtaskRemark} onEditRemark={onEditSubtaskRemark} onDeleteRemark={onDeleteSubtaskRemark} onReactRemark={onReactSubtaskRemark} onSetStatus={onSetSubtaskStatus} onEditSubtask={onEditSubtask} onDeleteSubtask={onDeleteSubtask} onAddRemarkAttachment={onAddSubtaskRemarkAttachment} onDeleteRemarkAttachment={onDeleteSubtaskRemarkAttachment} defaultOpen={subtask.id === initialSubtaskId} jumpToSubtaskId={jumpToSubtaskId} />)}</ul>
+          <ul className="etm-details-subtasks">{task.subtasks.map((subtask, index) => <SubtaskPanel key={subtask.id ?? index} task={task} subtask={subtask} members={task.assignments} canComment={canComment} onSetCompletion={onSetSubtaskCompletion} onAddRemark={onAddSubtaskRemark} onEditRemark={onEditSubtaskRemark} onDeleteRemark={onDeleteSubtaskRemark} onReactRemark={onReactSubtaskRemark} onAddReplyRemark={onAddSubtaskRemarkReply} onSetStatus={onSetSubtaskStatus} onEditSubtask={onEditSubtask} onDeleteSubtask={onDeleteSubtask} onAddRemarkAttachment={onAddSubtaskRemarkAttachment} onDeleteRemarkAttachment={onDeleteSubtaskRemarkAttachment} defaultOpen={subtask.id === initialSubtaskId} jumpToSubtaskId={jumpToSubtaskId} />)}</ul>
         </> : <p className="etm-details-text empty">This task has no subtasks.</p>}
         {canAddSubtasks && <form className="etm-add-subtask-later" onSubmit={addSubtask}><input id={`${fieldId}-new-subtask`} value={newSubtaskTitle} onChange={event => { setNewSubtaskTitle(event.target.value); setSubtaskError(""); }} placeholder="Add a subtask to this task" maxLength={255} disabled={addingSubtask} /><button type="submit" className="etm-button primary small" disabled={addingSubtask || !newSubtaskTitle.trim()}>{addingSubtask ? <Loader2 size={14} className="etm-form-spinner" /> : <Plus size={14} />}Add</button>{subtaskError && <p className="etm-field-error" role="alert">{subtaskError}</p>}</form>}
       </section>
@@ -917,6 +991,7 @@ function TaskDetailsContent({ task, onClose, onEdit, onProgress, onEditProgress,
           onEdit={editRemarkWithStatus}
           onDelete={onDeleteRemark}
           onReact={onReactRemark}
+          onAddReply={onAddRemarkReply}
           emptyText="No remarks yet."
           showStatusField
           currentStatus={task.status}
@@ -968,8 +1043,8 @@ function TaskDetailsContent({ task, onClose, onEdit, onProgress, onEditProgress,
   </>;
 }
 
-export default function TaskDetails({ task, open, onClose, onEdit, onProgress, onEditProgress, onDeleteProgress, onAddRemark, onEditRemark, onDeleteRemark, onReactRemark, onAddSubtaskRemark, onEditSubtaskRemark, onDeleteSubtaskRemark, onReactSubtaskRemark, onSetSubtaskStatus, onAddSubtask, onEditSubtask, onDeleteSubtask, onSetSubtaskCompletion, onAddRemarkAttachment, onDeleteRemarkAttachment, onAddSubtaskRemarkAttachment, onDeleteSubtaskRemarkAttachment, onMarkCompletionSeen, onMarkViewed, initialSubtaskId, page = false }: TaskDetailsProps) {
-  if (page) return <div className="etm-task-details-page"><TaskDetailsContent task={task} onClose={onClose} onEdit={onEdit} onProgress={onProgress} onEditProgress={onEditProgress} onDeleteProgress={onDeleteProgress} onAddRemark={onAddRemark} onEditRemark={onEditRemark} onDeleteRemark={onDeleteRemark} onReactRemark={onReactRemark} onAddSubtaskRemark={onAddSubtaskRemark} onEditSubtaskRemark={onEditSubtaskRemark} onDeleteSubtaskRemark={onDeleteSubtaskRemark} onReactSubtaskRemark={onReactSubtaskRemark} onSetSubtaskStatus={onSetSubtaskStatus} onAddSubtask={onAddSubtask} onEditSubtask={onEditSubtask} onDeleteSubtask={onDeleteSubtask} onSetSubtaskCompletion={onSetSubtaskCompletion} onAddRemarkAttachment={onAddRemarkAttachment} onDeleteRemarkAttachment={onDeleteRemarkAttachment} onAddSubtaskRemarkAttachment={onAddSubtaskRemarkAttachment} onDeleteSubtaskRemarkAttachment={onDeleteSubtaskRemarkAttachment} onMarkCompletionSeen={onMarkCompletionSeen} onMarkViewed={onMarkViewed} initialSubtaskId={initialSubtaskId} page /></div>;
+export default function TaskDetails({ task, open, onClose, onEdit, onProgress, onEditProgress, onDeleteProgress, onAddRemark, onEditRemark, onDeleteRemark, onReactRemark, onAddRemarkReply, onAddSubtaskRemark, onEditSubtaskRemark, onDeleteSubtaskRemark, onReactSubtaskRemark, onAddSubtaskRemarkReply, onSetSubtaskStatus, onAddSubtask, onEditSubtask, onDeleteSubtask, onSetSubtaskCompletion, onAddRemarkAttachment, onDeleteRemarkAttachment, onAddSubtaskRemarkAttachment, onDeleteSubtaskRemarkAttachment, onMarkCompletionSeen, onMarkViewed, initialSubtaskId, page = false }: TaskDetailsProps) {
+  if (page) return <div className="etm-task-details-page"><TaskDetailsContent task={task} onClose={onClose} onEdit={onEdit} onProgress={onProgress} onEditProgress={onEditProgress} onDeleteProgress={onDeleteProgress} onAddRemark={onAddRemark} onEditRemark={onEditRemark} onDeleteRemark={onDeleteRemark} onReactRemark={onReactRemark} onAddRemarkReply={onAddRemarkReply} onAddSubtaskRemark={onAddSubtaskRemark} onEditSubtaskRemark={onEditSubtaskRemark} onDeleteSubtaskRemark={onDeleteSubtaskRemark} onReactSubtaskRemark={onReactSubtaskRemark} onAddSubtaskRemarkReply={onAddSubtaskRemarkReply} onSetSubtaskStatus={onSetSubtaskStatus} onAddSubtask={onAddSubtask} onEditSubtask={onEditSubtask} onDeleteSubtask={onDeleteSubtask} onSetSubtaskCompletion={onSetSubtaskCompletion} onAddRemarkAttachment={onAddRemarkAttachment} onDeleteRemarkAttachment={onDeleteRemarkAttachment} onAddSubtaskRemarkAttachment={onAddSubtaskRemarkAttachment} onDeleteSubtaskRemarkAttachment={onDeleteSubtaskRemarkAttachment} onMarkCompletionSeen={onMarkCompletionSeen} onMarkViewed={onMarkViewed} initialSubtaskId={initialSubtaskId} page /></div>;
   function ignoreWhileSwalOpen(event: { preventDefault: () => void }) {
     // A SweetAlert popup renders outside this Dialog.Content in the DOM, so Radix sees
     // clicks/Escape on it as "outside" and would otherwise close this dialog underneath it.
@@ -983,6 +1058,6 @@ export default function TaskDetails({ task, open, onClose, onEdit, onProgress, o
       onPointerDownOutside={ignoreWhileSwalOpen}
       onInteractOutside={ignoreWhileSwalOpen}
       onEscapeKeyDown={ignoreWhileSwalOpen}
-    ><TaskDetailsContent key={`${task.id}-${initialSubtaskId ?? "task"}`} task={task} onClose={onClose} onEdit={onEdit} onProgress={onProgress} onEditProgress={onEditProgress} onDeleteProgress={onDeleteProgress} onAddRemark={onAddRemark} onEditRemark={onEditRemark} onDeleteRemark={onDeleteRemark} onReactRemark={onReactRemark} onAddSubtaskRemark={onAddSubtaskRemark} onEditSubtaskRemark={onEditSubtaskRemark} onDeleteSubtaskRemark={onDeleteSubtaskRemark} onReactSubtaskRemark={onReactSubtaskRemark} onSetSubtaskStatus={onSetSubtaskStatus} onAddSubtask={onAddSubtask} onEditSubtask={onEditSubtask} onDeleteSubtask={onDeleteSubtask} onSetSubtaskCompletion={onSetSubtaskCompletion} onAddRemarkAttachment={onAddRemarkAttachment} onDeleteRemarkAttachment={onDeleteRemarkAttachment} onAddSubtaskRemarkAttachment={onAddSubtaskRemarkAttachment} onDeleteSubtaskRemarkAttachment={onDeleteSubtaskRemarkAttachment} onMarkCompletionSeen={onMarkCompletionSeen} onMarkViewed={onMarkViewed} initialSubtaskId={initialSubtaskId} /></Dialog.Content></Dialog.Portal>
+    ><TaskDetailsContent key={`${task.id}-${initialSubtaskId ?? "task"}`} task={task} onClose={onClose} onEdit={onEdit} onProgress={onProgress} onEditProgress={onEditProgress} onDeleteProgress={onDeleteProgress} onAddRemark={onAddRemark} onEditRemark={onEditRemark} onDeleteRemark={onDeleteRemark} onReactRemark={onReactRemark} onAddRemarkReply={onAddRemarkReply} onAddSubtaskRemark={onAddSubtaskRemark} onEditSubtaskRemark={onEditSubtaskRemark} onDeleteSubtaskRemark={onDeleteSubtaskRemark} onReactSubtaskRemark={onReactSubtaskRemark} onAddSubtaskRemarkReply={onAddSubtaskRemarkReply} onSetSubtaskStatus={onSetSubtaskStatus} onAddSubtask={onAddSubtask} onEditSubtask={onEditSubtask} onDeleteSubtask={onDeleteSubtask} onSetSubtaskCompletion={onSetSubtaskCompletion} onAddRemarkAttachment={onAddRemarkAttachment} onDeleteRemarkAttachment={onDeleteRemarkAttachment} onAddSubtaskRemarkAttachment={onAddSubtaskRemarkAttachment} onDeleteSubtaskRemarkAttachment={onDeleteSubtaskRemarkAttachment} onMarkCompletionSeen={onMarkCompletionSeen} onMarkViewed={onMarkViewed} initialSubtaskId={initialSubtaskId} /></Dialog.Content></Dialog.Portal>
   </Dialog.Root>;
 }

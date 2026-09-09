@@ -39,6 +39,8 @@ export const taskService = {
     (await api.delete<Task>(`etm/tasks/${id}/remarks/${remarkId}/`)).data,
   reactToRemark: async (id: number, remarkId: number, emoji: string) =>
     (await api.post<Task>(`etm/tasks/${id}/remarks/${remarkId}/reactions/`, { emoji })).data,
+  addRemarkReply: async (id: number, remarkId: number, message: string) =>
+    (await api.post<Task>(`etm/tasks/${id}/remarks/${remarkId}/replies/`, { message })).data,
   addSubtaskRemark: async (id: number, subtaskId: number, message: string) =>
     (await api.post<Task>(`etm/tasks/${id}/subtasks/${subtaskId}/remarks/`, { message })).data,
   editSubtaskRemark: async (id: number, subtaskId: number, remarkId: number, message: string) =>
@@ -47,6 +49,8 @@ export const taskService = {
     (await api.delete<Task>(`etm/tasks/${id}/subtasks/${subtaskId}/remarks/${remarkId}/`)).data,
   reactToSubtaskRemark: async (id: number, subtaskId: number, remarkId: number, emoji: string) =>
     (await api.post<Task>(`etm/tasks/${id}/subtasks/${subtaskId}/remarks/${remarkId}/reactions/`, { emoji })).data,
+  addSubtaskRemarkReply: async (id: number, subtaskId: number, remarkId: number, message: string) =>
+    (await api.post<Task>(`etm/tasks/${id}/subtasks/${subtaskId}/remarks/${remarkId}/replies/`, { message })).data,
   setSubtaskStatus: async (id: number, subtaskId: number, message: string, status: TaskStatus) =>
     (await api.post<Task>(`etm/tasks/${id}/subtasks/${subtaskId}/progress/`, { message, status })).data,
   addSubtask: async (id: number, title: string, description = "") =>

@@ -74,6 +74,9 @@ export default function TaskProvider({ children }: { children: ReactNode }) {
   const reactToRemark = async (id: number, remarkId: number, emoji: string) => {
     replace(await taskService.reactToRemark(id, remarkId, emoji));
   };
+  const addRemarkReply = async (id: number, remarkId: number, message: string) => {
+    replace(await taskService.addRemarkReply(id, remarkId, message));
+  };
   const addSubtaskRemark = async (id: number, subtaskId: number, message: string, file?: File) => {
     const updated = await taskService.addSubtaskRemark(id, subtaskId, message);
     const newRemarkId = file ? updated.subtasks.find(subtask => subtask.id === subtaskId)?.remarks?.[0]?.id : undefined;
@@ -87,6 +90,9 @@ export default function TaskProvider({ children }: { children: ReactNode }) {
   };
   const reactToSubtaskRemark = async (id: number, subtaskId: number, remarkId: number, emoji: string) => {
     replace(await taskService.reactToSubtaskRemark(id, subtaskId, remarkId, emoji));
+  };
+  const addSubtaskRemarkReply = async (id: number, subtaskId: number, remarkId: number, message: string) => {
+    replace(await taskService.addSubtaskRemarkReply(id, subtaskId, remarkId, message));
   };
   const setSubtaskStatus = async (id: number, subtaskId: number, message: string, status: TaskStatus) => {
     replace(await taskService.setSubtaskStatus(id, subtaskId, message, status));
@@ -132,5 +138,5 @@ export default function TaskProvider({ children }: { children: ReactNode }) {
     replace(await taskService.markViewed(id));
   };
 
-  return <TaskContext.Provider value={{ tasks, members, projects, loading, error, refresh, listArchivedTasks, addMember, createTask, updateTask, deleteTask, addProgress, editProgress, deleteProgress, addRemark, editRemark, deleteRemark, reactToRemark, addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, bulkArchive, bulkDelete, addRemarkAttachment, deleteRemarkAttachment, addSubtaskRemarkAttachment, deleteSubtaskRemarkAttachment, markCompletionSeen, markViewed }}>{children}</TaskContext.Provider>;
+  return <TaskContext.Provider value={{ tasks, members, projects, loading, error, refresh, listArchivedTasks, addMember, createTask, updateTask, deleteTask, addProgress, editProgress, deleteProgress, addRemark, editRemark, deleteRemark, reactToRemark, addRemarkReply, addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, bulkArchive, bulkDelete, addRemarkAttachment, deleteRemarkAttachment, addSubtaskRemarkAttachment, deleteSubtaskRemarkAttachment, markCompletionSeen, markViewed }}>{children}</TaskContext.Provider>;
 }
