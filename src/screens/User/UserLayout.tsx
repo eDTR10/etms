@@ -1,23 +1,21 @@
-import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
-  FileText,
-  Bell,
-  Menu,
-  X,
+  Plus,
+  ListChecks,
   LogOut,
   UserCircle,
 } from "lucide-react";
-import viteLogo from "/vite.svg";
 import { ModeToggle } from "../../components/mode-toggle";
 import { useAuth } from "../Auth/AuthContext";
+import NotificationBell from "../../features/notifications/NotificationBell";
+import etmsLogo from "../../assets/eTMS-icon.png";
 
 // ── Nav config ────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
-  { label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, to: "/tm/user/dashboard" },
-  { label: "Documents", icon: <FileText className="w-4 h-4" />,        to: "/tm/user/documents" },
-  { label: "Profile",   icon: <UserCircle className="w-4 h-4" />,      to: "/tm/user/profile" },
+  { label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, to: "/tm/dashboard" },
+  { label: "Add Task", icon: <Plus className="w-4 h-4" />, to: "/tm/tasks/new" },
+  { label: "All Tasks", icon: <ListChecks className="w-4 h-4" />, to: "/tm/tasks" },
 ];
 
 // ── Props ─────────────────────────────────────────────────────────────────
@@ -32,7 +30,6 @@ const UserLayout = ({ title, subtitle, children }: UserLayoutProps) => {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = async () => {
     await logout();
@@ -42,34 +39,14 @@ const UserLayout = ({ title, subtitle, children }: UserLayoutProps) => {
   return (
     <div className="min-h-screen w-full bg-background flex">
 
-      {/* Mobile overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-30 bg-black/50"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* ── Sidebar ────────────────────────────────────────────────────── */}
-      <aside
-        className={`
-          relative z-40 w-60 shrink-0 bg-card border-r border-border flex flex-col
-          md:fixed md:top-0 md:left-0 md:h-full md:transition-transform md:duration-300
-          ${sidebarOpen ? "md:translate-x-0" : "md:-translate-x-full"}
-        `}
-      >
+      {/* ── Sidebar (desktop only) ─────────────────────────────────────── */}
+      <aside className="w-60 h-screen sticky top-0 self-start shrink-0 overflow-hidden bg-card border-r border-border flex flex-col md:hidden">
         {/* Logo */}
         <div className="flex items-center gap-3 px-5 py-5 border-b border-border">
-          <img src={viteLogo} alt="Logo" className="w-7 h-7" />
-          <span className="text-foreground font-semibold text-sm tracking-wide uppercase">
-            My Account
+          <img src={etmsLogo} alt="eTMS logo" className="w-7 h-7 object-contain" />
+          <span className="text-foreground font-semibold text-sm tracking-wide">
+            eTMS
           </span>
-          <button
-            className="ml-auto hidden md:flex text-muted-foreground hover:text-foreground"
-            onClick={() => setSidebarOpen(false)}
-          >
-            <X className="w-4 h-4" />
-          </button>
         </div>
 
         {/* Nav links */}
@@ -80,12 +57,10 @@ const UserLayout = ({ title, subtitle, children }: UserLayoutProps) => {
               <Link
                 key={item.label}
                 to={item.to}
-                onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                }`}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive
+                  ? "bg-[#0d8a92] text-white dark:bg-[#17b3ac]"
+                  : "text-muted-foreground hover:bg-[#0d8a92] hover:text-white dark:hover:bg-[#17b3ac]"
+                  }`}
               >
                 {item.icon}
                 {item.label}
@@ -98,7 +73,6 @@ const UserLayout = ({ title, subtitle, children }: UserLayoutProps) => {
         <div className="px-3 pb-5 border-t border-border pt-4 flex flex-col gap-2">
           <Link
             to="/tm/user/profile"
-            onClick={() => setSidebarOpen(false)}
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-accent hover:opacity-80 transition-opacity"
           >
             <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold uppercase">
@@ -127,35 +101,51 @@ const UserLayout = ({ title, subtitle, children }: UserLayoutProps) => {
 
         {/* Top bar */}
         <header className="sticky top-0 z-20 bg-background border-b border-border px-6 py-4 flex items-center justify-between slg:px-4 sm:px-3">
-          <div className="flex items-center gap-3">
-            <button
-              className="hidden md:flex text-muted-foreground hover:text-foreground p-1"
-              onClick={() => setSidebarOpen(true)}
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-            <div>
-              <h1 className="text-lg font-bold text-foreground">{title}</h1>
-              {subtitle && (
-                <p className="text-xs text-muted-foreground sm:hidden">{subtitle}</p>
-              )}
-            </div>
+          <div>
+            <h1 className="text-lg font-bold text-foreground">{title}</h1>
+            {subtitle && (
+              <p className="text-xs text-muted-foreground sm:hidden">{subtitle}</p>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
             <ModeToggle />
-            <button className="relative p-2 rounded-full hover:bg-accent transition-colors text-muted-foreground hover:text-foreground">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary" />
-            </button>
+            <NotificationBell />
+            {/* Profile (mobile only — desktop reaches it via the sidebar). Logout lives on the Profile page on mobile. */}
+            <Link to="/tm/user/profile" className="hidden md:flex p-2 rounded-full hover:bg-accent transition-colors text-muted-foreground hover:text-foreground" aria-label="Profile">
+              <UserCircle className="w-5 h-5" />
+            </Link>
           </div>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 px-6 py-6 slg:px-4 sm:px-3 overflow-auto">
+        <main className="flex-1 px-6 py-6 slg:px-4 sm:px-3 md:pb-24 overflow-auto">
           {children}
         </main>
       </div>
+
+      {/* ── Bottom navigation (mobile only) ──────────────────────────────── */}
+      <nav className="hidden md:flex fixed bottom-0 left-0 right-0 z-30 items-stretch bg-card border-t border-border" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+        <Link
+          to="/tm/dashboard"
+          className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 text-[10px] font-semibold ${pathname === "/tm/dashboard" ? "text-[#0d8a92] dark:text-[#17b3ac]" : "text-muted-foreground"}`}
+        >
+          <LayoutDashboard className="w-5 h-5" />
+          Dashboard
+        </Link>
+        <Link to="/tm/tasks/new" className="flex-1 flex flex-col items-center justify-center" aria-label="Add task">
+          <span className="flex items-center justify-center w-11 h-11 -mt-5 rounded-full bg-[#0d8a92] text-white shadow-lg dark:bg-[#17b3ac]">
+            <Plus className="w-6 h-6" />
+          </span>
+        </Link>
+        <Link
+          to="/tm/tasks"
+          className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 text-[10px] font-semibold ${pathname === "/tm/tasks" ? "text-[#0d8a92] dark:text-[#17b3ac]" : "text-muted-foreground"}`}
+        >
+          <ListChecks className="w-5 h-5" />
+          All Tasks
+        </Link>
+      </nav>
 
     </div>
   );

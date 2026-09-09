@@ -183,7 +183,7 @@ const Register = () => {
 
         {/* Footer */}
         <p className="text-center text-xs text-muted-foreground mt-6">
-          &copy; {new Date().getFullYear()} YourApp. All rights reserved.
+          &copy; {new Date().getFullYear()} eTMS. All rights reserved.
         </p>
       </div>
     </div>

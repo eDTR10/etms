@@ -1,11 +1,11 @@
 import { useState, FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import viteLogo from "/vite.svg";
+import { useNavigate } from "react-router-dom";
 import { ModeToggle } from "../../components/mode-toggle";
 import { useAuth } from "./AuthContext";
 import { getHomePath } from "./roles";
 import Swal from "sweetalert2";
 import axios from "axios";
+import etmsLogo from "../../assets/eTMS-icon.png";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -67,18 +67,13 @@ const Login = () => {
 
             {/* Logo & Title */}
             <div className="flex flex-col items-center gap-3 mb-8">
-              <img src={viteLogo} alt="Logo" className="w-10 h-10" />
-              <h1 className="text-2xl font-bold text-foreground tracking-tight">
-                Sign in to your account
-              </h1>
+              <div className="flex items-center gap-2.5">
+                <img src={etmsLogo} alt="eTMS logo" className="w-10 h-10 object-contain" />
+                <h1 className="text-3xl font-bold text-foreground tracking-tight">eTMS</h1>
+              </div>
+              <p className="text-xs font-medium text-muted-foreground tracking-wide uppercase">Electronic Task Management System</p>
               <p className="text-sm text-muted-foreground">
-                Don&apos;t have an account?{" "}
-                <Link
-                  to="/tm/register"
-                  className="text-primary font-medium hover:underline"
-                >
-                  Register
-                </Link>
+                Sign in to your account
               </p>
             </div>
 
@@ -167,7 +162,7 @@ const Login = () => {
 
           {/* Footer */}
           <p className="text-center text-xs text-muted-foreground mt-6">
-            &copy; {new Date().getFullYear()} YourApp. All rights reserved.
+            &copy; {new Date().getFullYear()} eTMS. All rights reserved.
           </p>
         </div>
       </div>

@@ -24,8 +24,11 @@ const Page2 = lazy(() =>
 const Login = lazy(() => import("./screens/Auth/login.tsx"));
 const Register = lazy(() => import("./screens/Auth/Register.tsx"));
 
-// ── User pages ──────────────────────────────────────────────────────────
+// ── User pages (eTM) ────────────────────────────────────────────────────
 const UserDashboard  = lazy(() => import("./screens/User/Dashboard.tsx"));
+const UserAddTask    = lazy(() => import("./screens/User/AddTask.tsx"));
+const UserAllTasks   = lazy(() => import("./screens/User/AllTasks.tsx"));
+const UserTaskDetails = lazy(() => import("./screens/User/TaskDetailsPage.tsx"));
 const UserDocuments  = lazy(() => import("./screens/User/Documents.tsx"));
 const UserProfile    = lazy(() => import("./screens/User/Profile.tsx"));
 
@@ -66,8 +69,24 @@ const router = createBrowserRouter([
 
   // ── User pages — any authenticated user ────────────────
   {
-    path: "/tm/user/dashboard",
+    path: "/tm/dashboard",
     element: <ProtectedRoute><Suspense fallback={<Loader />}><UserDashboard /></Suspense></ProtectedRoute>,
+  },
+  {
+    path: "/tm/user/dashboard",
+    element: <Navigate to="/tm/dashboard" replace />,
+  },
+  {
+    path: "/tm/tasks/new",
+    element: <ProtectedRoute><Suspense fallback={<Loader />}><UserAddTask /></Suspense></ProtectedRoute>,
+  },
+  {
+    path: "/tm/tasks",
+    element: <ProtectedRoute><Suspense fallback={<Loader />}><UserAllTasks /></Suspense></ProtectedRoute>,
+  },
+  {
+    path: "/tm/tasks/:taskId",
+    element: <ProtectedRoute><Suspense fallback={<Loader />}><UserTaskDetails /></Suspense></ProtectedRoute>,
   },
   {
     path: "/tm/user/documents",
@@ -76,12 +95,6 @@ const router = createBrowserRouter([
   {
     path: "/tm/user/profile",
     element: <ProtectedRoute><Suspense fallback={<Loader />}><UserProfile /></Suspense></ProtectedRoute>,
-  },
-
-  // ── Legacy dashboard redirect ──────────────────────────
-  {
-    path: "/tm/dashboard",
-    element: <Navigate to="/tm/user/dashboard" replace />,
   },
 
   // ── Main app with navbar ──────────────────────────────

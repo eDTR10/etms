@@ -1,13 +1,20 @@
 import { useState } from "react";
-import { Camera, Save, Lock } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Camera, Save, Lock, LogOut } from "lucide-react";
 import UserLayout from "./UserLayout";
 import { ProfileSkeleton } from "../../components/ui/skeleton";
 import { useAuth } from "../Auth/AuthContext";
 
 const Profile = () => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, logout } = useAuth();
+  const navigate = useNavigate();
   const [saved, setSaved] = useState(false);
   const [tab, setTab]     = useState<"info" | "password">("info");
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/tm/login");
+  };
 
   // ProtectedRoute only renders this once isLoading is false, so `user` is
   // already populated on first render — safe to seed state from it directly
@@ -143,6 +150,17 @@ const Profile = () => {
               >
                 <Save className="w-4 h-4" />
                 {saved ? "Saved!" : "Save Changes"}
+              </button>
+            </div>
+
+            {/* ── Log out (mobile only — desktop has it in the sidebar) ── */}
+            <div className="hidden md:block bg-card border border-border rounded-xl p-4">
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-3 w-full text-left text-sm font-medium text-destructive hover:opacity-80 transition-opacity"
+              >
+                <LogOut className="w-4 h-4" />
+                Log Out
               </button>
             </div>
           </>
