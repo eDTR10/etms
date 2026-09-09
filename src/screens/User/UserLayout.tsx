@@ -13,9 +13,9 @@ import etmsLogo from "../../assets/eTMS-icon.png";
 
 // ── Nav config ────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
-  { label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, to: "/tm/dashboard" },
-  { label: "Add Task", icon: <Plus className="w-4 h-4" />, to: "/tm/tasks/new" },
-  { label: "All Tasks", icon: <ListChecks className="w-4 h-4" />, to: "/tm/tasks" },
+  { label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, to: "/etms/dashboard" },
+  { label: "Add Task", icon: <Plus className="w-4 h-4" />, to: "/etms/tasks/new" },
+  { label: "All Tasks", icon: <ListChecks className="w-4 h-4" />, to: "/etms/tasks" },
 ];
 
 // ── Props ─────────────────────────────────────────────────────────────────
@@ -33,7 +33,7 @@ const UserLayout = ({ title, subtitle, children }: UserLayoutProps) => {
 
   const handleLogout = async () => {
     await logout();
-    navigate("/tm/login");
+    navigate("/etms/login");
   };
 
   return (
@@ -72,7 +72,7 @@ const UserLayout = ({ title, subtitle, children }: UserLayoutProps) => {
         {/* User info + Logout */}
         <div className="px-3 pb-5 border-t border-border pt-4 flex flex-col gap-2">
           <Link
-            to="/tm/user/profile"
+            to="/etms/user/profile"
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-accent hover:opacity-80 transition-opacity"
           >
             <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold uppercase">
@@ -112,7 +112,7 @@ const UserLayout = ({ title, subtitle, children }: UserLayoutProps) => {
             <ModeToggle />
             <NotificationBell />
             {/* Profile (mobile only — desktop reaches it via the sidebar). Logout lives on the Profile page on mobile. */}
-            <Link to="/tm/user/profile" className="hidden md:flex p-2 rounded-full hover:bg-accent transition-colors text-muted-foreground hover:text-foreground" aria-label="Profile">
+            <Link to="/etms/user/profile" className="hidden md:flex p-2 rounded-full hover:bg-accent transition-colors text-muted-foreground hover:text-foreground" aria-label="Profile">
               <UserCircle className="w-5 h-5" />
             </Link>
           </div>
@@ -127,20 +127,20 @@ const UserLayout = ({ title, subtitle, children }: UserLayoutProps) => {
       {/* ── Bottom navigation (mobile only) ──────────────────────────────── */}
       <nav className="hidden md:flex fixed bottom-0 left-0 right-0 z-30 items-stretch bg-card border-t border-border" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
         <Link
-          to="/tm/dashboard"
-          className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 text-[10px] font-semibold ${pathname === "/tm/dashboard" ? "text-[#0d8a92] dark:text-[#17b3ac]" : "text-muted-foreground"}`}
+          to="/etms/dashboard"
+          className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 text-[10px] font-semibold ${pathname === "/etms/dashboard" ? "text-[#0d8a92] dark:text-[#17b3ac]" : "text-muted-foreground"}`}
         >
           <LayoutDashboard className="w-5 h-5" />
           Dashboard
         </Link>
-        <Link to="/tm/tasks/new" className="flex-1 flex flex-col items-center justify-center" aria-label="Add task">
+        <Link to="/etms/tasks/new" className="flex-1 flex flex-col items-center justify-center" aria-label="Add task">
           <span className="flex items-center justify-center w-11 h-11 -mt-5 rounded-full bg-[#0d8a92] text-white shadow-lg dark:bg-[#17b3ac]">
             <Plus className="w-6 h-6" />
           </span>
         </Link>
         <Link
-          to="/tm/tasks"
-          className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 text-[10px] font-semibold ${pathname === "/tm/tasks" ? "text-[#0d8a92] dark:text-[#17b3ac]" : "text-muted-foreground"}`}
+          to="/etms/tasks"
+          className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 text-[10px] font-semibold ${pathname === "/etms/tasks" ? "text-[#0d8a92] dark:text-[#17b3ac]" : "text-muted-foreground"}`}
         >
           <ListChecks className="w-5 h-5" />
           All Tasks

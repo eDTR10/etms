@@ -22,7 +22,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       secureStorage.removeItem("auth_token");
       secureStorage.removeItem("user");
-      window.location.href = "/tm/login";
+      window.location.href = "/etms/login";
     }
     return Promise.reject(error);
   }

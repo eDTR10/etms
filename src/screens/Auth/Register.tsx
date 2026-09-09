@@ -56,7 +56,7 @@ const Register = () => {
         background: "hsl(var(--background))",
         color: "hsl(var(--foreground))",
       });
-      navigate("/tm/login");
+      navigate("/etms/login");
     } catch (err: unknown) {
       const data = axios.isAxiosError(err) ? err.response?.data : undefined;
       if (data && typeof data === "object") {
@@ -99,7 +99,7 @@ const Register = () => {
             <p className="text-sm text-muted-foreground">
               Already have an account?{" "}
               <Link
-                to="/tm/login"
+                to="/etms/login"
                 className="text-primary font-medium hover:underline"
               >
                 Sign in

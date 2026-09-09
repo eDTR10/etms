@@ -22,7 +22,7 @@ export default function NotificationBell() {
   function openNotification(n: AppNotification) {
     if (!n.is_read) void markRead(n.id);
     setOpen(false);
-    if (n.task) navigate(`/tm/tasks/${n.task}`);
+    if (n.task) navigate(`/etms/tasks/${n.task}`);
   }
 
   useEffect(() => {

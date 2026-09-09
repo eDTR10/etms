@@ -15,7 +15,7 @@ function DashboardContent() {
   return (
     <div>
       <TaskFeedback />
-      {!loading && !error && <EtmOverview onViewMajorTasks={() => navigate("/tm/tasks")} />}
+      {!loading && !error && <EtmOverview onViewMajorTasks={() => navigate("/etms/tasks")} />}
     </div>
   );
 }

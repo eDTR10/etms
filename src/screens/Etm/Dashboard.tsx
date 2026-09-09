@@ -71,7 +71,7 @@ export default function Dashboard({ onViewMajorTasks }: DashboardOverviewProps) 
           <span className="etm-kpi-value">{totalUnassigned}</span>
         </div>
         <div className="etm-panel etm-kpi-card success">
-          <div className="etm-kpi-card-top"><span className="etm-kpi-label">Completed Tasks</span><span className="etm-kpi-icon"><CheckCircle2 size={17} />{unseenCompleted > 0 && <span className="etm-kpi-badge" title={`${unseenCompleted} completed task${unseenCompleted === 1 ? "" : "s"} you haven't viewed yet`}>{unseenCompleted > 9 ? "9+" : unseenCompleted}</span>}</span></div>
+          <div className="etm-kpi-card-top"><span className="etm-kpi-label">Completed Tasks</span><span className="etm-kpi-icon"><CheckCircle2 size={17} /></span></div>
           <span className="etm-kpi-value">{totalCompleted}</span>
         </div>
         <div className="etm-panel etm-kpi-card danger">
@@ -90,7 +90,7 @@ export default function Dashboard({ onViewMajorTasks }: DashboardOverviewProps) 
               <button type="button" className="etm-member-row" onClick={() => setExpandedMemberId(expanded ? null : member.id)} aria-expanded={expanded} aria-controls={`member-tasks-${member.id}`}>
                 <span className="etm-member-row-avatar" aria-hidden="true">{member.first_name?.charAt(0)}{member.last_name?.charAt(0)}</span><span className="etm-member-row-name">{memberName(member)}{member.position && <small>{member.position}</small>}</span><span className="etm-member-row-count">{count} {count === 1 ? "task" : "tasks"}</span><ChevronRight className="etm-member-workload-chevron" size={16} />
               </button>
-              {expanded && <div className="etm-member-workload-tasks" id={`member-tasks-${member.id}`}>{memberTasks.map(task => <button type="button" key={task.id} onClick={() => navigate(`/tm/tasks/${task.id}`)}><ClipboardList size={15} /><span>{task.title}<small>{task.status} · {task.project?.name ?? "Personal"}</small></span><ChevronRight size={15} /></button>)}</div>}
+              {expanded && <div className="etm-member-workload-tasks" id={`member-tasks-${member.id}`}>{memberTasks.map(task => <button type="button" key={task.id} onClick={() => navigate(`/etms/tasks/${task.id}`)}><ClipboardList size={15} /><span>{task.title}<small>{task.status} · {task.project?.name ?? "Personal"}</small></span><ChevronRight size={15} /></button>)}</div>}
             </div>;
           }) : <p className="etm-empty-row">No one has a task assigned yet.</p>}
         </div>
@@ -113,7 +113,7 @@ export default function Dashboard({ onViewMajorTasks }: DashboardOverviewProps) 
           hasActiveFilters={hasActiveFilters}
           onClear={clearFilters}
         />
-        <StatusChips value={status} onChange={setStatus} />
+        <StatusChips value={status} onChange={setStatus} badges={{ Completed: unseenCompleted }} />
         {recentTasks.length > 0 && <div className="etm-task-card-toolbar"><button type="button" className="etm-inline-link-button" onClick={selection.toggleAll}>{selection.isAllSelected ? "Clear selection" : "Select all"}</button></div>}
         <BulkActionBar
           count={selection.count}

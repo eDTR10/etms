@@ -13,7 +13,7 @@ const Profile = () => {
 
   const handleLogout = async () => {
     await logout();
-    navigate("/tm/login");
+    navigate("/etms/login");
   };
 
   // ProtectedRoute only renders this once isLoading is false, so `user` is

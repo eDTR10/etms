@@ -4,7 +4,7 @@ import { defineConfig } from "vite"
 
 export default defineConfig({
         // REPO-NAME
-  base: "/tm",
+  base: "/etms",
   plugins: [react()],
   server: {
     host: '0.0.0.0', // IP address, 0.0.0.0 makes it accessible on your local network

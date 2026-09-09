@@ -19,8 +19,7 @@
 .etm-kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; margin-bottom: 20px; }
 .etm-kpi-card { display: flex; flex-direction: column; gap: 10px; padding: 18px; }
 .etm-kpi-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.etm-kpi-icon { position: relative; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 9px; background: #eaf6f6; color: var(--etm-primary); }
-.etm-kpi-badge { position: absolute; top: -6px; right: -6px; display: flex; align-items: center; justify-content: center; min-width: 17px; height: 17px; padding: 0 4px; border: 2px solid var(--etm-surface); border-radius: 20px; background: #c85f5a; color: #fff; font-size: 11px; font-weight: 700; line-height: 1; }
+.etm-kpi-icon { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 9px; background: #eaf6f6; color: var(--etm-primary); }
 .etm-kpi-label { color: var(--etm-muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .3px; }
 .etm-kpi-value { color: var(--etm-ink); font-size: 26px; font-weight: 700; line-height: 1; }
 .etm-kpi-card.warn .etm-kpi-icon { background: #fff3e6; color: #c18a31; }
@@ -35,6 +34,8 @@
 .etm-status-chip { padding: 7px 14px; border: 1px solid var(--etm-border); border-radius: 20px; background: var(--etm-surface); color: var(--etm-muted); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background .15s, color .15s, border-color .15s; }
 .etm-status-chip:hover { border-color: var(--etm-primary); color: var(--etm-ink); }
 .etm-status-chip.active { background: var(--etm-primary); border-color: var(--etm-primary); color: #fff; }
+.etm-status-chip-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 16px; height: 16px; margin-left: 6px; padding: 0 4px; border-radius: 20px; background: #c85f5a; color: #fff; font-size: 10px; font-weight: 700; line-height: 1; vertical-align: middle; }
+.etm-status-chip.active .etm-status-chip-badge { background: #fff; color: #c85f5a; }
 
 .etm-section { margin-bottom: 22px; }
 .etm-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }

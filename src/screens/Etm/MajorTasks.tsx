@@ -181,7 +181,7 @@ export default function MajorTasks() {
                 <Fragment key={task.id}>
                   <tr className={expanded ? "expanded" : ""}>
                     <td className="etm-tasks-table-title-col">
-                      <TaskTitleCell task={task} onOpen={() => navigate(`/tm/tasks/${task.id}`)}>
+                      <TaskTitleCell task={task} onOpen={() => navigate(`/etms/tasks/${task.id}`)}>
                       <input
                         type="checkbox"
                         aria-label={`Select ${task.title}`}
@@ -211,7 +211,7 @@ export default function MajorTasks() {
                         ) : <small className="etm-progresslog-empty">No remarks yet.</small>}
                       </div>
                     </td>
-                    <td><TaskRowActions task={task} onView={() => navigate(`/tm/tasks/${task.id}`)} onEdit={() => setEditingId(task.id)} onDelete={() => void confirmDelete(task)} /></td>
+                    <td><TaskRowActions task={task} onView={() => navigate(`/etms/tasks/${task.id}`)} onEdit={() => setEditingId(task.id)} onDelete={() => void confirmDelete(task)} /></td>
                   </tr>
                   {expanded && (
                     <tr className="etm-tasks-table-subrow" id={`task-subtasks-${task.id}`}>

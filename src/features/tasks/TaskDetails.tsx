@@ -274,7 +274,7 @@ function RemarkChip({ remark, members, onEdit, onDelete, canUpload, onAddAttachm
       ) : <>{subtaskTagMatch && (
           subtaskTagId ? <button type="button" className="etm-remark-subtask-tag" onClick={() => onOpenSubtask?.(subtaskTagId)}><CheckCheck size={11} />Subtask: {subtaskTagTitle}</button>
           : <span className="etm-remark-subtask-tag"><CheckCheck size={11} />Subtask: {subtaskTagTitle}</span>
-        )}<span className="etm-remark-chip-message" dangerouslySetInnerHTML={{ __html: safeRichText(displayMessage) }} />{(taskMentions.length > 0 || subtaskMentions.length > 0) && <span className="etm-remark-task-links">{taskMentions.map(taskId => <button type="button" key={`task-${taskId}`} onClick={() => navigate(`/tm/tasks/${taskId}`)}>Open Task #{taskId}</button>)}{subtaskMentions.map(mention => <button type="button" key={`subtask-${mention.id}`} onClick={() => onOpenSubtask?.(mention.id)}>Open Subtask: {mention.title}</button>)}</span>}</>}
+        )}<span className="etm-remark-chip-message" dangerouslySetInnerHTML={{ __html: safeRichText(displayMessage) }} />{(taskMentions.length > 0 || subtaskMentions.length > 0) && <span className="etm-remark-task-links">{taskMentions.map(taskId => <button type="button" key={`task-${taskId}`} onClick={() => navigate(`/etms/tasks/${taskId}`)}>Open Task #{taskId}</button>)}{subtaskMentions.map(mention => <button type="button" key={`subtask-${mention.id}`} onClick={() => onOpenSubtask?.(mention.id)}>Open Subtask: {mention.title}</button>)}</span>}</>}
       {remark.reactions.length > 0 && !editing && (
         <span className="etm-reaction-pills">
           {remark.reactions.map(reaction => (

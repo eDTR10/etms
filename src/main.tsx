@@ -38,7 +38,7 @@ const Home = () => {
   if (isLoading) return <Loader />;
   return (
     <Navigate
-      to={isAuthenticated ? getHomePath(user) : "/tm/login"}
+      to={isAuthenticated ? getHomePath(user) : "/etms/login"}
       replace
     />
   );
@@ -47,7 +47,7 @@ const Home = () => {
 const router = createBrowserRouter([
   // ── Auth pages (no navbar) — redirect away if already logged in ────────
   {
-    path: "/tm/login",
+    path: "/etms/login",
     element: (
       <GuestRoute>
         <Suspense fallback={<Loader />}>
@@ -57,7 +57,7 @@ const router = createBrowserRouter([
     ),
   },
   {
-    path: "/tm/register",
+    path: "/etms/register",
     element: (
       <GuestRoute>
         <Suspense fallback={<Loader />}>
@@ -69,45 +69,45 @@ const router = createBrowserRouter([
 
   // ── User pages — any authenticated user ────────────────
   {
-    path: "/tm/dashboard",
+    path: "/etms/dashboard",
     element: <ProtectedRoute><Suspense fallback={<Loader />}><UserDashboard /></Suspense></ProtectedRoute>,
   },
   {
-    path: "/tm/user/dashboard",
-    element: <Navigate to="/tm/dashboard" replace />,
+    path: "/etms/user/dashboard",
+    element: <Navigate to="/etms/dashboard" replace />,
   },
   {
-    path: "/tm/tasks/new",
+    path: "/etms/tasks/new",
     element: <ProtectedRoute><Suspense fallback={<Loader />}><UserAddTask /></Suspense></ProtectedRoute>,
   },
   {
-    path: "/tm/tasks",
+    path: "/etms/tasks",
     element: <ProtectedRoute><Suspense fallback={<Loader />}><UserAllTasks /></Suspense></ProtectedRoute>,
   },
   {
-    path: "/tm/tasks/:taskId",
+    path: "/etms/tasks/:taskId",
     element: <ProtectedRoute><Suspense fallback={<Loader />}><UserTaskDetails /></Suspense></ProtectedRoute>,
   },
   {
-    path: "/tm/user/documents",
+    path: "/etms/user/documents",
     element: <ProtectedRoute><Suspense fallback={<Loader />}><UserDocuments /></Suspense></ProtectedRoute>,
   },
   {
-    path: "/tm/user/profile",
+    path: "/etms/user/profile",
     element: <ProtectedRoute><Suspense fallback={<Loader />}><UserProfile /></Suspense></ProtectedRoute>,
   },
 
   // ── Main app with navbar ──────────────────────────────
   {
-    path: "/tm/",
+    path: "/etms/",
     element: <App />,
     children: [
       {
-        path: "/tm/",
+        path: "/etms/",
         element: <Home />,
       },
       {
-        path: "/tm/page1",
+        path: "/etms/page1",
         element: (
           <Suspense fallback={<Loader />}>
             <Page1 />
@@ -115,7 +115,7 @@ const router = createBrowserRouter([
         ),
       },
       {
-        path: "/tm/page2",
+        path: "/etms/page2",
         element: (
           <Suspense fallback={<Loader />}>
             <Page2 />

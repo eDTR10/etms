@@ -14,7 +14,7 @@ function AddTaskContent() {
   return (
     <div>
       <TaskFeedback />
-      {!loading && !error && <EtmAddTask onCreated={() => navigate("/tm/tasks")} onCancel={() => navigate("/tm/dashboard")} />}
+      {!loading && !error && <EtmAddTask onCreated={() => navigate("/etms/tasks")} onCancel={() => navigate("/etms/dashboard")} />}
     </div>
   );
 }

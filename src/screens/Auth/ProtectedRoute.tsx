@@ -10,7 +10,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) return <Loader />;
-  if (!isAuthenticated) return <Navigate to="/tm/login" replace />;
+  if (!isAuthenticated) return <Navigate to="/etms/login" replace />;
 
   return <>{children}</>;
 };

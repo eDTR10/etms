@@ -15,7 +15,7 @@ const NotFound = () => {
             <p className='mt-3 text-lg font-medium text-accent-foreground'>Oops! The page you are looking for does not exist.</p>
       <p className='font-light text-accent-foreground'>It might have been moved or deleted, or perhaps you mistyped the URL.</p>
             <Button asChild className=" my-3 animate-pulse ">
-            <Link to="/tm" className=" flex gap-2 items-center"><Home className="h-[1.2rem] w-[1.2rem]" /> Go Home   </Link>
+            <Link to="/etms" className=" flex gap-2 items-center"><Home className="h-[1.2rem] w-[1.2rem]" /> Go Home   </Link>
             
             </Button>
         </div>
