@@ -43,7 +43,10 @@ export const secureStorage = {
     try {
       return JSON.parse(decrypted) as T;
     } catch {
-      return null;
+      // Not JSON — e.g. a raw auth token another DICT app encrypted directly
+      // without JSON.stringify-ing it first. It still decrypted correctly with
+      // the shared secret, so return it as-is instead of discarding a good value.
+      return decrypted as unknown as T;
     }
   },
 
@@ -52,6 +55,5 @@ export const secureStorage = {
   },
 
   clear(): void {
-    localStorage.clear();
   },
 };

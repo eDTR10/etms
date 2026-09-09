@@ -12,6 +12,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  // Seed from the shared, cross-app cached profile (if another DICT system already
+  // logged this user in) for an instant initial render; getMe() below still refreshes it.
   const [user, setUser] = useState<UserProfile | null>(
     () => authService.getCachedUser()
   );

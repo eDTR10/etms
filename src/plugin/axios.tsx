@@ -21,7 +21,7 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       secureStorage.removeItem("auth_token");
-      secureStorage.removeItem("user");
+      secureStorage.removeItem("auth_user_profile");
       window.location.href = "/etms/login";
     }
     return Promise.reject(error);

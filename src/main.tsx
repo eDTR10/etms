@@ -136,6 +136,15 @@ function wait(time: number) {
   });
 }
 
+// A lazy-loaded route chunk 404s when the page was left open across a deploy — the
+// hashed filename it was built with no longer exists once a newer build replaces it.
+// Reload once to pick up the current build instead of leaving the user on a white screen.
+window.addEventListener('vite:preloadError', () => {
+  if (sessionStorage.getItem('vite-reload-once')) return;
+  sessionStorage.setItem('vite-reload-once', '1');
+  window.location.reload();
+});
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
@@ -145,3 +154,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </ThemeProvider>
   </React.StrictMode>,
 )
+
+// Reaching here means the current build's chunks loaded fine — allow another
+// auto-reload later in this tab if a future deploy triggers preloadError again.
+sessionStorage.removeItem('vite-reload-once');
+sessionStorage.removeItem('etms-cache-bust-reload');

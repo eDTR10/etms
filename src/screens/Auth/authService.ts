@@ -52,7 +52,9 @@ export const authService = {
 
   getMe: async (): Promise<UserProfile> => {
     const { data } = await api.get<UserProfile>("users/me/");
-    secureStorage.setItem("user", data);
+    // Shared key with the other DICT front-ends (DMT, KMS) — same secureStorage/AES
+    // scheme, same VITE_PASSWORD secret — so a cached profile is recognized across systems.
+    secureStorage.setItem("auth_user_profile", data);
     return data;
   },
 
@@ -61,7 +63,7 @@ export const authService = {
     // is cleared either way.
     await api.post("token/logout/").catch(() => {});
     secureStorage.removeItem("auth_token");
-    secureStorage.removeItem("user");
+    secureStorage.removeItem("auth_user_profile");
   },
 
   isAuthenticated: (): boolean => {
@@ -69,7 +71,7 @@ export const authService = {
   },
 
   getCachedUser: (): UserProfile | null => {
-    return secureStorage.getItem<UserProfile>("user");
+    return secureStorage.getItem<UserProfile>("auth_user_profile");
   },
 };
 
