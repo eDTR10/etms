@@ -24,7 +24,30 @@
         }
       })(window.location);
     </script>
-    <script type="module" crossorigin src="/etms/assets/index-BZmRCghl.js"></script>
+    <script type="text/javascript">
+      // If this page was left open (or bookmarked/reloaded) across a deploy, the browser's
+      // cached index.html can still point at an entry script hash that a newer deploy has
+      // since removed — a plain reload just re-serves the same stale cached HTML forever.
+      // Catch the failed <script type="module"> load (capture phase — resource errors don't
+      // bubble) and force one cache-busted reload to fetch the current build.
+      (function () {
+        var GUARD_KEY = "etms-cache-bust-reload";
+        window.addEventListener(
+          "error",
+          function (event) {
+            var target = event.target;
+            if (!target || target.tagName !== "SCRIPT" || target.type !== "module") return;
+            if (sessionStorage.getItem(GUARD_KEY)) return;
+            sessionStorage.setItem(GUARD_KEY, "1");
+            var url = new URL(window.location.href);
+            url.searchParams.set("_r", Date.now().toString());
+            window.location.replace(url.toString());
+          },
+          true
+        );
+      })();
+    </script>
+    <script type="module" crossorigin src="/etms/assets/index-D6l5tah4.js"></script>
     <link rel="stylesheet" crossorigin href="/etms/assets/index-P3sF6n1n.css">
   </head>
   <body>
