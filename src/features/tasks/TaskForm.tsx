@@ -1,10 +1,28 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { isAxiosError } from "axios";
-import { AlertTriangle, CalendarDays, Check, CheckCheck, ChevronDown, ClipboardList, Clock3, Flag, Folder, Loader2, Plus, Search, Trash2, User, UserPlus, Users, X } from "lucide-react";
+import { AlertTriangle, CalendarDays, Check, CheckCheck, ChevronDown, ClipboardList, Clock3, Flag, Folder, Loader2, MapPin, Plus, Repeat, Search, Trash2, User, UserPlus, Users, X } from "lucide-react";
 import { useTasks } from "./taskContext";
 import { taskError } from "./taskService";
-import { ASSIGNMENT_ROLES, formatDate, memberName, PRIORITIES, STATUSES, type AssignmentInput, type AssignmentRole, type Member, type Project, type SubTask, type Task, type TaskInput, type TaskStatus } from "./types";
+import { ASSIGNMENT_ROLES, formatDate, memberName, PRIORITIES, RECURRENCE_LABELS, RECURRENCES, STATUSES, type AssignmentInput, type AssignmentRole, type Member, type Priority, type Project, type Recurrence, type SubTask, type Task, type TaskInput, type TaskStatus } from "./types";
+import { describeRecurrence, WEEKDAYS } from "./recurrence";
+import { REGION_X_BARANGAYS, REGION_X_CITIES, REGION_X_PROVINCES } from "./regionXLocations";
 import "./forms.css";
+
+// Eisenhower-matrix framing shown as a note under each priority option.
+const PRIORITY_NOTES: Record<Priority, string> = {
+  Low: "Delegate (Urgent & Not Important)",
+  Medium: "Schedule (Important & Not Urgent)",
+  High: "Do First (Urgent & Important)",
+};
+
+const RECURRENCE_HELPER: Record<Recurrence, string> = {
+  None: "This task only shows on the Calendar on its deadline.",
+  Daily: "This task will appear on the Calendar every day, starting from the deadline above.",
+  Weekly: "This task will appear on the Calendar every week on the selected day(s).",
+  Monthly: "This task will appear on the Calendar every month, on the same day of month as the deadline above.",
+  Specific: "This task will appear on the Calendar only on the dates you add.",
+  Anytime: "This task has no fixed schedule, so it won't repeat automatically on the Calendar.",
+};
 
 interface TaskFormProps {
   task?: Task;
@@ -30,8 +48,14 @@ function initialValues(task?: Task): FormValues {
     project: task?.project?.name ?? "",
     details: task?.details ?? "",
     requestor: task?.requestor ?? "",
+    location_province: task?.location_province ?? "",
+    location_city: task?.location_city ?? "",
+    location_barangay: task?.location_barangay ?? "",
     priority: task?.priority ?? "Medium",
     deadline: task?.deadline?.slice(0, 10) ?? "",
+    recurrence: task?.recurrence ?? "None",
+    recurrence_weekdays: task?.recurrence_weekdays ?? "",
+    recurrence_dates: task?.recurrence_dates ?? [],
     status: task?.is_completed ? "Completed" : task?.status ?? "Pending",
     is_completed: task?.is_completed ?? task?.status === "Completed",
     assignments: (task?.assignments ?? []).map(person => ({ user: person.id, role: person.role })),
@@ -58,6 +82,7 @@ function saveError(error: unknown): string {
 function TaskLivePreview({ values, members }: { values: FormValues; members: Member[] }) {
   const assignedMembers = values.assignments.map(assignment => members.find(member => member.id === assignment.user)).filter((member): member is Member => !!member);
   const completeSubtasks = values.subtasks.filter(subtask => subtask.is_completed).length;
+  const location = [values.location_barangay, values.location_city, values.location_province].filter(Boolean).join(", ");
 
   return <section className="etm-panel etm-task-preview" aria-live="polite" aria-label="Task preview">
     <div className="etm-task-preview-heading"><span className="etm-form-section-icon"><ClipboardList size={19} /></span><div><span>LIVE PREVIEW</span><h2>{values.title.trim() || "New task"}</h2></div></div>
@@ -67,6 +92,8 @@ function TaskLivePreview({ values, members }: { values: FormValues; members: Mem
       <div><dt><CalendarDays size={14} />Deadline</dt><dd>{formatDate(values.deadline)}</dd></div>
       <div><dt><Flag size={14} />Priority</dt><dd className={values.priority.toLowerCase()}>{values.priority}</dd></div>
       <div><dt><User size={14} />Requestor</dt><dd>{values.requestor.trim() || "Not specified"}</dd></div>
+      {location && <div><dt><MapPin size={14} />Location</dt><dd>{location}</dd></div>}
+      {values.recurrence !== "None" && <div><dt><Repeat size={14} />Repeats</dt><dd>{describeRecurrence(values)}</dd></div>}
     </dl>
     <div className="etm-task-preview-group"><div><Users size={14} /><strong>Assigned persons</strong><span>{assignedMembers.length}</span></div>{assignedMembers.length ? <ul>{assignedMembers.slice(0, 3).map(member => <li key={member.id}><span>{member.first_name.charAt(0)}{member.last_name.charAt(0)}</span>{memberName(member)}</li>)}{assignedMembers.length > 3 && <li className="more">+{assignedMembers.length - 3} more</li>}</ul> : <p>No one assigned yet.</p>}</div>
     <div className="etm-task-preview-group"><div><CheckCheck size={14} /><strong>Subtasks</strong><span>{completeSubtasks}/{values.subtasks.length}</span></div>{values.subtasks.length ? <ul>{values.subtasks.slice(0, 3).map((subtask, index) => <li key={subtask.localKey} className={subtask.is_completed ? "completed" : ""}><Check size={12} />{subtask.title.trim() || `Subtask ${index + 1}`}</li>)}{values.subtasks.length > 3 && <li className="more">+{values.subtasks.length - 3} more</li>}</ul> : <p>No subtasks added yet.</p>}</div>
@@ -185,6 +212,8 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
       const deadline = new Date(`${values.deadline}T00:00:00Z`);
       if (Number.isNaN(deadline.getTime()) || deadline.toISOString().slice(0, 10) !== values.deadline) nextErrors.deadline = "Enter a valid deadline.";
     }
+    if (values.recurrence === "Weekly" && !values.recurrence_weekdays) nextErrors.recurrence_weekdays = "Select at least one weekday.";
+    if (values.recurrence === "Specific" && values.recurrence_dates.length === 0) nextErrors.recurrence_dates = "Add at least one date.";
     values.subtasks.forEach(subtask => {
       if (!subtask.title.trim()) nextErrors[subtask.localKey] = "Add a subtask title, or remove this row.";
     });
@@ -206,6 +235,9 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
         project: isPersonal ? null : project.trim(),
         details: values.details.trim(),
         requestor: values.requestor.trim(),
+        location_province: values.location_province.trim(),
+        location_city: values.location_city.trim(),
+        location_barangay: values.location_barangay.trim(),
         progress_message: values.progress_message?.trim() || undefined,
         subtasks: values.subtasks.map(({ id, title, description, status, is_completed }) => ({ ...(id !== undefined ? { id } : {}), title: title.trim(), description: description.trim(), status, is_completed })),
       });
@@ -230,17 +262,17 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
               <div className="etm-form-section-body">
                 <div className="etm-field">
                   <label htmlFor={`${fieldId}-title`}>Task title <span aria-hidden="true">*</span></label>
-                  <input id={`${fieldId}-title`} value={values.title} onChange={event => update("title", event.target.value)} placeholder="What needs to get done?" maxLength={255} required aria-invalid={!!errors.title} aria-describedby={errors.title ? `${fieldId}-title-error` : undefined} />
+                  <input data-howto="task-title" id={`${fieldId}-title`} value={values.title} onChange={event => update("title", event.target.value)} placeholder="What needs to get done?" maxLength={255} required aria-invalid={!!errors.title} aria-describedby={errors.title ? `${fieldId}-title-error` : undefined} />
                   {errors.title && <p className="etm-field-error" id={`${fieldId}-title-error`}>{errors.title}</p>}
                 </div>
                 <fieldset className="etm-tasktype-field">
                   <legend>Task type</legend>
                   <div className="etm-tasktype-options">
-                    <label className={`etm-tasktype-option ${!values.isPersonal ? "selected" : ""}`}>
+                    <label data-howto="task-type-project" className={`etm-tasktype-option ${!values.isPersonal ? "selected" : ""}`}>
                       <input type="radio" name={`${fieldId}-tasktype`} checked={!values.isPersonal} onChange={() => update("isPersonal", false)} />
                       <Folder size={15} /><span>Project task</span>
                     </label>
-                    <label className={`etm-tasktype-option ${values.isPersonal ? "selected" : ""}`}>
+                    <label data-howto="task-type-personal" className={`etm-tasktype-option ${values.isPersonal ? "selected" : ""}`}>
                       <input type="radio" name={`${fieldId}-tasktype`} checked={values.isPersonal} onChange={() => setValues(current => ({ ...current, isPersonal: true, assignments: [] }))} />
                       <User size={15} /><span>Personal</span>
                     </label>
@@ -275,9 +307,10 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
                 </div>
                 <fieldset className="etm-priority-field">
                   <legend>Priority</legend>
-                  <div className="etm-priority-options">{PRIORITIES.map(priority => <label key={priority} className={`etm-priority-option ${priority.toLowerCase()} ${values.priority === priority ? "selected" : ""}`}>
+                  <div className="etm-priority-options">{PRIORITIES.map(priority => <label key={priority} data-howto={`priority-${priority.toLowerCase()}`} className={`etm-priority-option ${priority.toLowerCase()} ${values.priority === priority ? "selected" : ""}`}>
                     <input type="radio" name={`${fieldId}-priority`} value={priority} checked={values.priority === priority} onChange={() => update("priority", priority)} />
-                    <Flag size={15} /><span>{priority}</span>{values.priority === priority && <Check size={14} className="etm-priority-check" />}
+                    <span className="etm-priority-option-top"><Flag size={15} /><span>{priority}</span>{values.priority === priority && <Check size={14} className="etm-priority-check" />}</span>
+                    <small className="etm-priority-note">{PRIORITY_NOTES[priority]}</small>
                   </label>)}</div>
                 </fieldset>
               </div>
@@ -288,8 +321,28 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
               <div className="etm-form-section-body">
                 <div className="etm-field">
                   <label htmlFor={`${fieldId}-requestor`}>Requestor <span className="etm-form-optional">(optional)</span></label>
-                  <input id={`${fieldId}-requestor`} value={values.requestor} onChange={event => update("requestor", event.target.value)} placeholder="Who requested this task?" maxLength={255} />
+                  <input data-howto="requestor" id={`${fieldId}-requestor`} value={values.requestor} onChange={event => update("requestor", event.target.value)} placeholder="Who requested this task?" maxLength={255} />
                 </div>
+                <fieldset className="etm-location-field">
+                  <legend><MapPin size={15} /> Location <span className="etm-form-optional">(optional)</span></legend>
+                  <p className="etm-form-helper">Choose Region X suggestions, or type a city or barangay that is not listed.</p>
+                  <div className="etm-location-grid">
+                    <label htmlFor={`${fieldId}-province`}>Province
+                      <select id={`${fieldId}-province`} value={values.location_province} onChange={event => setValues(current => ({ ...current, location_province: event.target.value, location_city: "", location_barangay: "" }))}>
+                        <option value="">Select a Region X province</option>
+                        {REGION_X_PROVINCES.map(province => <option key={province} value={province}>{province}</option>)}
+                      </select>
+                    </label>
+                    <label htmlFor={`${fieldId}-city`}>City / Municipality
+                      <input id={`${fieldId}-city`} list={`${fieldId}-city-options`} value={values.location_city} onChange={event => update("location_city", event.target.value)} placeholder={values.location_province ? "Search or type a city" : "Select a province first"} disabled={!values.location_province} maxLength={100} />
+                      <datalist id={`${fieldId}-city-options`}>{(REGION_X_CITIES[values.location_province] ?? []).map(city => <option key={city} value={city} />)}</datalist>
+                    </label>
+                    <label htmlFor={`${fieldId}-barangay`}>Barangay
+                      <input id={`${fieldId}-barangay`} list={`${fieldId}-barangay-options`} value={values.location_barangay} onChange={event => update("location_barangay", event.target.value)} placeholder="Search or type a barangay" maxLength={100} />
+                      <datalist id={`${fieldId}-barangay-options`}>{(REGION_X_BARANGAYS[values.location_city] ?? []).map(barangay => <option key={barangay} value={barangay} />)}</datalist>
+                    </label>
+                  </div>
+                </fieldset>
                 {values.isPersonal ? (
                   <div className="etm-field">
                     <label>Assigned persons</label>
@@ -367,19 +420,73 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
               <div className="etm-form-section-body">
                 <div className="etm-field">
                   <label htmlFor={`${fieldId}-deadline`}>Deadline <span aria-hidden="true">*</span></label>
-                  <input type="date" id={`${fieldId}-deadline`} value={values.deadline ?? ""} onChange={event => update("deadline", event.target.value)} required aria-invalid={!!errors.deadline} aria-describedby={errors.deadline ? `${fieldId}-deadline-error` : undefined} />
+                  <input data-howto="deadline" type="date" id={`${fieldId}-deadline`} value={values.deadline ?? ""} onChange={event => update("deadline", event.target.value)} required aria-invalid={!!errors.deadline} aria-describedby={errors.deadline ? `${fieldId}-deadline-error` : undefined} />
                   {errors.deadline && <p className="etm-field-error" id={`${fieldId}-deadline-error`}>{errors.deadline}</p>}
+                </div>
+                <div className="etm-field">
+                  <label htmlFor={`${fieldId}-recurrence`}>Repeat</label>
+                  <select data-howto="repeat" id={`${fieldId}-recurrence`} value={values.recurrence} onChange={event => update("recurrence", event.target.value as Recurrence)}>
+                    {RECURRENCES.map(item => <option key={item} value={item}>{RECURRENCE_LABELS[item]}</option>)}
+                  </select>
+                  {values.recurrence === "Weekly" && (
+                    <div className="etm-weekday-picker" role="group" aria-label="Repeat on these weekdays">
+                      {WEEKDAYS.map(day => {
+                        const codes = values.recurrence_weekdays.split(",").filter(Boolean);
+                        const selected = codes.includes(day.code);
+                        return (
+                          <button
+                            type="button"
+                            key={day.code}
+                            className={`etm-weekday-chip ${selected ? "selected" : ""}`}
+                            aria-pressed={selected}
+                            onClick={() => {
+                              const next = selected ? codes.filter(code => code !== day.code) : [...codes, day.code];
+                              update("recurrence_weekdays", WEEKDAYS.filter(item => next.includes(item.code)).map(item => item.code).join(","));
+                            }}
+                          >
+                            {day.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {values.recurrence === "Weekly" && errors.recurrence_weekdays && <p className="etm-field-error">{errors.recurrence_weekdays}</p>}
+                  {values.recurrence === "Specific" && (
+                    <div className="etm-specific-dates-picker">
+                      <input
+                        type="date"
+                        aria-label="Add a specific date"
+                        value=""
+                        onChange={event => {
+                          const value = event.target.value;
+                          if (value && !values.recurrence_dates.includes(value)) update("recurrence_dates", [...values.recurrence_dates, value].sort());
+                        }}
+                      />
+                      {values.recurrence_dates.length > 0 && (
+                        <div className="etm-specific-dates-list">
+                          {values.recurrence_dates.map(dateStr => (
+                            <span className="etm-specific-date-chip" key={dateStr}>
+                              {formatDate(dateStr)}
+                              <button type="button" aria-label={`Remove ${formatDate(dateStr)}`} onClick={() => update("recurrence_dates", values.recurrence_dates.filter(item => item !== dateStr))}><X size={12} /></button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {errors.recurrence_dates && <p className="etm-field-error">{errors.recurrence_dates}</p>}
+                    </div>
+                  )}
+                  <p className="etm-form-helper">{RECURRENCE_HELPER[values.recurrence]}</p>
                 </div>
                 {task ? (
                   <>
                     <div className="etm-field">
                       <label htmlFor={`${fieldId}-status`}>Status</label>
-                      <select id={`${fieldId}-status`} value={values.status} onChange={event => updateStatus(event.target.value as TaskStatus)} aria-invalid={!!errors.status} aria-describedby={errors.status ? `${fieldId}-status-error` : undefined}>{STATUSES.map(status => <option key={status} value={status}>{status}</option>)}</select>
+                      <select data-howto="status" id={`${fieldId}-status`} value={values.status} onChange={event => updateStatus(event.target.value as TaskStatus)} aria-invalid={!!errors.status} aria-describedby={errors.status ? `${fieldId}-status-error` : undefined}>{STATUSES.map(status => <option key={status} value={status}>{status}</option>)}</select>
                       {errors.status && <p className="etm-field-error" id={`${fieldId}-status-error`}>{errors.status}</p>}
                     </div>
                     {values.status === "Completed" && incompleteSubtasks > 0 && <div className="etm-subtask-completion-warning" role="alert"><AlertTriangle size={17} /><span><strong>{incompleteSubtasks} subtask{incompleteSubtasks === 1 ? "" : "s"} still incomplete.</strong> Complete every subtask before completing this task.</span></div>}
                     <label className={`etm-completion-control ${values.is_completed ? "checked" : ""}`}>
-                      <input type="checkbox" checked={values.is_completed} onChange={event => updateStatus(event.target.checked ? "Completed" : "Ongoing")} />
+                      <input type="checkbox" checked={values.is_completed} onChange={event => updateStatus(event.target.checked ? "Completed" : "In-Progress")} />
                       <span><strong>Mark task as completed</strong><small>Completed tasks appear crossed out in your task list.</small></span>
                     </label>
                   </>
@@ -405,7 +512,7 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
         </div>
       </fieldset>
       {error && <div className="etm-form-error-banner" role="alert">{error}</div>}
-      <div className="etm-form-footer"><span>Your team’s next step starts here.</span><div><button className="etm-button ghost" type="button" disabled={saving} onClick={onCancel}>Cancel</button><button className="etm-button primary" type="submit" disabled={saving}>{saving ? <Loader2 size={17} className="etm-form-spinner" /> : <Check size={17} />}{saving ? "Saving task…" : task ? "Save changes" : "Create task"}</button></div></div>
+      <div className="etm-form-footer"><span>Your team’s next step starts here.</span><div><button className="etm-button ghost" type="button" disabled={saving} onClick={onCancel}>Cancel</button><button data-howto="submit-button" className="etm-button primary" type="submit" disabled={saving}>{saving ? <Loader2 size={17} className="etm-form-spinner" /> : <Check size={17} />}{saving ? "Saving task…" : task ? "Save changes" : "Create task"}</button></div></div>
     </form>
   );
 }

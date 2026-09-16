@@ -14,6 +14,8 @@ export interface TaskContextValue {
   createTask: (input: TaskInput) => Promise<Task>;
   updateTask: (id: number, input: Partial<TaskInput>) => Promise<Task>;
   deleteTask: (id: number) => Promise<void>;
+  duplicateTask: (id: number) => Promise<Task>;
+  toggleOccurrence: (id: number, date: string) => Promise<void>;
   addProgress: (id: number, message: string, status: TaskStatus) => Promise<void>;
   editProgress: (id: number, logId: number, message: string) => Promise<void>;
   deleteProgress: (id: number, logId: number) => Promise<void>;

@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Archive, ChevronRight, Circle, Check, Clock3, PlayCircle, PauseCircle, CheckCircle2 } from "lucide-react";
+import { Archive, ChevronRight, Circle, Check, Clock, PlayCircle, PauseCircle, CheckCircle2 } from "lucide-react";
 import { useTasks } from "../../features/tasks/taskContext";
 import { useTaskFilters } from "../../features/tasks/useTaskFilters";
 import TaskFilterBar from "../../features/tasks/TaskFilterBar";
@@ -11,9 +11,10 @@ import TaskRowActions from "../../features/tasks/TaskRowActions";
 import TaskTitleCell from "../../features/tasks/TaskTitleCell";
 import BulkActionBar from "../../features/tasks/BulkActionBar";
 import { useDeleteTaskConfirm } from "../../features/tasks/useDeleteTaskConfirm";
+import { useDuplicateTask } from "../../features/tasks/useDuplicateTask";
 import { useBulkTaskActions } from "../../features/tasks/useBulkTaskActions";
 import { useRowSelection } from "../../features/tasks/useRowSelection";
-import { formatDate, remarkPreview, statusChipLabel, type Task, type TaskStatus } from "../../features/tasks/types";
+import { formatDate, memberName, RECURRENCE_LABELS, remarkPreview, statusChipLabel, statusSlug, type Task, type TaskStatus } from "../../features/tasks/types";
 
 type TaskScope = "assigned" | "personal";
 
@@ -22,11 +23,11 @@ const SCOPE_TABS: { key: TaskScope; label: string }[] = [
   { key: "personal", label: "Personal Task" },
 ];
 
-const STATUS_KPIS: { status: TaskStatus; icon: typeof Clock3; variant: string }[] = [
-  { status: "Pending", icon: Clock3, variant: "warn" },
-  { status: "Ongoing", icon: PlayCircle, variant: "" },
-  { status: "On hold", icon: PauseCircle, variant: "danger" },
+const STATUS_KPIS: { status: TaskStatus; icon: typeof PlayCircle; variant: string }[] = [
+  { status: "Pending", icon: Clock, variant: "warn" },
+  { status: "In-Progress", icon: PlayCircle, variant: "" },
   { status: "Completed", icon: CheckCircle2, variant: "success" },
+  { status: "Blocked/Stuck", icon: PauseCircle, variant: "danger" },
 ];
 
 export default function MajorTasks() {
@@ -39,6 +40,7 @@ export default function MajorTasks() {
     addRemarkAttachment, deleteRemarkAttachment, addSubtaskRemarkAttachment, deleteSubtaskRemarkAttachment, markCompletionSeen, markViewed,
   } = useTasks();
   const confirmDelete = useDeleteTaskConfirm();
+  const { confirmDuplicate, isDuplicating } = useDuplicateTask();
   const { confirmArchive, confirmDelete: confirmBulkDelete } = useBulkTaskActions();
   const [scope, setScope] = useState<TaskScope>("assigned");
   const [showArchived, setShowArchived] = useState(false);
@@ -63,7 +65,7 @@ export default function MajorTasks() {
   }), [baseTasks]);
 
   const statusCounts = useMemo(() => {
-    const counts = { Pending: 0, Ongoing: 0, "On hold": 0, Completed: 0 } as Record<TaskStatus, number>;
+    const counts = { Pending: 0, "In-Progress": 0, Completed: 0, "Blocked/Stuck": 0 } as Record<TaskStatus, number>;
     scopedTasks.forEach(task => { counts[task.status] += 1; });
     return counts;
   }, [scopedTasks]);
@@ -167,7 +169,13 @@ export default function MajorTasks() {
                 Task Title
                 </div>
               </th>
+              <th scope="col">Project</th>
+              <th scope="col">Priority</th>
+              <th scope="col">Repeat</th>
+              <th scope="col">Requestor</th>
+              <th scope="col">Details</th>
               <th scope="col">Date</th>
+              <th scope="col">Assigned To</th>
               <th scope="col">Progress Log</th>
               <th scope="col" className="etm-tasks-table-actions-col">Action Buttons</th>
             </tr>
@@ -179,7 +187,7 @@ export default function MajorTasks() {
               const lastRemark = task.remarks[0];
               return (
                 <Fragment key={task.id}>
-                  <tr className={expanded ? "expanded" : ""}>
+                  <tr className={`etm-tasks-table-row-clickable ${expanded ? "expanded" : ""}`} onClick={() => navigate(`/etms/tasks/${task.id}`)}>
                     <td className="etm-tasks-table-title-col">
                       <TaskTitleCell task={task} onOpen={() => navigate(`/etms/tasks/${task.id}`)}>
                       <input
@@ -202,26 +210,43 @@ export default function MajorTasks() {
                       )}
                       </TaskTitleCell>
                     </td>
+                    <td>{task.project ? task.project.name : <span className="etm-tasks-table-unassigned">Personal</span>}</td>
+                    <td><span className={`etm-priority-pill ${task.priority.toLowerCase()}`}>{task.priority}</span></td>
+                    <td>{task.recurrence !== "None" ? RECURRENCE_LABELS[task.recurrence] : <span className="etm-tasks-table-unassigned">—</span>}</td>
+                    <td>{task.requestor || <span className="etm-tasks-table-unassigned">Not specified</span>}</td>
+                    <td className="etm-tasks-table-details-col">{task.details ? <span title={task.details}>{task.details}</span> : <span className="etm-tasks-table-unassigned">No details</span>}</td>
                     <td><div className="etm-task-cell-stack"><span>{formatDate(task.created_at)}</span>{task.deadline && <small>Due {formatDate(task.deadline)}</small>}</div></td>
                     <td>
+                      {task.assignments.length ? (
+                        <div className="etm-tasks-table-assignees" aria-label="Assignees">
+                          {task.assignments.map(person => (
+                            <span className="etm-tasks-table-assignee" key={person.id} title={`${memberName(person)} · ${person.role}`}>
+                              <span className="etm-tasks-table-assignee-avatar" aria-hidden="true">{person.first_name?.charAt(0)}{person.last_name?.charAt(0)}</span>
+                              {memberName(person)}
+                            </span>
+                          ))}
+                        </div>
+                      ) : <span className="etm-tasks-table-unassigned">Unassigned</span>}
+                    </td>
+                    <td>
                       <div className="etm-progresslog-cell">
-                        <span className={`etm-badge ${task.status.toLowerCase().replace(/\s+/g, "-")}`}>{statusChipLabel(task)}</span>
+                        <span className={`etm-badge ${statusSlug(task.status)}`}>{statusChipLabel(task)}</span>
                         {lastRemark ? (
                           <p className="etm-progresslog-remark">"{remarkPreview(lastRemark.message)}"<small>— {lastRemark.created_by_name ?? "Unknown"}</small></p>
                         ) : <small className="etm-progresslog-empty">No remarks yet.</small>}
                       </div>
                     </td>
-                    <td><TaskRowActions task={task} onView={() => navigate(`/etms/tasks/${task.id}`)} onEdit={() => setEditingId(task.id)} onDelete={() => void confirmDelete(task)} /></td>
+                    <td onClick={event => event.stopPropagation()}><TaskRowActions task={task} onView={() => navigate(`/etms/tasks/${task.id}`)} onEdit={() => setEditingId(task.id)} onDelete={() => void confirmDelete(task)} onDuplicate={() => void confirmDuplicate(task)} duplicating={isDuplicating(task.id)} /></td>
                   </tr>
                   {expanded && (
                     <tr className="etm-tasks-table-subrow" id={`task-subtasks-${task.id}`}>
-                      <td colSpan={4}>
+                      <td colSpan={10}>
                         <div className="etm-accordion-body">
                           {task.subtasks.map((subtask, index) => (
                             <button type="button" className={`etm-accordion-subtask ${subtask.is_completed ? "completed" : ""}`} key={subtask.id ?? index} onClick={() => { setViewingSubtaskId(subtask.id ?? null); setViewingId(task.id); }} aria-label={`Open subtask: ${subtask.title}`}>
                               {subtask.is_completed ? <Check size={13} /> : <Circle size={13} />}
                               <span className="etm-accordion-subtask-text">
-                                <span className="etm-accordion-subtask-title-row"><span>{subtask.title}</span><span className={`etm-badge ${subtask.status.toLowerCase().replace(/\s+/g, "-")}`}>{subtask.status}</span></span>
+                                <span className="etm-accordion-subtask-title-row"><span>{subtask.title}</span><span className={`etm-badge ${statusSlug(subtask.status)}`}>{subtask.status}</span></span>
                                 {subtask.description && <small>{subtask.description}</small>}
                                 <small>Open updates</small>
                               </span>
@@ -234,7 +259,7 @@ export default function MajorTasks() {
                 </Fragment>
               );
             }) : (
-              <tr><td colSpan={4} className="etm-empty-row">{
+              <tr><td colSpan={10} className="etm-empty-row">{
                 !tasks.length ? "No tasks yet — create your first one from Add Task."
                 : !scopedTasks.length ? (scope === "personal" ? "You don't have any personal tasks yet." : "No assigned tasks yet.")
                 : "No tasks match your filters."
@@ -250,6 +275,8 @@ export default function MajorTasks() {
         onClose={() => { setViewingId(null); setViewingSubtaskId(null); }}
         initialSubtaskId={viewingSubtaskId}
         onEdit={() => { setEditingId(viewingTask.id); setViewingId(null); }}
+        onDuplicate={() => void confirmDuplicate(viewingTask)}
+        duplicating={isDuplicating(viewingTask.id)}
         onProgress={(message, status) => addProgress(viewingTask.id, message, status)}
         onEditProgress={(logId, message) => editProgress(viewingTask.id, logId, message)}
         onDeleteProgress={logId => deleteProgress(viewingTask.id, logId)}

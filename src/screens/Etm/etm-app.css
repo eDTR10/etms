@@ -42,6 +42,48 @@
 .etm-section-heading h2 { margin: 0; color: var(--etm-ink); font-size: 15px; font-weight: 700; }
 .etm-section-heading p { margin: 2px 0 0; color: var(--etm-muted); font-size: 12px; }
 
+/* Dashboard charts */
+.etm-charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
+.etm-chart-panel { padding: 18px; display: flex; flex-direction: column; }
+.etm-chart-title { margin: 0 0 16px; color: var(--etm-ink); font-size: 13px; font-weight: 700; }
+
+/* Vertical bar chart (Most completed tasks) */
+.etm-vbar-chart-frame { flex: 1; display: flex; flex-direction: column; min-height: 150px; padding: 6px 0 0 10px; border-left: 1px solid var(--etm-border); border-bottom: 1px solid var(--etm-border); }
+.etm-vbar-chart { flex: 1; display: flex; align-items: flex-end; gap: 3px; }
+.etm-vbar-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; flex: 1; height: 100%; min-width: 0; }
+.etm-vbar-value { color: var(--etm-ink); font-size: 12.5px; font-weight: 700; }
+.etm-vbar-track { width: 100%; flex: 1; display: flex; align-items: flex-end; border-radius: 4px 4px 0 0; background: var(--etm-surface-sunken); overflow: hidden; }
+.etm-vbar-fill { width: 100%; background: linear-gradient(180deg, var(--etm-primary), color-mix(in srgb, var(--etm-primary) 70%, #0d8a92)); border-radius: 4px 4px 0 0; transition: height .3s ease; }
+.etm-vbar-label { max-width: 100%; color: var(--etm-muted); font-size: 11px; font-weight: 600; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.etm-vbar-col-empty .etm-vbar-track { height: 100%; opacity: .4; }
+
+/* Donut chart + status rows (Task progression) */
+.etm-donut-wrap { display: flex; justify-content: center; margin-bottom: 18px; }
+.etm-donut { position: relative; width: 132px; height: 132px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.etm-donut::before { content: ""; position: absolute; inset: 20px; border-radius: 50%; background: var(--etm-surface); }
+.etm-donut-center { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; }
+.etm-donut-pct { color: var(--etm-ink); font-size: 21px; font-weight: 800; line-height: 1.1; }
+.etm-donut-label { color: var(--etm-muted); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; }
+.etm-donut-rows { display: flex; flex-direction: column; gap: 12px; }
+.etm-donut-row-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; }
+.etm-donut-row-label { display: inline-flex; align-items: center; gap: 7px; color: var(--etm-ink); font-size: 12.5px; font-weight: 600; }
+.etm-donut-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.etm-donut-row-count { color: var(--etm-ink); font-size: 12.5px; font-weight: 700; }
+.etm-donut-row-track { height: 7px; border-radius: 20px; background: var(--etm-surface-sunken); overflow: hidden; }
+.etm-donut-row-fill { height: 100%; border-radius: 20px; transition: width .3s ease; }
+.etm-donut-row-caption { display: block; margin-top: 4px; color: var(--etm-muted); font-size: 11px; }
+
+@media (max-width: 767px) {
+  .etm-charts-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 619px) {
+  .etm-vbar-chart-frame { min-height: 130px; }
+  .etm-vbar-chart { gap: 2px; }
+  .etm-donut { width: 112px; height: 112px; }
+  .etm-donut::before { inset: 16px; }
+  .etm-donut-pct { font-size: 18px; }
+}
+
 /* Member table */
 .etm-member-row { display: flex; align-items: center; gap: 11px; padding: 11px 16px; border-bottom: 1px solid var(--etm-border); }
 .etm-member-row:last-child { border-bottom: 0; }
@@ -49,6 +91,24 @@
 .etm-member-row-name { flex: 1; min-width: 0; color: var(--etm-ink); font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .etm-member-row-name small { display: block; color: var(--etm-muted); font-size: 11px; font-weight: 400; }
 .etm-member-row-count { flex-shrink: 0; padding: 4px 10px; border-radius: 20px; background: #f0f4f6; color: #5c6c78; font-size: 12px; font-weight: 700; }
+.etm-workload-list { margin: -2px -18px 0; border-top: 1px solid var(--etm-border); }
+.etm-workload-list .etm-member-row:nth-child(odd) { background: var(--etm-surface-alt); }
+.etm-workload-list .etm-member-row { border-bottom: 1px solid var(--etm-border); }
+.etm-workload-list .etm-member-row:hover { background: var(--etm-surface-sunken); }
+.etm-workload-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.etm-workload-heading .etm-chart-title { margin: 0; }
+.etm-workload-heading label { display: inline-flex; align-items: center; gap: 6px; color: var(--etm-muted); font-size: 11px; font-weight: 600; }
+.etm-workload-heading select { min-height: 31px; padding: 0 7px; border: 1px solid var(--etm-border); border-radius: 6px; background: var(--etm-surface-alt); color: var(--etm-ink); font: inherit; font-size: 12px; cursor: pointer; }
+.etm-workload-pagination { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; padding-top: 13px; border-top: 1px solid var(--etm-border); }
+.etm-workload-pagination > span { color: var(--etm-muted); font-size: 12px; font-weight: 600; }
+.etm-workload-dialog > p { margin: 0 0 14px; color: var(--etm-muted); font-size: 13px; }
+.etm-workload-dialog-tasks { display: grid; gap: 8px; }
+.etm-workload-dialog-tasks button { display: flex; align-items: center; gap: 9px; width: 100%; padding: 10px 11px; border: 1px solid var(--etm-border); border-radius: 8px; background: var(--etm-surface-alt); color: var(--etm-ink); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.etm-workload-dialog-tasks button:hover { border-color: var(--etm-primary); }
+.etm-workload-dialog-tasks button > svg:first-child { color: var(--etm-primary); flex: 0 0 auto; }
+.etm-workload-dialog-tasks button > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.etm-workload-dialog-tasks button small { display: block; margin-top: 2px; color: var(--etm-muted); font-size: 11px; }
+.etm-workload-dialog-tasks button > svg:last-child { color: var(--etm-muted); flex: 0 0 auto; }
 .etm-empty-row { padding: 24px 16px; text-align: center; color: var(--etm-muted); font-size: 13px; }
 
 /* Tasks table (cards on mobile, table on wide) */
@@ -78,9 +138,11 @@
 
 /* Tasks table (All Tasks page) */
 .etm-table-wrap { overflow-x: auto; overflow-y: hidden; }
-.etm-tasks-table { width: 100%; min-width: 860px; border-collapse: collapse; }
-.etm-tasks-table.compact { min-width: 860px; }
-.etm-tasks-table-title-col { width: 40%; min-width: 280px; }
+.etm-tasks-table { width: 100%; min-width: 1720px; border-collapse: collapse; }
+.etm-tasks-table.compact { min-width: 1600px; }
+.etm-tasks-table-dashboard { min-width: 980px; }
+.etm-tasks-table-title-col { width: 20%; min-width: 300px; }
+.etm-tasks-table-details-col { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .etm-task-title-heading, .etm-task-title-cell { display: flex; align-items: center; gap: 12px; }
 .etm-task-title-cell { align-items: flex-start; }
 .etm-task-title-controls { display: flex; align-items: center; gap: 4px; min-height: 34px; flex-shrink: 0; }
@@ -108,12 +170,13 @@
 .etm-button.ghost.danger:hover { background: #fdecea; }
 .etm-tasks-table tbody tr:not(.etm-tasks-table-subrow) { border-bottom: 1px solid var(--etm-border); transition: background .12s; }
 .etm-tasks-table tbody tr:not(.etm-tasks-table-subrow):hover { background: var(--etm-surface-alt); }
+.etm-tasks-table-row-clickable { cursor: pointer; }
 .etm-tasks-table tbody tr.expanded { background: var(--etm-surface-alt); }
 .etm-tasks-table tbody tr:last-child { border-bottom: 0; }
 .etm-tasks-table td { padding: 12px 14px; vertical-align: middle; font-size: 14px; color: var(--etm-ink); white-space: nowrap; }
 .etm-tasks-table-title { display: flex; flex-direction: column; gap: 2px; white-space: normal; }
 .etm-tasks-table-title > span { font-weight: 600; overflow-wrap: anywhere; }
-.etm-task-title-row { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.etm-task-title-row { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
 .etm-task-title-number { flex-shrink: 0; color: var(--etm-muted); font-size: 12px; font-weight: 700; letter-spacing: .3px; }
 .etm-task-title-link { display: block; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 600; text-align: left; cursor: pointer; overflow-wrap: anywhere; }.etm-task-title-link:hover { color: var(--etm-primary); text-decoration: underline; }.etm-task-title-link.completed { text-decoration: line-through; color: var(--etm-muted); }
 .etm-tasks-table-title span.completed { text-decoration: line-through; color: var(--etm-muted); }
@@ -136,41 +199,64 @@
 .etm-tasks-table-subrow td { padding: 0 14px 14px 48px; white-space: normal; }
 .etm-tasks-table .etm-empty-row { white-space: normal; }
 
-/* Task cards (Dashboard) */
-.etm-task-card-toolbar { display: flex; justify-content: flex-end; margin-bottom: 10px; }
-.etm-task-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
-.etm-task-card { position: relative; display: flex; flex-direction: column; gap: 11px; padding: 16px 16px 14px; border: 1px solid var(--etm-border); border-top: 3px solid transparent; border-radius: 14px; background: var(--etm-surface); cursor: pointer; transition: box-shadow .15s, border-color .15s; }
-.etm-task-card:hover { box-shadow: 0 6px 18px rgba(18, 43, 65, .08); }
-.etm-task-card:focus-visible { outline: 2px solid var(--etm-primary); outline-offset: 2px; }
-.etm-task-card.low { border-top-color: #6fb6a8; }
-.etm-task-card.medium { border-top-color: #d8a94a; }
-.etm-task-card.high { border-top-color: #d16c69; }
-.etm-task-card.completed .etm-task-card-title { color: var(--etm-muted); text-decoration: line-through; }
-.etm-task-card-top { display: flex; align-items: flex-start; gap: 10px; }
-.etm-task-card-top input[type="checkbox"] { flex-shrink: 0; width: 15px; height: 15px; margin-top: 3px; accent-color: var(--etm-primary); cursor: pointer; }
-.etm-task-card-title-group { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
-.etm-task-card-number { color: var(--etm-muted); font-size: 11px; font-weight: 700; letter-spacing: .3px; }
-.etm-task-card-title { flex: 1; min-width: 0; padding: 0; border: 0; background: transparent; color: var(--etm-ink); font: inherit; font-size: 15px; font-weight: 700; line-height: 1.4; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
-.etm-task-card-title:hover { color: var(--etm-primary); text-decoration: underline; }
+/* Priority pill (Dashboard + All Tasks table) */
 .etm-priority-pill { flex-shrink: 0; display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; white-space: nowrap; }
 .etm-priority-pill.low { color: #2f7e72; background: #edf7f3; }
 .etm-priority-pill.medium { color: #a17527; background: #fcf7ec; }
 .etm-priority-pill.high { color: #b55755; background: #fcf0ef; }
-.etm-task-card-remark { margin: 0; min-height: 30px; color: var(--etm-muted); font-size: 13px; line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
-.etm-task-card-remark small { display: block; margin-top: 3px; color: var(--etm-muted); opacity: .8; font-size: 11.5px; font-style: normal; }
-.etm-task-card-remark-empty { font-style: italic; }
-.etm-task-card-meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-.etm-task-card-assignees { display: flex; align-items: center; }
-.etm-task-card-avatar { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin-left: -6px; border: 2px solid var(--etm-surface); border-radius: 50%; background: #eaf0f4; color: #547084; font-size: 11px; font-weight: 700; text-transform: uppercase; }
-.etm-task-card-avatar:first-child { margin-left: 0; }
-.etm-task-card-avatar.more { background: var(--etm-surface-sunken); color: var(--etm-muted); }
-.etm-task-card-unassigned { color: var(--etm-muted); font-size: 12px; }
-.etm-task-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 10px; border-top: 1px solid var(--etm-border); }
-.etm-task-card-stats { display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; }
-.etm-task-card-stat { display: inline-flex; align-items: center; gap: 4px; color: var(--etm-muted); font-size: 12.5px; font-weight: 600; white-space: nowrap; }
-.etm-task-card-stat svg { flex-shrink: 0; }
-.etm-task-card-stat.overdue { color: #bc706c; }
-:root.dark .etm-task-card-stat.overdue { color: #e08b85; }
+
+/* Calendar */
+.etm-calendar-panel { padding: 18px; margin-bottom: 20px; }
+.etm-calendar-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.etm-calendar-header h2 { margin: 0 0 0 4px; font-size: 18px; font-weight: 700; color: var(--etm-ink); }
+.etm-calendar-nav-button { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; flex-shrink: 0; border: 1px solid var(--etm-border); border-radius: 8px; background: var(--etm-surface); color: var(--etm-ink); cursor: pointer; transition: background .12s; }
+.etm-calendar-nav-button:hover { background: var(--etm-surface-alt); }
+.etm-calendar-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); border-bottom: 1px solid var(--etm-border); }
+.etm-calendar-weekdays span { text-align: center; color: var(--etm-muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; padding: 8px 0; }
+.etm-calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); border-left: 1px solid var(--etm-border); border-top: 1px solid var(--etm-border); }
+.etm-calendar-day { position: relative; display: flex; flex-direction: column; gap: 4px; min-height: 108px; padding: 6px; border-right: 1px solid var(--etm-border); border-bottom: 1px solid var(--etm-border); background: var(--etm-surface); color: var(--etm-ink); overflow: hidden; cursor: pointer; transition: background .12s; }
+.etm-calendar-day:hover { background: var(--etm-surface-alt); }
+.etm-calendar-day.outside { background: var(--etm-surface-alt); color: var(--etm-muted); opacity: .55; }
+.etm-calendar-day.selected { background: var(--etm-surface-sunken); box-shadow: inset 0 0 0 2px var(--etm-primary); }
+.etm-calendar-day-number { align-self: flex-start; display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 50%; font-size: 12.5px; font-weight: 600; }
+.etm-calendar-day-number.today { background: var(--etm-primary); color: #fff; font-weight: 700; }
+.etm-calendar-day-chips { display: flex; flex-direction: column; gap: 3px; overflow-y: auto; }
+.etm-calendar-chip { display: block; width: 100%; padding: 3px 6px; border: 0; border-radius: 5px; font-family: inherit; font-size: 11px; font-weight: 600; line-height: 1.4; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; color: #fff; transition: filter .1s; }
+.etm-calendar-chip:hover { filter: brightness(1.1); text-decoration: underline; }
+.etm-calendar-chip.low { background: #3e9276; }
+.etm-calendar-chip.medium { background: #c18a31; }
+.etm-calendar-chip.high { background: #c0605a; }
+.etm-calendar-chip.completed { opacity: .55; text-decoration: line-through; }
+.etm-calendar-chip-repeat-icon { flex-shrink: 0; margin: 0 3px -1px 0; }
+.etm-calendar-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--etm-border); }
+.etm-calendar-legend-label { font-size: 12px; font-weight: 700; color: var(--etm-muted); }
+.etm-calendar-legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--etm-ink); }
+.etm-calendar-legend-swatch { display: inline-block; width: 11px; height: 11px; border-radius: 3px; }
+.etm-calendar-legend-swatch.low { background: #3e9276; }
+.etm-calendar-legend-swatch.medium { background: #c18a31; }
+.etm-calendar-legend-swatch.high { background: #c0605a; }
+
+.etm-calendar-daylist { padding: 18px; }
+.etm-calendar-daylist-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.etm-calendar-daylist-header h3 { margin: 0; font-size: 15px; font-weight: 700; color: var(--etm-ink); }
+.etm-calendar-daylist-empty { margin: 0; color: var(--etm-muted); font-size: 13px; }
+.etm-calendar-daylist-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.etm-calendar-daylist-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--etm-border); border-radius: 10px; cursor: pointer; transition: background .12s; }
+.etm-calendar-daylist-item:hover { background: var(--etm-surface-alt); }
+.etm-calendar-daylist-item.completed .etm-calendar-daylist-title { color: var(--etm-muted); text-decoration: line-through; }
+.etm-calendar-occurrence-toggle { flex-shrink: 0; width: 16px; height: 16px; accent-color: var(--etm-primary); cursor: pointer; }
+.etm-calendar-daylist-title { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; color: var(--etm-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.etm-calendar-daylist-recurrence { flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 20px; background: var(--etm-surface-sunken); font-size: 11px; font-weight: 600; color: var(--etm-muted); white-space: nowrap; }
+.etm-calendar-daylist-assignee { flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px; max-width: 160px; font-size: 12px; color: var(--etm-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.etm-calendar-daylist-date { flex-shrink: 0; font-size: 12px; color: var(--etm-muted); }
+@media (max-width: 619px) {
+  .etm-calendar-day { min-height: 78px; padding: 4px; }
+  .etm-calendar-chip { font-size: 10px; padding: 2px 5px; }
+  .etm-calendar-header h2 { font-size: 15px; }
+  .etm-calendar-daylist-item { flex-wrap: wrap; }
+  .etm-calendar-daylist-title { flex-basis: 100%; order: 3; }
+  .etm-calendar-daylist-assignee { flex-basis: 100%; order: 4; max-width: none; }
+}
 
 @media (min-width: 720px) {
   .etm-kpi-grid { grid-template-columns: repeat(4, 1fr); }
@@ -189,8 +275,63 @@
 :root.dark .etm-bulk-bar { background: color-mix(in srgb, var(--etm-primary) 16%, var(--etm-surface)); }
 :root.dark .etm-button.ghost.danger { color: #e3928d; border-color: #5a2f2c; }
 :root.dark .etm-button.ghost.danger:hover { background: #3a1f1d; }
-:root.dark .etm-task-card:hover { box-shadow: 0 6px 18px rgba(0, 0, 0, .35); }
 :root.dark .etm-priority-pill.low { color: #7bd4b5; background: #163a30; }
 :root.dark .etm-priority-pill.medium { color: #e6c179; background: #3a2f16; }
 :root.dark .etm-priority-pill.high { color: #e3928d; background: #3a1f1d; }
-:root.dark .etm-task-card-avatar { background: #223038; color: #9db5c2; }
+
+/* How To guide */
+.etm-howto-tabs { margin-bottom: 18px; }
+.etm-howto-layout { display: grid; gap: 20px; grid-template-columns: 1fr; align-items: start; }
+.etm-howto-steps { margin: 0; padding: 22px; box-sizing: border-box; }
+.etm-howto-steps-head { margin-bottom: 18px; }
+.etm-howto-steps h2 { margin: 0 0 4px; color: var(--etm-ink); font-size: 16px; font-weight: 700; }
+.etm-howto-steps-head p { margin: 0; color: var(--etm-muted); font-size: 13px; line-height: 1.5; }
+.etm-howto-step-list { list-style: none; margin: 0 0 18px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.etm-howto-controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 16px; border-top: 1px solid var(--etm-border); }
+.etm-howto-speed { display: flex; padding: 2px; border: 1px solid var(--etm-border); border-radius: 8px; background: var(--etm-surface-sunken); }
+.etm-howto-speed button { padding: 5px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--etm-muted); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; transition: background .15s, color .15s; }
+.etm-howto-speed button.active { background: var(--etm-primary); color: #fff; }
+.etm-howto-controls .etm-button { flex: 1; justify-content: center; }
+.etm-howto-step { display: flex; align-items: flex-start; width: 100%; gap: 12px; padding: 10px; border: 1px solid transparent; border-radius: 10px; background: transparent; font-family: inherit; text-align: left; cursor: pointer; transition: background .15s, border-color .15s; }
+.etm-howto-step:hover { background: var(--etm-surface-alt); }
+.etm-howto-step.active { background: color-mix(in srgb, var(--etm-primary) 10%, var(--etm-surface)); border-color: var(--etm-primary); }
+.etm-howto-step-list.playing .etm-howto-step { cursor: default; opacity: .6; }
+.etm-howto-step-list.playing .etm-howto-step.active { opacity: 1; }
+.etm-howto-step.active .etm-howto-step-number { background: var(--etm-primary); color: #fff; }
+.etm-howto-step-number { flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: var(--etm-surface-sunken); color: var(--etm-ink); font-size: 12px; font-weight: 700; transition: background .15s, color .15s; }
+.etm-howto-step-text { padding-top: 3px; color: var(--etm-ink); font-size: 13.5px; line-height: 1.6; }
+.etm-howto-step-text strong { color: var(--etm-primary); font-weight: 700; }
+.etm-howto-preview-wrap { min-width: 0; padding: 20px; box-sizing: border-box; }
+.etm-howto-preview-badge { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 14px; padding: 5px 11px; border-radius: 20px; background: color-mix(in srgb, var(--etm-primary) 12%, var(--etm-surface)); color: var(--etm-primary); font-size: 12px; font-weight: 700; }
+
+.etm-howto-cursor { position: fixed; top: 0; left: 0; z-index: 9999; margin: -4px 0 0 -4px; color: var(--etm-primary); filter: drop-shadow(0 2px 5px rgba(0, 0, 0, .4)); pointer-events: none; transition: transform .55s cubic-bezier(.4, 0, .2, 1); will-change: transform; }
+.etm-howto-ripple { position: fixed; top: 0; left: 0; z-index: 9998; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%; background: color-mix(in srgb, var(--etm-primary) 45%, transparent); pointer-events: none; animation: etm-howto-ripple .6s ease-out forwards; }
+@keyframes etm-howto-ripple {
+  from { opacity: .9; scale: .3; }
+  to { opacity: 0; scale: 1.8; }
+}
+
+.etm-howto-drag-ghost { position: fixed; top: 0; left: 0; z-index: 9998; display: flex; align-items: center; gap: 6px; margin: -14px 0 0 16px; padding: 6px 12px; border: 1px solid var(--etm-primary); border-radius: 8px; background: var(--etm-surface); color: var(--etm-ink); font-size: 12.5px; font-weight: 600; white-space: nowrap; box-shadow: 0 8px 20px rgba(0, 0, 0, .35); pointer-events: none; transition: transform .55s cubic-bezier(.4, 0, .2, 1), opacity .2s ease; will-change: transform; }
+.etm-howto-drag-ghost > svg { flex: 0 0 auto; color: var(--etm-muted); }
+
+.etm-howto-snackbar { position: fixed; left: 50%; bottom: max(40px, calc(env(safe-area-inset-bottom) + 24px)); z-index: 9997; max-width: min(92vw, 460px); padding: 13px 20px; border-radius: 30px; background: var(--etm-ink); color: var(--etm-surface); font-size: 13px; font-weight: 600; text-align: center; box-shadow: 0 10px 30px rgba(0, 0, 0, .35); transform: translateX(-50%); animation: etm-howto-snackbar-in .25s ease-out; }
+@keyframes etm-howto-snackbar-in {
+  from { opacity: 0; transform: translate(-50%, 10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+:root.dark .etm-howto-snackbar { background: var(--etm-primary); color: #fff; }
+@media (max-width: 767px) {
+  /* Clear the fixed mobile bottom tab bar instead of sitting behind/on top of it. */
+  .etm-howto-snackbar { bottom: calc(78px + env(safe-area-inset-bottom)); }
+}
+
+@media (min-width: 1000px) {
+  .etm-howto-layout { grid-template-columns: 320px minmax(0, 1fr); }
+  .etm-howto-steps,
+  .etm-howto-preview-wrap {
+    position: sticky;
+    top: 18px;
+    height: var(--etm-howto-panel-height, calc(100vh - 220px));
+    overflow-y: auto;
+  }
+}

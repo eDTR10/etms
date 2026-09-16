@@ -3,6 +3,9 @@ import {
   LayoutDashboard,
   Plus,
   ListChecks,
+  BarChart3,
+  Calendar,
+  HelpCircle,
   LogOut,
   UserCircle,
 } from "lucide-react";
@@ -15,7 +18,10 @@ import etmsLogo from "../../assets/eTMS-icon.png";
 const NAV_ITEMS = [
   { label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, to: "/etms/dashboard" },
   { label: "Add Task", icon: <Plus className="w-4 h-4" />, to: "/etms/tasks/new" },
+  { label: "Calendar", icon: <Calendar className="w-4 h-4" />, to: "/etms/calendar" },
   { label: "All Tasks", icon: <ListChecks className="w-4 h-4" />, to: "/etms/tasks" },
+  { label: "Reports", icon: <BarChart3 className="w-4 h-4" />, to: "/etms/reports" },
+  { label: "How To?", icon: <HelpCircle className="w-4 h-4" />, to: "/etms/how-to" },
 ];
 
 // ── Props ─────────────────────────────────────────────────────────────────
@@ -111,8 +117,18 @@ const UserLayout = ({ title, subtitle, children }: UserLayoutProps) => {
           <div className="flex items-center gap-2">
             <ModeToggle />
             <NotificationBell />
-            {/* Profile (mobile only — desktop reaches it via the sidebar). Logout lives on the Profile page on mobile. */}
-            <Link to="/etms/user/profile" className="hidden md:flex p-2 rounded-full hover:bg-accent transition-colors text-muted-foreground hover:text-foreground" aria-label="Profile">
+            <Link
+              to="/etms/how-to"
+              aria-label="Open How To guide"
+              className={`hidden md:inline-flex items-center justify-center w-9 h-9 rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground ${pathname === "/etms/how-to" ? "bg-accent text-[#0d8a92] dark:text-[#17b3ac]" : ""}`}
+            >
+              <HelpCircle className="w-5 h-5" />
+            </Link>
+            <Link
+              to="/etms/user/profile"
+              aria-label="Open profile"
+              className={`hidden md:inline-flex items-center justify-center w-9 h-9 rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground ${pathname === "/etms/user/profile" ? "bg-accent text-[#0d8a92] dark:text-[#17b3ac]" : ""}`}
+            >
               <UserCircle className="w-5 h-5" />
             </Link>
           </div>
@@ -133,6 +149,13 @@ const UserLayout = ({ title, subtitle, children }: UserLayoutProps) => {
           <LayoutDashboard className="w-5 h-5" />
           Dashboard
         </Link>
+        <Link
+          to="/etms/calendar"
+          className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 text-[10px] font-semibold ${pathname === "/etms/calendar" ? "text-[#0d8a92] dark:text-[#17b3ac]" : "text-muted-foreground"}`}
+        >
+          <Calendar className="w-5 h-5" />
+          Calendar
+        </Link>
         <Link to="/etms/tasks/new" className="flex-1 flex flex-col items-center justify-center" aria-label="Add task">
           <span className="flex items-center justify-center w-11 h-11 -mt-5 rounded-full bg-[#0d8a92] text-white shadow-lg dark:bg-[#17b3ac]">
             <Plus className="w-6 h-6" />
@@ -144,6 +167,13 @@ const UserLayout = ({ title, subtitle, children }: UserLayoutProps) => {
         >
           <ListChecks className="w-5 h-5" />
           All Tasks
+        </Link>
+        <Link
+          to="/etms/reports"
+          className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 text-[10px] font-semibold ${pathname === "/etms/reports" ? "text-[#0d8a92] dark:text-[#17b3ac]" : "text-muted-foreground"}`}
+        >
+          <BarChart3 className="w-5 h-5" />
+          Reports
         </Link>
       </nav>
 

@@ -1,6 +1,6 @@
 import axios from "axios";
 import api from "../../plugin/axios";
-import type { Member, Project, Task, TaskInput, TaskStatus } from "./types";
+import type { GroupedTask, GroupedTaskInput, Member, Project, Task, TaskInput, TaskStatus } from "./types";
 
 export interface BulkActionResult {
   succeeded: number[];
@@ -14,6 +14,11 @@ interface OfficeDirectoryItem {
 
 export const taskService = {
   list: async () => (await api.get<Task[]>("etm/tasks/")).data,
+  listGroupedTasks: async () => (await api.get<GroupedTask[]>("etm/grouped-tasks/")).data,
+  createGroupedTask: async (input: GroupedTaskInput) => (await api.post<GroupedTask>("etm/grouped-tasks/", input)).data,
+  updateGroupedTask: async (id: number, input: Partial<GroupedTaskInput>) =>
+    (await api.patch<GroupedTask>(`etm/grouped-tasks/${id}/`, input)).data,
+  deleteGroupedTask: async (id: number) => { await api.delete(`etm/grouped-tasks/${id}/`); },
   listArchived: async () => (await api.get<Task[]>("etm/tasks/", { params: { archived: "1" } })).data,
   members: async () => (await api.get<Member[]>("etm/members/")).data,
   addMember: async (input: { first_name: string; last_name: string; email: string; position?: string }) =>
@@ -25,6 +30,8 @@ export const taskService = {
   create: async (input: TaskInput) => (await api.post<Task>("etm/tasks/", input)).data,
   update: async (id: number, input: Partial<TaskInput>) => (await api.patch<Task>(`etm/tasks/${id}/`, input)).data,
   remove: async (id: number) => { await api.delete(`etm/tasks/${id}/`); },
+  duplicate: async (id: number) => (await api.post<Task>(`etm/tasks/${id}/duplicate/`)).data,
+  toggleOccurrence: async (id: number, date: string) => (await api.post<Task>(`etm/tasks/${id}/occurrences/${date}/toggle/`)).data,
   progress: async (id: number, message: string, status: TaskStatus) =>
     (await api.post<Task>(`etm/tasks/${id}/progress/`, { message, status })).data,
   editProgress: async (id: number, logId: number, message: string) =>

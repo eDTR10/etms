@@ -1,23 +1,44 @@
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { ChevronRight } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { ChevronLeft } from "lucide-react";
 import UserLayout from "./UserLayout";
 import TaskProvider from "../../features/tasks/TaskProvider";
 import TaskFeedback from "../../features/tasks/TaskFeedback";
 import TaskDetails from "../../features/tasks/TaskDetails";
 import { useTasks } from "../../features/tasks/taskContext";
+import { useDuplicateTask } from "../../features/tasks/useDuplicateTask";
 import "../../features/tasks/etm-base.css";
 import "../Etm/etm-app.css";
 
 function TaskPageContent() {
   const { taskId } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { confirmDuplicate, isDuplicating } = useDuplicateTask();
+  // Captured once on mount — a notification redirect (?hl=task or ?hl=subtask-123)
+  // should flash its target only for this one arrival, not again on every re-render
+  // or if the URL param lingers after a refresh.
+  const hlRef = useRef(searchParams.get("hl"));
+  useEffect(() => {
+    if (hlRef.current) setSearchParams(params => { params.delete("hl"); return params; }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const hl = hlRef.current;
+  const hlSubtaskMatch = hl?.match(/^subtask-(\d+)$/);
+  const highlightSubtaskId = hlSubtaskMatch ? Number(hlSubtaskMatch[1]) : null;
+  const highlightHeader = hl === "task";
+  const highlightRemarks = hl === "remark";
   const { tasks, loading, error, addProgress, editProgress, deleteProgress, addRemark, editRemark, deleteRemark, reactToRemark, addRemarkReply, addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, addRemarkAttachment, deleteRemarkAttachment, addSubtaskRemarkAttachment, deleteSubtaskRemarkAttachment, markCompletionSeen, markViewed } = useTasks();
   const task = tasks.find(item => item.id === Number(taskId));
+  function goBack() {
+    if (window.history.length > 1) navigate(-1);
+    else navigate("/etms/tasks");
+  }
   if (loading || error) return <TaskFeedback />;
-  if (!task) return <div className="etm-error"><div><strong>Task not found</strong><p>This task may no longer be available.</p></div><button type="button" className="etm-button ghost" onClick={() => navigate("/etms/tasks")}>Back to All Tasks</button></div>;
+  if (!task) return <div className="etm-error"><div><strong>Task not found</strong><p>This task may no longer be available.</p></div><button type="button" className="etm-button ghost" onClick={goBack}>Go back</button></div>;
   return <>
-    <nav className="etm-breadcrumb" aria-label="Breadcrumb"><Link to="/etms/tasks">All Tasks</Link><ChevronRight size={15} /><span aria-current="page">{task.title}</span></nav>
-    <TaskDetails task={task} open page onClose={() => navigate("/etms/tasks")} onEdit={() => undefined} onProgress={(message, status) => addProgress(task.id, message, status)} onEditProgress={(logId, message) => editProgress(task.id, logId, message)} onDeleteProgress={logId => deleteProgress(task.id, logId)} onAddRemark={(message, file) => addRemark(task.id, message, file)} onEditRemark={(remarkId, message) => editRemark(task.id, remarkId, message)} onDeleteRemark={remarkId => deleteRemark(task.id, remarkId)} onReactRemark={(remarkId, emoji) => reactToRemark(task.id, remarkId, emoji)} onAddRemarkReply={(remarkId, message) => addRemarkReply(task.id, remarkId, message)} onAddSubtaskRemark={(subtaskId, message, file) => addSubtaskRemark(task.id, subtaskId, message, file)} onEditSubtaskRemark={(subtaskId, remarkId, message) => editSubtaskRemark(task.id, subtaskId, remarkId, message)} onDeleteSubtaskRemark={(subtaskId, remarkId) => deleteSubtaskRemark(task.id, subtaskId, remarkId)} onReactSubtaskRemark={(subtaskId, remarkId, emoji) => reactToSubtaskRemark(task.id, subtaskId, remarkId, emoji)} onAddSubtaskRemarkReply={(subtaskId, remarkId, message) => addSubtaskRemarkReply(task.id, subtaskId, remarkId, message)} onSetSubtaskStatus={(subtaskId, message, status) => setSubtaskStatus(task.id, subtaskId, message, status)} onAddSubtask={(title, description) => addSubtask(task.id, title, description)} onEditSubtask={(subtaskId, input) => editSubtask(task.id, subtaskId, input)} onDeleteSubtask={subtaskId => deleteSubtask(task.id, subtaskId)} onSetSubtaskCompletion={(subtaskId, complete) => setSubtaskCompletion(task.id, subtaskId, complete)} onAddRemarkAttachment={(remarkId, file) => addRemarkAttachment(task.id, remarkId, file)} onDeleteRemarkAttachment={(remarkId, attachmentId) => deleteRemarkAttachment(task.id, remarkId, attachmentId)} onAddSubtaskRemarkAttachment={(subtaskId, remarkId, file) => addSubtaskRemarkAttachment(task.id, subtaskId, remarkId, file)} onDeleteSubtaskRemarkAttachment={(subtaskId, remarkId, attachmentId) => deleteSubtaskRemarkAttachment(task.id, subtaskId, remarkId, attachmentId)} onMarkCompletionSeen={() => markCompletionSeen(task.id)} onMarkViewed={() => markViewed(task.id)} />
+    <button type="button" className="etm-button ghost small etm-task-back" onClick={goBack}><ChevronLeft size={15} />Back</button>
+    <TaskDetails task={task} open page onClose={goBack} onEdit={() => undefined} onDuplicate={() => void confirmDuplicate(task)} duplicating={isDuplicating(task.id)} initialSubtaskId={highlightSubtaskId} highlightHeader={highlightHeader} highlightRemarks={highlightRemarks} onProgress={(message, status) => addProgress(task.id, message, status)} onEditProgress={(logId, message) => editProgress(task.id, logId, message)} onDeleteProgress={logId => deleteProgress(task.id, logId)} onAddRemark={(message, file) => addRemark(task.id, message, file)} onEditRemark={(remarkId, message) => editRemark(task.id, remarkId, message)} onDeleteRemark={remarkId => deleteRemark(task.id, remarkId)} onReactRemark={(remarkId, emoji) => reactToRemark(task.id, remarkId, emoji)} onAddRemarkReply={(remarkId, message) => addRemarkReply(task.id, remarkId, message)} onAddSubtaskRemark={(subtaskId, message, file) => addSubtaskRemark(task.id, subtaskId, message, file)} onEditSubtaskRemark={(subtaskId, remarkId, message) => editSubtaskRemark(task.id, subtaskId, remarkId, message)} onDeleteSubtaskRemark={(subtaskId, remarkId) => deleteSubtaskRemark(task.id, subtaskId, remarkId)} onReactSubtaskRemark={(subtaskId, remarkId, emoji) => reactToSubtaskRemark(task.id, subtaskId, remarkId, emoji)} onAddSubtaskRemarkReply={(subtaskId, remarkId, message) => addSubtaskRemarkReply(task.id, subtaskId, remarkId, message)} onSetSubtaskStatus={(subtaskId, message, status) => setSubtaskStatus(task.id, subtaskId, message, status)} onAddSubtask={(title, description) => addSubtask(task.id, title, description)} onEditSubtask={(subtaskId, input) => editSubtask(task.id, subtaskId, input)} onDeleteSubtask={subtaskId => deleteSubtask(task.id, subtaskId)} onSetSubtaskCompletion={(subtaskId, complete) => setSubtaskCompletion(task.id, subtaskId, complete)} onAddRemarkAttachment={(remarkId, file) => addRemarkAttachment(task.id, remarkId, file)} onDeleteRemarkAttachment={(remarkId, attachmentId) => deleteRemarkAttachment(task.id, remarkId, attachmentId)} onAddSubtaskRemarkAttachment={(subtaskId, remarkId, file) => addSubtaskRemarkAttachment(task.id, subtaskId, remarkId, file)} onDeleteSubtaskRemarkAttachment={(subtaskId, remarkId, attachmentId) => deleteSubtaskRemarkAttachment(task.id, subtaskId, remarkId, attachmentId)} onMarkCompletionSeen={() => markCompletionSeen(task.id)} onMarkViewed={() => markViewed(task.id)} />
   </>;
 }
 

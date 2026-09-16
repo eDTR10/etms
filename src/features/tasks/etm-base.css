@@ -37,6 +37,8 @@
 .swal2-styled { min-height: 38px; margin: 0 !important; padding: 0 15px; border: 1px solid transparent !important; border-radius: 8px !important; box-shadow: none !important; font: inherit !important; font-size: 12px !important; font-weight: 600 !important; }
 .swal2-styled.swal2-confirm { background: var(--etm-primary) !important; color: #fff !important; }
 .swal2-popup.etm-danger-dialog .swal2-styled.swal2-confirm { background: #c85f5a !important; }
+.etm-report-delete-task-list { max-height: 160px; margin: 10px 0 0; padding: 8px 10px 8px 26px; overflow-y: auto; border: 1px solid var(--etm-border); border-radius: 8px; background: var(--etm-surface-alt); text-align: left; font-size: 13px; color: var(--etm-ink); }
+.etm-report-delete-task-list li { padding: 2px 0; }
 .swal2-popup.etm-warning-dialog .swal2-styled.swal2-confirm { background: #c18a31 !important; }
 .swal2-styled.swal2-confirm:focus-visible, .swal2-styled.swal2-cancel:focus-visible { outline: 2px solid var(--etm-primary); outline-offset: 2px; }
 .swal2-styled.swal2-cancel { background: var(--etm-surface-sunken) !important; border-color: var(--etm-border) !important; color: var(--etm-ink) !important; }
@@ -60,18 +62,98 @@
 .etm-button.destructive { background: #c85f5a; }
 .etm-button.destructive:hover { background: #b24f4b; }
 
+/* Reports */
+.etm-reports { width: 100%; }
+.etm-report-heading, .etm-report-section-title { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; margin-bottom: 16px; }
+.etm-report-heading h2, .etm-report-section-title h2 { margin: 0; color: var(--etm-ink); font-size: 18px; font-weight: 700; }
+.etm-report-heading > div > p:not(.etm-report-eyebrow) { margin: 5px 0 0; color: var(--etm-muted); font-size: 13px; }
+.etm-report-eyebrow { display: flex; align-items: center; gap: 6px; margin: 0 0 5px; color: var(--etm-primary); font-size: 11px; font-weight: 700; letter-spacing: .45px; text-transform: uppercase; }
+.etm-report-check { width: 44px; text-align: center; }
+.etm-tasks-table.etm-report-table { min-width: 700px; }
+.etm-report-table th, .etm-report-table td { white-space: nowrap; }
+.etm-report-task-title { display: inline-flex; align-items: center; gap: 6px; color: var(--etm-ink); font-weight: 600; }
+.etm-report-table tbody tr[draggable="true"] { cursor: grab; }
+.etm-report-table tbody tr[draggable="true"]:active { cursor: grabbing; }
+.etm-report-drag-handle { flex-shrink: 0; color: var(--etm-muted); opacity: .6; }
+.etm-report-table tbody tr:hover .etm-report-drag-handle { opacity: 1; }
+.etm-report-row-dragging { opacity: .45; }
+.etm-report-groups-table tbody tr.etm-report-group-drag-over { background: color-mix(in srgb, var(--etm-primary) 14%, transparent); outline: 2px dashed var(--etm-primary); outline-offset: -2px; }
+.etm-report-groups-section { margin-top: 30px; }
+.etm-report-section-title-actions { display: flex; align-items: center; gap: 14px; }
+.etm-report-section-title-actions > span { color: var(--etm-muted); font-size: 13px; }
+.etm-report-group-tasks-empty { margin: 0; padding: 8px 0; color: var(--etm-muted); font-size: 13px; }
+.etm-report-groups { overflow: hidden; }
+.etm-tasks-table.etm-report-groups-table { min-width: 650px; }
+.etm-report-group-row { display: flex; align-items: center; width: 100%; min-height: 58px; gap: 11px; padding: 11px 16px; border: 0; background: transparent; color: var(--etm-ink); font-family: inherit; text-align: left; cursor: pointer; }
+.etm-report-group-row:hover { background: var(--etm-surface-alt); }
+.etm-report-group-row > svg { flex: 0 0 auto; color: var(--etm-muted); transition: transform .18s ease; }
+.etm-report-group-row > svg.open { transform: rotate(90deg); }
+.etm-report-group-name-block { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 140px; }
+.etm-report-group-id { color: var(--etm-muted); font-size: 10.5px; font-weight: 400; letter-spacing: .3px; }
+.etm-report-group-name { font-size: 14px; font-weight: 650; }
+.etm-report-group-name strong { color: var(--etm-primary); }
+.etm-report-group-meta { color: var(--etm-muted); font-size: 12px; }
+.etm-report-group-tasks { padding: 6px 16px 12px 45px; border-bottom: 1px solid var(--etm-border); background: var(--etm-surface-alt); }
+.etm-report-group-expanded td { padding: 0 !important; white-space: normal !important; }
+.etm-report-group-tasks > div { display: flex; align-items: center; gap: 8px; min-height: 32px; color: var(--etm-ink); font-size: 13px; }
+.etm-report-group-tasks > div > svg { color: #3e9276; flex: 0 0 auto; }
+.etm-report-group-tasks > div > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.etm-report-group-tasks small { color: var(--etm-muted); }
+.etm-report-group-task-meta { display: flex; align-items: center; gap: 4px; margin-left: auto; flex: 0 0 auto; }
+.etm-report-group-task-meta .etm-icon-button { width: 26px; height: 26px; }
+.etm-report-group-task-rename-trigger { width: 22px; height: 22px; flex: 0 0 auto; color: var(--etm-muted); }
+.etm-report-group-task-rename { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+.etm-report-group-task-rename-input { flex: 1; min-width: 0; box-sizing: border-box; padding: 4px 8px; border: 1px solid var(--etm-border); border-radius: 6px; background: var(--etm-surface); color: var(--etm-ink); font: inherit; font-size: 13px; }
+.etm-report-group-task-rename .etm-icon-button { width: 26px; height: 26px; flex: 0 0 auto; }
+.etm-report-group-actions { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.etm-report-error { margin: 0 0 12px; padding: 10px 12px; border: 1px solid #d9908c; border-radius: 8px; background: #fbeceb; color: #a44f4a; font-size: 13px; }
+.etm-report-form { display: flex; flex-direction: column; gap: 14px; }
+.etm-report-form-intro { margin: -2px 0 2px; color: var(--etm-muted); font-size: 13px; }
+.etm-report-form > label, .etm-report-target-row > label { display: flex; flex-direction: column; gap: 6px; color: var(--etm-ink); font-size: 13px; font-weight: 600; }
+.etm-report-task-picker { display: flex; flex-direction: column; gap: 8px; }
+.etm-report-task-picker-label { margin: 0; color: var(--etm-ink); font-size: 13px; font-weight: 600; }
+.etm-report-task-picker-list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; max-height: 220px; overflow-y: auto; border: 1px solid var(--etm-border); border-radius: 8px; background: var(--etm-surface-alt); }
+.etm-report-task-picker-row { display: flex; align-items: center; justify-content: space-between; gap: 9px; padding: 9px 11px; border-bottom: 1px solid var(--etm-border); font-size: 13px; color: var(--etm-ink); }
+.etm-report-task-picker-row:last-child { border-bottom: 0; }
+.etm-report-task-picker-row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.etm-report-task-picker-row small { flex: 0 0 auto; color: var(--etm-muted); }
+.etm-report-form input:not([type="radio"]):not([type="checkbox"]), .etm-report-form select { box-sizing: border-box; width: 100%; min-height: 39px; padding: 0 10px; border: 1px solid var(--etm-border); border-radius: 8px; background: var(--etm-surface-alt); color: var(--etm-ink); font: inherit; font-size: 14px; font-weight: 400; }
+.etm-report-form input[readonly] { color: var(--etm-muted); cursor: default; }
+.etm-report-project-picker { position: relative; }
+.etm-report-project-picker input { padding-right: 39px !important; }
+.etm-report-project-toggle { position: absolute; top: 1px; right: 1px; display: inline-flex; align-items: center; justify-content: center; width: 37px; height: 37px; border: 0; border-left: 1px solid var(--etm-border); border-radius: 0 8px 8px 0; background: transparent; color: var(--etm-muted); cursor: pointer; }
+.etm-report-project-toggle:hover { color: var(--etm-primary); background: var(--etm-surface-sunken); }
+.etm-report-project-menu { position: absolute; z-index: 4; top: calc(100% + 4px); right: 0; left: 0; max-height: 190px; overflow-y: auto; border: 1px solid var(--etm-border); border-radius: 8px; background: var(--etm-surface); box-shadow: 0 10px 24px #122a4129; }
+.etm-report-project-menu button { display: block; width: 100%; padding: 9px 11px; border: 0; background: transparent; color: var(--etm-ink); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.etm-report-project-menu button:hover, .etm-report-project-menu button[aria-selected="true"] { background: var(--etm-surface-sunken); color: var(--etm-primary); }
+.etm-report-project-menu .etm-report-project-add { color: var(--etm-primary); font-weight: 700; border-bottom: 1px solid var(--etm-border); }
+.etm-report-project-menu p { margin: 0; padding: 10px 11px; color: var(--etm-muted); font-size: 12px; line-height: 1.4; }
+.etm-report-form fieldset { padding: 0; margin: 1px 0 0; border: 0; }
+.etm-report-form legend { margin-bottom: 7px; color: var(--etm-ink); font-size: 13px; font-weight: 600; }
+.etm-report-radio-row { display: flex; gap: 15px; }
+.etm-report-radio-row label { display: inline-flex; align-items: center; gap: 6px; color: var(--etm-muted); font-size: 13px; cursor: pointer; }
+.etm-report-radio-row input { accent-color: var(--etm-primary); }
+.etm-report-target-row { display: grid; grid-template-columns: 1fr 150px; gap: 12px; }
+.etm-report-form-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 4px; }
+@media (max-width: 619px) {
+  .etm-report-heading, .etm-report-section-title { align-items: flex-start; flex-direction: column; }
+  .etm-report-heading .etm-button { width: 100%; }
+  .etm-report-section-title-actions { width: 100%; justify-content: space-between; }
+  .etm-report-group-row { align-items: flex-start; flex-wrap: wrap; }
+  .etm-report-group-name-block { flex-basis: calc(100% - 30px); }
+  .etm-report-group-meta { width: 100%; margin-left: 29px; white-space: normal; }
+  .etm-report-target-row { grid-template-columns: 1fr; }
+}
+
 .etm-icon-button { display: inline-flex; align-items: center; justify-content: center; width: 33px; height: 33px; border: 0; border-radius: 8px; background: transparent; color: var(--etm-muted); cursor: pointer; transition: background .15s, color .15s; }
 .etm-icon-button:hover { background: var(--etm-surface-sunken); color: var(--etm-ink); }
 .etm-icon-button.danger:hover { background: #fff1ef; color: #bf625f; }
 
 .etm-badge { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: 5px; color: #687e93; background: #f0f3f6; font-size: 12px; line-height: 1.2; font-weight: 500; white-space: nowrap; }
-.etm-badge.ongoing { color: #5484bd; background: #edf4fc; }
-.etm-badge.pending { color: #b0863f; background: #fff7e9; }
+.etm-badge.pending { color: #a17527; background: #fcf7ec; }
+.etm-badge.in-progress { color: #5484bd; background: #edf4fc; }
 .etm-badge.completed { color: #3e9276; background: #edf8f2; }
-.etm-badge.on-hold { color: #9b7abb; background: #f6effb; }
-.etm-badge.for-approval { color: #5b6bc0; background: #eef0fc; }
-.etm-badge.for-signing { color: #c15b8f; background: #fcedf4; }
-.etm-badge.for-sending { color: #c1793a; background: #fdf1e4; }
+.etm-badge.blocked-stuck { color: #c0605a; background: #fbeceb; }
 
 .etm-loading, .etm-error { display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 220px; padding: 24px; color: var(--etm-muted); font-size: 15px; text-align: center; }
 .etm-spin { animation: etm-form-spin .8s linear infinite; }
@@ -137,13 +219,10 @@
 }
 
 :root.dark .etm-badge { color: #a7c3e0; background: #223245; }
-:root.dark .etm-badge.ongoing { color: #8ab6ef; background: #1c2f47; }
-:root.dark .etm-badge.pending { color: #e0b567; background: #3a2f19; }
+:root.dark .etm-badge.pending { color: #e6c179; background: #3a2f16; }
+:root.dark .etm-badge.in-progress { color: #8ab6ef; background: #1c2f47; }
 :root.dark .etm-badge.completed { color: #7fd6ac; background: #16332a; }
-:root.dark .etm-badge.on-hold { color: #c9a6e8; background: #2c2138; }
-:root.dark .etm-badge.for-approval { color: #a9b4ef; background: #262c4a; }
-:root.dark .etm-badge.for-signing { color: #e3a0c4; background: #3a2231; }
-:root.dark .etm-badge.for-sending { color: #e3ad74; background: #3a2818; }
+:root.dark .etm-badge.blocked-stuck { color: #e3928d; background: #3a1f1d; }
 :root.dark .etm-icon-button.danger:hover { background: #3a2321; color: #e08b85; }
 :root.dark .etm-error { color: #e0908a; }
 :root.dark .etm-tasktype-option.selected { border-color: #1f5f5c; background: #17302f; }

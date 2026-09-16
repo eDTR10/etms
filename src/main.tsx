@@ -28,6 +28,9 @@ const Register = lazy(() => import("./screens/Auth/Register.tsx"));
 const UserDashboard  = lazy(() => import("./screens/User/Dashboard.tsx"));
 const UserAddTask    = lazy(() => import("./screens/User/AddTask.tsx"));
 const UserAllTasks   = lazy(() => import("./screens/User/AllTasks.tsx"));
+const UserReports    = lazy(() => import("./screens/User/Reports.tsx"));
+const UserHowTo      = lazy(() => import("./screens/User/HowTo.tsx"));
+const UserCalendar   = lazy(() => import("./screens/User/Calendar.tsx"));
 const UserTaskDetails = lazy(() => import("./screens/User/TaskDetailsPage.tsx"));
 const UserDocuments  = lazy(() => import("./screens/User/Documents.tsx"));
 const UserProfile    = lazy(() => import("./screens/User/Profile.tsx"));
@@ -83,6 +86,18 @@ const router = createBrowserRouter([
   {
     path: "/etms/tasks",
     element: <ProtectedRoute><Suspense fallback={<Loader />}><UserAllTasks /></Suspense></ProtectedRoute>,
+  },
+  {
+    path: "/etms/reports",
+    element: <ProtectedRoute><Suspense fallback={<Loader />}><UserReports /></Suspense></ProtectedRoute>,
+  },
+  {
+    path: "/etms/how-to",
+    element: <ProtectedRoute><Suspense fallback={<Loader />}><UserHowTo /></Suspense></ProtectedRoute>,
+  },
+  {
+    path: "/etms/calendar",
+    element: <ProtectedRoute><Suspense fallback={<Loader />}><UserCalendar /></Suspense></ProtectedRoute>,
   },
   {
     path: "/etms/tasks/:taskId",

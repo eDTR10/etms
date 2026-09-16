@@ -111,6 +111,15 @@ const Profile = () => {
                     </div>
                   ))}
                 </div>
+                <div className="flex justify-end mt-5">
+                  <button
+                    onClick={handleSave}
+                    className="flex items-center gap-2 bg-primary text-primary-foreground text-sm font-medium px-5 py-2.5 rounded-lg hover:opacity-90 transition"
+                  >
+                    <Save className="w-4 h-4" />
+                    {saved ? "Saved!" : "Save Changes"}
+                  </button>
+                </div>
               </section>
             )}
 
@@ -143,21 +152,11 @@ const Profile = () => {
             )}
 
             {/* Save */}
-            <div className="flex justify-end">
-              <button
-                onClick={handleSave}
-                className="flex items-center gap-2 bg-primary text-primary-foreground text-sm font-medium px-5 py-2.5 rounded-lg hover:opacity-90 transition"
-              >
-                <Save className="w-4 h-4" />
-                {saved ? "Saved!" : "Save Changes"}
-              </button>
-            </div>
-
             {/* ── Log out (mobile only — desktop has it in the sidebar) ── */}
-            <div className="hidden md:block bg-card border border-border rounded-xl p-4">
+            <div className="hidden md:flex justify-end">
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-3 w-full text-left text-sm font-medium text-destructive hover:opacity-80 transition-opacity"
+                className="flex items-center gap-2 border border-destructive/40 text-destructive text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-destructive/10 transition-colors"
               >
                 <LogOut className="w-4 h-4" />
                 Log Out

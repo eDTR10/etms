@@ -1,7 +1,13 @@
 export type Priority = "Low" | "Medium" | "High";
-export type TaskStatus = "Pending" | "Ongoing" | "On hold" | "For Approval" | "For Signing" | "For Sending" | "Completed";
+export type TaskStatus = "Pending" | "In-Progress" | "Completed" | "Blocked/Stuck";
 export type AssignmentRole = "Editor" | "Viewer" | "Commentor";
 export type TaskRole = "Owner" | AssignmentRole;
+export type Recurrence = "None" | "Daily" | "Weekly" | "Monthly" | "Specific" | "Anytime";
+
+export interface OccurrenceCompletion {
+  date: string;
+  is_completed: boolean;
+}
 
 export interface Member {
   id: number;
@@ -15,6 +21,37 @@ export interface Project {
   name: string;
   created_by?: number;
   created_at?: string;
+}
+
+export type GroupTargetType = "number" | "percent";
+
+export interface GroupedTaskItem {
+  id: number;
+  title: string;
+  project_name: string;
+  created_at: string;
+}
+
+export interface GroupedTask {
+  id: number;
+  grouped_task_id: string;
+  name: string;
+  project_name: string;
+  has_target: boolean;
+  target_value: number | null;
+  target_type: GroupTargetType;
+  tasks: GroupedTaskItem[];
+  created_at: string;
+}
+
+export interface GroupedTaskInput {
+  grouped_task_id: string;
+  name: string;
+  project_name: string;
+  has_target: boolean;
+  target_value: number | null;
+  target_type: GroupTargetType;
+  task_ids: number[];
 }
 
 export interface Assignment extends Member {
@@ -104,8 +141,15 @@ export interface Task {
   project: Project | null;
   details: string;
   requestor: string;
+  location_province: string;
+  location_city: string;
+  location_barangay: string;
   priority: Priority;
   deadline: string | null;
+  recurrence: Recurrence;
+  recurrence_weekdays: string;
+  recurrence_dates: string[];
+  occurrence_completions: OccurrenceCompletion[];
   status: TaskStatus;
   is_completed: boolean;
   is_archived: boolean;
@@ -131,8 +175,14 @@ export interface TaskInput {
   project: string | null;
   details: string;
   requestor: string;
+  location_province: string;
+  location_city: string;
+  location_barangay: string;
   priority: Priority;
   deadline: string | null;
+  recurrence: Recurrence;
+  recurrence_weekdays: string;
+  recurrence_dates: string[];
   status: TaskStatus;
   is_completed: boolean;
   assignments: AssignmentInput[];
@@ -140,9 +190,24 @@ export interface TaskInput {
   progress_message?: string;
 }
 
-export const STATUSES: TaskStatus[] = ["Pending", "Ongoing", "On hold", "For Approval", "For Signing", "For Sending", "Completed"];
+export const STATUSES: TaskStatus[] = ["Pending", "In-Progress", "Completed", "Blocked/Stuck"];
 export const PRIORITIES: Priority[] = ["Low", "Medium", "High"];
 export const ASSIGNMENT_ROLES: AssignmentRole[] = ["Editor", "Commentor", "Viewer"];
+export const RECURRENCES: Recurrence[] = ["None", "Daily", "Weekly", "Monthly", "Specific", "Anytime"];
+export const RECURRENCE_LABELS: Record<Recurrence, string> = {
+  None: "Does not repeat",
+  Daily: "Daily",
+  Weekly: "Weekly",
+  Monthly: "Monthly",
+  Specific: "Specific dates",
+  Anytime: "Anytime",
+};
+
+// Safe CSS-class form of a status label — handles the "/" in "Blocked/Stuck", which
+// a plain `.replace(/\s+/g, "-")` would leave in place (invalid in a class name).
+export function statusSlug(status: string): string {
+  return status.toLowerCase().replace(/[\s/]+/g, "-");
+}
 
 export function memberName(member: Member) {
   return `${member.first_name} ${member.last_name}`.trim();

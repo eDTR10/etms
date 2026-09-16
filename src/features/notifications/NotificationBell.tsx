@@ -22,7 +22,17 @@ export default function NotificationBell() {
   function openNotification(n: AppNotification) {
     if (!n.is_read) void markRead(n.id);
     setOpen(false);
-    if (n.task) navigate(`/etms/tasks/${n.task}`);
+    if (!n.task) return;
+    // `hl` tells TaskDetailsPage what to scroll to and flash with a blinking border
+    // once it lands: a specific subtask if this notification named one (its own
+    // Remarks are nested inside, so that's precise enough on its own); otherwise the
+    // Remarks card for a remark/mention notification, or the task header for
+    // everything else (status change, assignment, viewed) — so the redirect always
+    // lands on the actual content the notification is about, not just the task.
+    const hl = n.subtask
+      ? `subtask-${n.subtask}`
+      : (n.category === "remark" || n.category === "mention") ? "remark" : "task";
+    navigate(`/etms/tasks/${n.task}?hl=${hl}`);
   }
 
   useEffect(() => {

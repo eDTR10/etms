@@ -51,6 +51,14 @@ export default function TaskProvider({ children }: { children: ReactNode }) {
     await taskService.remove(id);
     setTasks(current => current.filter(task => task.id !== id));
   };
+  const duplicateTask = async (id: number) => {
+    const task = await taskService.duplicate(id);
+    setTasks(current => [task, ...current]);
+    return task;
+  };
+  const toggleOccurrence = async (id: number, date: string) => {
+    replace(await taskService.toggleOccurrence(id, date));
+  };
   const addProgress = async (id: number, message: string, status: TaskStatus) => {
     replace(await taskService.progress(id, message, status));
   };
@@ -138,5 +146,5 @@ export default function TaskProvider({ children }: { children: ReactNode }) {
     replace(await taskService.markViewed(id));
   };
 
-  return <TaskContext.Provider value={{ tasks, members, projects, loading, error, refresh, listArchivedTasks, addMember, createTask, updateTask, deleteTask, addProgress, editProgress, deleteProgress, addRemark, editRemark, deleteRemark, reactToRemark, addRemarkReply, addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, bulkArchive, bulkDelete, addRemarkAttachment, deleteRemarkAttachment, addSubtaskRemarkAttachment, deleteSubtaskRemarkAttachment, markCompletionSeen, markViewed }}>{children}</TaskContext.Provider>;
+  return <TaskContext.Provider value={{ tasks, members, projects, loading, error, refresh, listArchivedTasks, addMember, createTask, updateTask, deleteTask, duplicateTask, toggleOccurrence, addProgress, editProgress, deleteProgress, addRemark, editRemark, deleteRemark, reactToRemark, addRemarkReply, addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, bulkArchive, bulkDelete, addRemarkAttachment, deleteRemarkAttachment, addSubtaskRemarkAttachment, deleteSubtaskRemarkAttachment, markCompletionSeen, markViewed }}>{children}</TaskContext.Provider>;
 }
