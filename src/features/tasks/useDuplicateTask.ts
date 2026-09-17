@@ -19,8 +19,19 @@ export function useDuplicateTask(basePath = "/etms/tasks") {
     if (pendingRef.current.has(task.id)) return;
     pendingRef.current.add(task.id);
     setPendingIds(new Set(pendingRef.current));
+    // Blocks the whole page (no outside click/Escape to dismiss) while the duplicate
+    // request is in flight, so nothing else can be tapped in the meantime — replaced by
+    // the rename prompt or an error below once it settles.
+    void Swal.fire({
+      title: "Duplicating task…",
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      didOpen: () => Swal.showLoading(),
+    });
     try {
       const copy = await duplicateTask(task.id);
+      Swal.close();
       // Rename (if any) happens before navigating away, not after — navigating to
       // /etms/tasks/:taskId mounts that page's own, separate TaskProvider, so an
       // updateTask() call fired afterwards would land on this now-unmounted provider's
@@ -46,6 +57,7 @@ export function useDuplicateTask(basePath = "/etms/tasks") {
       }
       navigate(`${basePath}/${copy.id}`);
     } catch (error) {
+      Swal.close();
       void Swal.fire({ title: "Couldn't duplicate task", text: taskError(error), icon: "error" });
     } finally {
       pendingRef.current.delete(task.id);
