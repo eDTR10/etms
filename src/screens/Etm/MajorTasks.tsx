@@ -30,7 +30,13 @@ const STATUS_KPIS: { status: TaskStatus; icon: typeof PlayCircle; variant: strin
   { status: "Blocked/Stuck", icon: PauseCircle, variant: "danger" },
 ];
 
-export default function MajorTasks() {
+interface MajorTasksProps {
+  // Lets an admin-mode instance of this same page link within /etms/admin/tasks instead
+  // of the regular user's /etms/tasks.
+  basePath?: string;
+}
+
+export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps = {}) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   // Computed once via the lazy useState initializer — a Dashboard KPI tap links here with
@@ -208,9 +214,9 @@ export default function MajorTasks() {
               const lastRemark = task.remarks[0];
               return (
                 <Fragment key={task.id}>
-                  <tr className={`etm-tasks-table-row-clickable ${expanded ? "expanded" : ""}`} onClick={() => navigate(`/etms/tasks/${task.id}`)}>
+                  <tr className={`etm-tasks-table-row-clickable ${expanded ? "expanded" : ""}`} onClick={() => navigate(`${basePath}/${task.id}`)}>
                     <td className="etm-tasks-table-title-col">
-                      <TaskTitleCell task={task} onOpen={() => navigate(`/etms/tasks/${task.id}`)}>
+                      <TaskTitleCell task={task} onOpen={() => navigate(`${basePath}/${task.id}`)}>
                       <input
                         type="checkbox"
                         aria-label={`Select ${task.title}`}
@@ -257,7 +263,7 @@ export default function MajorTasks() {
                         ) : <small className="etm-progresslog-empty">No remarks yet.</small>}
                       </div>
                     </td>
-                    <td onClick={event => event.stopPropagation()}><TaskRowActions task={task} onView={() => navigate(`/etms/tasks/${task.id}`)} onEdit={() => setEditingId(task.id)} onDelete={() => void confirmDelete(task)} onDuplicate={() => void confirmDuplicate(task)} duplicating={isDuplicating(task.id)} /></td>
+                    <td onClick={event => event.stopPropagation()}><TaskRowActions task={task} onView={() => navigate(`${basePath}/${task.id}`)} onEdit={() => setEditingId(task.id)} onDelete={() => void confirmDelete(task)} onDuplicate={() => void confirmDuplicate(task)} duplicating={isDuplicating(task.id)} /></td>
                   </tr>
                   {expanded && (
                     <tr className="etm-tasks-table-subrow" id={`task-subtasks-${task.id}`}>

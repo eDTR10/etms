@@ -19,6 +19,9 @@ import Modal from "../../components/ui/modal";
 
 interface DashboardOverviewProps {
   onViewMajorTasks: () => void;
+  // Lets an admin-mode instance of this same dashboard link within /etms/admin/tasks
+  // instead of the regular user's /etms/tasks.
+  basePath?: string;
 }
 
 const STATUS_COLORS: Record<TaskStatus, string> = {
@@ -61,7 +64,7 @@ function StatusRow({ label, count, total, color }: { label: string; count: numbe
   );
 }
 
-export default function Dashboard({ onViewMajorTasks }: DashboardOverviewProps) {
+export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks" }: DashboardOverviewProps) {
   const {
     tasks, members, projects, updateTask,
     addProgress, editProgress, deleteProgress,
@@ -136,19 +139,19 @@ export default function Dashboard({ onViewMajorTasks }: DashboardOverviewProps) 
   return (
     <div>
       <div className="etm-kpi-grid">
-        <button type="button" className="etm-panel etm-kpi-card etm-kpi-card-button" onClick={() => navigate("/etms/tasks")}>
+        <button type="button" className="etm-panel etm-kpi-card etm-kpi-card-button" onClick={() => navigate(basePath)}>
           <div className="etm-kpi-card-top"><span className="etm-kpi-label">Total Tasks</span><span className="etm-kpi-icon"><ClipboardList size={17} /></span></div>
           <span className="etm-kpi-value">{totalTasks}</span>
         </button>
-        <button type="button" className="etm-panel etm-kpi-card etm-kpi-card-button warn" onClick={() => navigate("/etms/tasks?unassigned=1")}>
+        <button type="button" className="etm-panel etm-kpi-card etm-kpi-card-button warn" onClick={() => navigate(`${basePath}?unassigned=1`)}>
           <div className="etm-kpi-card-top"><span className="etm-kpi-label">Unassigned Tasks</span><span className="etm-kpi-icon"><UserX size={17} /></span></div>
           <span className="etm-kpi-value">{totalUnassigned}</span>
         </button>
-        <button type="button" className="etm-panel etm-kpi-card etm-kpi-card-button success" onClick={() => navigate("/etms/tasks?status=Completed")}>
+        <button type="button" className="etm-panel etm-kpi-card etm-kpi-card-button success" onClick={() => navigate(`${basePath}?status=Completed`)}>
           <div className="etm-kpi-card-top"><span className="etm-kpi-label">Completed Tasks</span><span className="etm-kpi-icon"><CheckCircle2 size={17} /></span></div>
           <span className="etm-kpi-value">{totalCompleted}</span>
         </button>
-        <button type="button" className="etm-panel etm-kpi-card etm-kpi-card-button danger" onClick={() => navigate("/etms/tasks?overdue=1")}>
+        <button type="button" className="etm-panel etm-kpi-card etm-kpi-card-button danger" onClick={() => navigate(`${basePath}?overdue=1`)}>
           <div className="etm-kpi-card-top"><span className="etm-kpi-label">Past Due Tasks</span><span className="etm-kpi-icon"><AlertTriangle size={17} /></span></div>
           <span className="etm-kpi-value">{totalPastDue}</span>
         </button>
@@ -304,7 +307,7 @@ export default function Dashboard({ onViewMajorTasks }: DashboardOverviewProps) 
         {selectedMemberWorkload && <div className="etm-workload-dialog">
           <p>{selectedMemberTasks.length} assigned {selectedMemberTasks.length === 1 ? "task" : "tasks"}{selectedMemberWorkload.member.position ? ` · ${selectedMemberWorkload.member.position}` : ""}</p>
           <div className="etm-workload-dialog-tasks">
-            {selectedMemberTasks.map(task => <button type="button" key={task.id} onClick={() => { setSelectedMemberId(null); navigate(`/etms/tasks/${task.id}`); }}><ClipboardList size={15} /><span>{task.title}<small>{task.status} · {task.project?.name ?? "Personal"}</small></span><ChevronRight size={15} /></button>)}
+            {selectedMemberTasks.map(task => <button type="button" key={task.id} onClick={() => { setSelectedMemberId(null); navigate(`${basePath}/${task.id}`); }}><ClipboardList size={15} /><span>{task.title}<small>{task.status} · {task.project?.name ?? "Personal"}</small></span><ChevronRight size={15} /></button>)}
           </div>
         </div>}
       </Modal>

@@ -33,6 +33,7 @@ export interface UserProfile {
   acc_lvl: number;
   is_active: boolean;
   is_staff: boolean;
+  role: string;
 }
 
 // Matches the DRF-token scheme the backend actually exposes (djoser.urls.authtoken):

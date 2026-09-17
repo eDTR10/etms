@@ -10,7 +10,7 @@ import { useDuplicateTask } from "../../features/tasks/useDuplicateTask";
 import "../../features/tasks/etm-base.css";
 import "../Etm/etm-app.css";
 
-function TaskPageContent() {
+export function TaskPageContent({ basePath = "/etms/tasks" }: { basePath?: string } = {}) {
   const { taskId } = useParams();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -32,7 +32,7 @@ function TaskPageContent() {
   const task = tasks.find(item => item.id === Number(taskId));
   function goBack() {
     if (window.history.length > 1) navigate(-1);
-    else navigate("/etms/tasks");
+    else navigate(basePath);
   }
   if (loading || error) return <TaskFeedback />;
   if (!task) return <div className="etm-error"><div><strong>Task not found</strong><p>This task may no longer be available.</p></div><button type="button" className="etm-button ghost" onClick={goBack}>Go back</button></div>;

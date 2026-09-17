@@ -11,7 +11,7 @@ import { flattenTemplateSubtasks, type TaskTemplate } from "../../features/tasks
 import "../../features/tasks/etm-base.css";
 import "../Etm/etm-app.css";
 
-function TemplatesContent() {
+export function TemplatesContent() {
   const { templates, projects, loading, error, createTemplate, updateTemplate, deleteTemplate } = useTasks();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<TaskTemplate | undefined>(undefined);

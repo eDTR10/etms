@@ -9,6 +9,7 @@ import NotFound from "./screens/notFound";
 import Loader from './components/loader/loader.tsx';
 import { AuthProvider, useAuth } from './screens/Auth/AuthContext.tsx';
 import ProtectedRoute from './screens/Auth/ProtectedRoute.tsx';
+import AdminRoute from './screens/Auth/AdminRoute.tsx';
 import GuestRoute from './screens/Auth/GuestRoute.tsx';
 import { getHomePath } from './screens/Auth/roles.ts';
 import { ThemeProvider } from './components/theme-provider.tsx';
@@ -36,6 +37,14 @@ const UserDocuments  = lazy(() => import("./screens/User/Documents.tsx"));
 const UserProfile    = lazy(() => import("./screens/User/Profile.tsx"));
 const UserTemplates  = lazy(() => import("./screens/User/Templates.tsx"));
 const UserQuickLinks = lazy(() => import("./screens/User/QuickLinks.tsx"));
+
+// ── Admin pages (eTM) ────────────────────────────────────────────────────
+const AdminDashboard   = lazy(() => import("./screens/Admin/Dashboard.tsx"));
+const AdminAddTask     = lazy(() => import("./screens/Admin/AddTask.tsx"));
+const AdminTasks       = lazy(() => import("./screens/Admin/Tasks.tsx"));
+const AdminTaskDetails = lazy(() => import("./screens/Admin/TaskDetailsPage.tsx"));
+const AdminTemplates   = lazy(() => import("./screens/Admin/Templates.tsx"));
+const AdminQuickLinks  = lazy(() => import("./screens/Admin/QuickLinks.tsx"));
 
 // Sends "/" to the right place: dashboard if logged in, login otherwise.
 const Home = () => {
@@ -120,6 +129,32 @@ const router = createBrowserRouter([
   {
     path: "/etms/user/profile",
     element: <ProtectedRoute><Suspense fallback={<Loader />}><UserProfile /></Suspense></ProtectedRoute>,
+  },
+
+  // ── Admin pages — role=admin / is_staff only ────────────────
+  {
+    path: "/etms/admin/dashboard",
+    element: <AdminRoute><Suspense fallback={<Loader />}><AdminDashboard /></Suspense></AdminRoute>,
+  },
+  {
+    path: "/etms/admin/tasks/new",
+    element: <AdminRoute><Suspense fallback={<Loader />}><AdminAddTask /></Suspense></AdminRoute>,
+  },
+  {
+    path: "/etms/admin/tasks",
+    element: <AdminRoute><Suspense fallback={<Loader />}><AdminTasks /></Suspense></AdminRoute>,
+  },
+  {
+    path: "/etms/admin/tasks/:taskId",
+    element: <AdminRoute><Suspense fallback={<Loader />}><AdminTaskDetails /></Suspense></AdminRoute>,
+  },
+  {
+    path: "/etms/admin/templates",
+    element: <AdminRoute><Suspense fallback={<Loader />}><AdminTemplates /></Suspense></AdminRoute>,
+  },
+  {
+    path: "/etms/admin/quick-links",
+    element: <AdminRoute><Suspense fallback={<Loader />}><AdminQuickLinks /></Suspense></AdminRoute>,
   },
 
   // ── Main app with navbar ──────────────────────────────

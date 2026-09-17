@@ -93,7 +93,7 @@ function QuickLinkFormDialog({ link, open, onClose, onSave }: { link?: QuickLink
   );
 }
 
-function QuickLinksContent() {
+export function QuickLinksContent() {
   const { links, loading, error, createLink, updateLink, deleteLink } = useQuickLinks();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingLink, setEditingLink] = useState<QuickLink | undefined>(undefined);
