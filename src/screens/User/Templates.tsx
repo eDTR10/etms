@@ -7,7 +7,7 @@ import TaskFeedback from "../../features/tasks/TaskFeedback";
 import TemplateFormDialog from "../../features/tasks/TemplateFormDialog";
 import { useTasks } from "../../features/tasks/taskContext";
 import { taskError } from "../../features/tasks/taskService";
-import type { TaskTemplate } from "../../features/tasks/types";
+import { flattenTemplateSubtasks, type TaskTemplate } from "../../features/tasks/types";
 import "../../features/tasks/etm-base.css";
 import "../Etm/etm-app.css";
 
@@ -65,7 +65,7 @@ function TemplatesContent() {
                   <td>{template.title || <span className="etm-tasks-table-unassigned">Not set</span>}</td>
                   <td>{template.is_personal ? "Personal" : template.project || <span className="etm-tasks-table-unassigned">Not set</span>}</td>
                   <td className={template.priority.toLowerCase()}>{template.priority}</td>
-                  <td>{template.subtasks.length ? <span><CheckCheck size={13} style={{ verticalAlign: "-2px", marginRight: 5 }} />{template.subtasks.length}</span> : <span className="etm-tasks-table-unassigned">None</span>}</td>
+                  <td>{template.subtasks.length ? <span><CheckCheck size={13} style={{ verticalAlign: "-2px", marginRight: 5 }} />{flattenTemplateSubtasks(template.subtasks).length}</span> : <span className="etm-tasks-table-unassigned">None</span>}</td>
                   <td className="etm-report-group-actions">
                     <button type="button" className="etm-icon-button" aria-label={`Edit ${template.name}`} onClick={() => openEdit(template)}><Pencil size={15} /></button>
                     <button type="button" className="etm-icon-button danger" aria-label={`Delete ${template.name}`} onClick={() => void confirmDelete(template)}><Trash2 size={15} /></button>

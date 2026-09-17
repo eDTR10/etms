@@ -4,9 +4,10 @@ import { isAxiosError } from "axios";
 import { AlertTriangle, Bookmark, CalendarDays, Check, CheckCheck, ChevronDown, ClipboardList, Clock3, Flag, Folder, Loader2, MapPin, Plus, Repeat, Search, Trash2, User, UserPlus, Users, X } from "lucide-react";
 import { useTasks } from "./taskContext";
 import { taskError } from "./taskService";
-import { ASSIGNMENT_ROLES, formatDate, memberName, PRIORITIES, RECURRENCE_LABELS, RECURRENCES, STATUSES, type AssignmentInput, type AssignmentRole, type Member, type Priority, type Project, type Recurrence, type SubTask, type Task, type TaskInput, type TaskStatus, type TaskTemplate } from "./types";
+import { ASSIGNMENT_ROLES, formatDate, memberName, PRIORITIES, RECURRENCE_LABELS, RECURRENCES, STATUSES, type AssignmentInput, type AssignmentRole, type Member, type Priority, type Project, type Recurrence, type SubTask, type Task, type TaskInput, type TaskStatus, type TaskTemplate, type TemplateSubtask } from "./types";
 import { describeRecurrence, WEEKDAYS } from "./recurrence";
 import { REGION_X_BARANGAYS, REGION_X_CITIES, REGION_X_PROVINCES } from "./regionXLocations";
+import { addChildToSubtaskTree, flattenTree, mapSubtaskTree, removeFromSubtaskTree } from "./subtaskTree";
 import "./forms.css";
 
 // Eisenhower-matrix framing shown as a note under each priority option.
@@ -33,7 +34,7 @@ interface TaskFormProps {
   onCancel: () => void;
 }
 
-type EditableSubtask = SubTask & { localKey: string };
+type EditableSubtask = Omit<SubTask, "subtasks"> & { localKey: string; subtasks: EditableSubtask[] };
 type FormValues = Omit<TaskInput, "subtasks" | "assignments" | "project"> & {
   subtasks: EditableSubtask[];
   assignments: AssignmentInput[];
@@ -41,6 +42,26 @@ type FormValues = Omit<TaskInput, "subtasks" | "assignments" | "project"> & {
   project: string;
 };
 type FormErrors = Record<string, string>;
+
+let editableSubtaskSeed = 0;
+function toEditableSubtasks(subtasks: SubTask[], keyPrefix: string): EditableSubtask[] {
+  return subtasks.map(subtask => ({
+    ...subtask,
+    localKey: `${keyPrefix}-${subtask.id ?? editableSubtaskSeed++}`,
+    subtasks: toEditableSubtasks(subtask.subtasks ?? [], keyPrefix),
+  }));
+}
+
+function serializeSubtasks(subtasks: EditableSubtask[]): SubTask[] {
+  return subtasks.map(({ id, title, description, status, is_completed, subtasks: children }) => ({
+    ...(id !== undefined ? { id } : {}),
+    title: title.trim(),
+    description: description.trim(),
+    status,
+    is_completed,
+    subtasks: serializeSubtasks(children),
+  }));
+}
 
 function initialValues(task?: Task): FormValues {
   return {
@@ -60,7 +81,7 @@ function initialValues(task?: Task): FormValues {
     status: task?.is_completed ? "Completed" : task?.status ?? "Pending",
     is_completed: task?.is_completed ?? task?.status === "Completed",
     assignments: (task?.assignments ?? []).map(person => ({ user: person.id, role: person.role })),
-    subtasks: (task?.subtasks ?? []).map((subtask, index) => ({ ...subtask, localKey: `existing-${subtask.id ?? index}` })),
+    subtasks: toEditableSubtasks(task?.subtasks ?? [], "existing"),
     progress_message: "",
   };
 }
@@ -80,9 +101,37 @@ function saveError(error: unknown): string {
   return "Your task couldn’t be saved. Your changes are still here; please try again.";
 }
 
+function SubtaskEditorRow({ subtask, index, depth, fieldId, errors, onUpdate, onRemove, onAddChild }: {
+  subtask: EditableSubtask; index: number; depth: number; fieldId: string; errors: FormErrors;
+  onUpdate: (localKey: string, change: Partial<Pick<SubTask, "title" | "description" | "status" | "is_completed">>) => void;
+  onRemove: (localKey: string) => void;
+  onAddChild: (parentKey: string) => void;
+}) {
+  return (
+    <div className="etm-subtask-editor-item">
+      <div className={`etm-subtask-input-row ${subtask.is_completed ? "completed" : ""}`}>
+        <input type="checkbox" checked={subtask.is_completed} onChange={event => onUpdate(subtask.localKey, { is_completed: event.target.checked })} aria-label={`Mark subtask ${index + 1} complete`} />
+        <input type="text" data-subtask-key={subtask.localKey} value={subtask.title} onChange={event => onUpdate(subtask.localKey, { title: event.target.value })} placeholder={`Subtask ${index + 1}`} aria-label={`Subtask ${index + 1} title`} maxLength={255} aria-invalid={!!errors[subtask.localKey]} aria-describedby={errors[subtask.localKey] ? `${fieldId}-${subtask.localKey}-error` : undefined} />
+        <button className="etm-icon-button" type="button" aria-label={`Add a subtask under "${subtask.title || `subtask ${index + 1}`}"`} title="Add subtask" onClick={() => onAddChild(subtask.localKey)}><Plus size={16} /></button>
+        <button className="etm-icon-button" type="button" aria-label={`Remove subtask ${index + 1}`} onClick={() => onRemove(subtask.localKey)}><Trash2 size={16} /></button>
+      </div>
+      {errors[subtask.localKey] && <p className="etm-field-error" id={`${fieldId}-${subtask.localKey}-error`}>{errors[subtask.localKey]}</p>}
+      <textarea className="etm-subtask-description" value={subtask.description} onChange={event => onUpdate(subtask.localKey, { description: event.target.value })} placeholder="Add a short description for this subtask (optional)…" aria-label={`Subtask ${index + 1} description`} rows={2} maxLength={2000} />
+      {subtask.subtasks.length > 0 && (
+        <div className="etm-subtask-children">
+          {subtask.subtasks.map((child, childIndex) => (
+            <SubtaskEditorRow key={child.localKey} subtask={child} index={childIndex} depth={depth + 1} fieldId={fieldId} errors={errors} onUpdate={onUpdate} onRemove={onRemove} onAddChild={onAddChild} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TaskLivePreview({ values, members }: { values: FormValues; members: Member[] }) {
   const assignedMembers = values.assignments.map(assignment => members.find(member => member.id === assignment.user)).filter((member): member is Member => !!member);
-  const completeSubtasks = values.subtasks.filter(subtask => subtask.is_completed).length;
+  const allSubtasks = flattenTree(values.subtasks);
+  const completeSubtasks = allSubtasks.filter(subtask => subtask.is_completed).length;
   const location = [values.location_barangay, values.location_city, values.location_province].filter(Boolean).join(", ");
 
   return <section className="etm-panel etm-task-preview" aria-live="polite" aria-label="Task preview">
@@ -97,7 +146,7 @@ function TaskLivePreview({ values, members }: { values: FormValues; members: Mem
       {values.recurrence !== "None" && <div><dt><Repeat size={14} />Repeats</dt><dd>{describeRecurrence(values)}</dd></div>}
     </dl>
     <div className="etm-task-preview-group"><div><Users size={14} /><strong>Assigned persons</strong><span>{assignedMembers.length}</span></div>{assignedMembers.length ? <ul>{assignedMembers.slice(0, 3).map(member => <li key={member.id}><span>{member.first_name.charAt(0)}{member.last_name.charAt(0)}</span>{memberName(member)}</li>)}{assignedMembers.length > 3 && <li className="more">+{assignedMembers.length - 3} more</li>}</ul> : <p>No one assigned yet.</p>}</div>
-    <div className="etm-task-preview-group"><div><CheckCheck size={14} /><strong>Subtasks</strong><span>{completeSubtasks}/{values.subtasks.length}</span></div>{values.subtasks.length ? <ul>{values.subtasks.slice(0, 3).map((subtask, index) => <li key={subtask.localKey} className={subtask.is_completed ? "completed" : ""}><Check size={12} />{subtask.title.trim() || `Subtask ${index + 1}`}</li>)}{values.subtasks.length > 3 && <li className="more">+{values.subtasks.length - 3} more</li>}</ul> : <p>No subtasks added yet.</p>}</div>
+    <div className="etm-task-preview-group"><div><CheckCheck size={14} /><strong>Subtasks</strong><span>{completeSubtasks}/{allSubtasks.length}</span></div>{allSubtasks.length ? <ul>{allSubtasks.slice(0, 3).map((subtask, index) => <li key={subtask.localKey} className={subtask.is_completed ? "completed" : ""}><Check size={12} />{subtask.title.trim() || `Subtask ${index + 1}`}</li>)}{allSubtasks.length > 3 && <li className="more">+{allSubtasks.length - 3} more</li>}</ul> : <p>No subtasks added yet.</p>}</div>
   </section>;
 }
 
@@ -124,8 +173,9 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
   const projectOptions = [...new Map([...projects, ...(task?.project ? [task.project] : [])].map(project => [project.id, project])).values()].sort((a, b) => a.name.localeCompare(b.name));
   const filteredMembers = roster.filter(member => `${memberName(member)} ${member.position ?? ""}`.toLowerCase().includes(memberSearch.trim().toLowerCase()));
   const filteredProjects = projectOptions.filter(project => project.name.toLocaleLowerCase().includes(values.project.trim().toLocaleLowerCase()));
-  const completedSubtasks = values.subtasks.filter(subtask => subtask.is_completed).length;
-  const incompleteSubtasks = values.subtasks.length - completedSubtasks;
+  const allSubtasks = flattenTree(values.subtasks);
+  const completedSubtasks = allSubtasks.filter(subtask => subtask.is_completed).length;
+  const incompleteSubtasks = allSubtasks.length - completedSubtasks;
 
   useEffect(() => {
     if (!projectMenuOpen) return;
@@ -193,15 +243,30 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
     }
   }
 
-  function updateSubtask(localKey: string, change: Partial<SubTask>) {
-    setValues(current => ({ ...current, subtasks: current.subtasks.map(subtask => subtask.localKey === localKey ? { ...subtask, ...change } : subtask) }));
+  function updateSubtask(localKey: string, change: Partial<Pick<SubTask, "title" | "description" | "status" | "is_completed">>) {
+    setValues(current => ({ ...current, subtasks: mapSubtaskTree(current.subtasks, localKey, subtask => ({ ...subtask, ...change })) }));
     if (errors[localKey] || (change.is_completed !== undefined && errors.status)) setErrors(current => ({ ...current, [localKey]: "", ...(change.is_completed !== undefined ? { status: "" } : {}) }));
   }
 
-  function addSubtask() {
+  function removeSubtask(localKey: string) {
+    setValues(current => ({ ...current, subtasks: removeFromSubtaskTree(current.subtasks, localKey) }));
+  }
+
+  function addSubtask(parentKey: string | null = null) {
     const localKey = `new-${nextSubtask.current++}`;
-    setValues(current => ({ ...current, subtasks: [...current.subtasks, { localKey, title: "", description: "", status: "Pending", is_completed: false }] }));
+    setValues(current => ({ ...current, subtasks: addChildToSubtaskTree(current.subtasks, parentKey, { localKey, title: "", description: "", status: "Pending", is_completed: false, subtasks: [] }) }));
     requestAnimationFrame(() => formRef.current?.querySelector<HTMLInputElement>(`[data-subtask-key="${localKey}"]`)?.focus());
+  }
+
+  function templateToEditableSubtasks(templateId: number, subtasks: TemplateSubtask[]): EditableSubtask[] {
+    return subtasks.map(subtask => ({
+      title: subtask.title,
+      description: subtask.description,
+      status: "Pending",
+      is_completed: false,
+      localKey: `template-${templateId}-${nextTemplateSubtask.current++}`,
+      subtasks: templateToEditableSubtasks(templateId, subtask.subtasks ?? []),
+    }));
   }
 
   function applyTemplate(template: TaskTemplate) {
@@ -217,7 +282,7 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
       location_barangay: template.location_barangay,
       priority: template.priority,
       assignments: template.is_personal ? [] : current.assignments,
-      subtasks: template.subtasks.map(subtask => ({ ...subtask, status: "Pending", is_completed: false, localKey: `template-${template.id}-${nextTemplateSubtask.current++}` })),
+      subtasks: templateToEditableSubtasks(template.id, template.subtasks),
     }));
     setSelectedTemplateId(String(template.id));
     setErrors({});
@@ -243,7 +308,7 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
     }
     if (values.recurrence === "Weekly" && !values.recurrence_weekdays) nextErrors.recurrence_weekdays = "Select at least one weekday.";
     if (values.recurrence === "Specific" && values.recurrence_dates.length === 0) nextErrors.recurrence_dates = "Add at least one date.";
-    values.subtasks.forEach(subtask => {
+    allSubtasks.forEach(subtask => {
       if (!subtask.title.trim()) nextErrors[subtask.localKey] = "Add a subtask title, or remove this row.";
     });
     if (values.status === "Completed" && incompleteSubtasks > 0) {
@@ -268,7 +333,7 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
         location_city: values.location_city.trim(),
         location_barangay: values.location_barangay.trim(),
         progress_message: values.progress_message?.trim() || undefined,
-        subtasks: values.subtasks.map(({ id, title, description, status, is_completed }) => ({ ...(id !== undefined ? { id } : {}), title: title.trim(), description: description.trim(), status, is_completed })),
+        subtasks: serializeSubtasks(values.subtasks),
       });
     } catch (caught) {
       setError(saveError(caught));
@@ -440,19 +505,13 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
             </section>
 
             <section className="etm-panel etm-form-section" aria-labelledby={`${fieldId}-subtasks-heading`}>
-              <div className="etm-form-section-heading"><span className="etm-form-section-icon"><CheckCheck size={19} /></span><div><h2 id={`${fieldId}-subtasks-heading`}>Subtasks <span className="etm-form-optional">(optional)</span> <span className="etm-form-count">{values.subtasks.length}</span></h2><p>Add them now, or let the creator or assignees add them later.</p></div>{values.subtasks.length > 0 && <span className="etm-subtask-summary">{completedSubtasks}/{values.subtasks.length} done</span>}</div>
+              <div className="etm-form-section-heading"><span className="etm-form-section-icon"><CheckCheck size={19} /></span><div><h2 id={`${fieldId}-subtasks-heading`}>Subtasks <span className="etm-form-optional">(optional)</span> <span className="etm-form-count">{allSubtasks.length}</span></h2><p>Add them now, or let the creator or assignees add them later. Subtasks can have their own subtasks too.</p></div>{allSubtasks.length > 0 && <span className="etm-subtask-summary">{completedSubtasks}/{allSubtasks.length} done</span>}</div>
               <div className="etm-form-section-body">
-                {values.subtasks.length === 0 && <div className="etm-subtask-empty"><CheckCheck size={23} /><span>No subtasks yet. Add the first step below.</span></div>}
-                <div className="etm-subtask-editor">{values.subtasks.map((subtask, index) => <div className="etm-subtask-editor-item" key={subtask.localKey}>
-                  <div className={`etm-subtask-input-row ${subtask.is_completed ? "completed" : ""}`}>
-                    <input type="checkbox" checked={subtask.is_completed} onChange={event => updateSubtask(subtask.localKey, { is_completed: event.target.checked })} aria-label={`Mark subtask ${index + 1} complete`} />
-                    <input type="text" data-subtask-key={subtask.localKey} value={subtask.title} onChange={event => updateSubtask(subtask.localKey, { title: event.target.value })} placeholder={`Subtask ${index + 1}`} aria-label={`Subtask ${index + 1} title`} maxLength={255} aria-invalid={!!errors[subtask.localKey]} aria-describedby={errors[subtask.localKey] ? `${fieldId}-${subtask.localKey}-error` : undefined} />
-                    <button className="etm-icon-button" type="button" aria-label={`Remove subtask ${index + 1}`} onClick={() => update("subtasks", values.subtasks.filter(item => item.localKey !== subtask.localKey))}><Trash2 size={16} /></button>
-                  </div>
-                  {errors[subtask.localKey] && <p className="etm-field-error" id={`${fieldId}-${subtask.localKey}-error`}>{errors[subtask.localKey]}</p>}
-                  <textarea className="etm-subtask-description" value={subtask.description} onChange={event => updateSubtask(subtask.localKey, { description: event.target.value })} placeholder="Add a short description for this subtask (optional)…" aria-label={`Subtask ${index + 1} description`} rows={2} maxLength={2000} />
-                </div>)}</div>
-                <button type="button" className="etm-add-subtask" onClick={addSubtask}><Plus size={16} /> Add subtask</button>
+                {allSubtasks.length === 0 && <div className="etm-subtask-empty"><CheckCheck size={23} /><span>No subtasks yet. Add the first step below.</span></div>}
+                <div className="etm-subtask-editor">{values.subtasks.map((subtask, index) => (
+                  <SubtaskEditorRow key={subtask.localKey} subtask={subtask} index={index} depth={0} fieldId={fieldId} errors={errors} onUpdate={updateSubtask} onRemove={removeSubtask} onAddChild={addSubtask} />
+                ))}</div>
+                <button type="button" className="etm-add-subtask" onClick={() => addSubtask(null)}><Plus size={16} /> Add subtask</button>
               </div>
             </section>
           </div>

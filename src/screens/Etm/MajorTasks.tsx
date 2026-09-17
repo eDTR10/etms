@@ -291,7 +291,7 @@ export default function MajorTasks() {
         onReactSubtaskRemark={(subtaskId, remarkId, emoji) => reactToSubtaskRemark(viewingTask.id, subtaskId, remarkId, emoji)}
         onAddSubtaskRemarkReply={(subtaskId, remarkId, message) => addSubtaskRemarkReply(viewingTask.id, subtaskId, remarkId, message)}
         onSetSubtaskStatus={(subtaskId, message, status) => setSubtaskStatus(viewingTask.id, subtaskId, message, status)}
-        onAddSubtask={(title, description) => addSubtask(viewingTask.id, title, description)}
+        onAddSubtask={(title, description, parentId) => addSubtask(viewingTask.id, title, description, parentId)}
         onEditSubtask={(subtaskId, input) => editSubtask(viewingTask.id, subtaskId, input)}
         onDeleteSubtask={subtaskId => deleteSubtask(viewingTask.id, subtaskId)}
         onSetSubtaskCompletion={(subtaskId, isCompleted) => setSubtaskCompletion(viewingTask.id, subtaskId, isCompleted)}

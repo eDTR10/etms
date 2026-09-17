@@ -157,8 +157,8 @@ const GUIDES: Guide[] = [
 ];
 
 const SAMPLE_SUBTASKS = [
-  { id: 1, title: "Pull data from the task board", description: "", status: "Completed" as const, is_completed: true },
-  { id: 2, title: "Draft the summary write-up", description: "", status: "Pending" as const, is_completed: false },
+  { id: 1, title: "Pull data from the task board", description: "", status: "Completed" as const, is_completed: true, subtasks: [] },
+  { id: 2, title: "Draft the summary write-up", description: "", status: "Pending" as const, is_completed: false, subtasks: [] },
 ];
 
 const SAMPLE_COMPLETED_TASKS = [

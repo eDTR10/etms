@@ -8,7 +8,7 @@ import { AlertTriangle, Bold, CalendarDays, Check, CheckCheck, ChevronRight, Cir
 import MentionField from "./MentionField";
 import { useAuth } from "../../screens/Auth/AuthContext";
 import { useTasks } from "./taskContext";
-import { completionPercent, formatDate, formatFileSize, isOverdue, memberName, REACTION_EMOJI, STATUSES, statusSlug, type Attachment, type Member, type ProgressLog, type Remark, type SubTask, type Task, type TaskStatus } from "./types";
+import { completionPercent, flattenSubtasks, formatDate, formatFileSize, isOverdue, memberName, REACTION_EMOJI, STATUSES, statusSlug, type Attachment, type Member, type ProgressLog, type Remark, type SubTask, type Task, type TaskStatus } from "./types";
 import { describeRecurrence } from "./recurrence";
 import "./forms.css";
 
@@ -33,7 +33,7 @@ interface TaskDetailsProps {
   onReactSubtaskRemark: (subtaskId: number, remarkId: number, emoji: string) => Promise<void>;
   onAddSubtaskRemarkReply: (subtaskId: number, remarkId: number, message: string) => Promise<void>;
   onSetSubtaskStatus: (subtaskId: number, message: string, status: TaskStatus) => Promise<void>;
-  onAddSubtask: (title: string, description?: string) => Promise<void>;
+  onAddSubtask: (title: string, description?: string, parentId?: number) => Promise<void>;
   onEditSubtask: (subtaskId: number, input: { title?: string; description?: string }) => Promise<void>;
   onDeleteSubtask: (subtaskId: number) => Promise<void>;
   onSetSubtaskCompletion: (subtaskId: number, isCompleted: boolean) => Promise<void>;
@@ -649,7 +649,7 @@ function ProgressHistoryItem({ log, onEdit, onDelete }: ProgressHistoryItemProps
   );
 }
 
-function SubtaskPanel({ task, subtask, members, canComment, onSetCompletion, onAddRemark, onEditRemark, onDeleteRemark, onSetStatus, onReactRemark, onAddReplyRemark, onEditSubtask, onDeleteSubtask, onAddRemarkAttachment, onDeleteRemarkAttachment, defaultOpen = false, jumpToSubtaskId }: {
+function SubtaskPanel({ task, subtask, members, canComment, onSetCompletion, onAddRemark, onEditRemark, onDeleteRemark, onSetStatus, onReactRemark, onAddReplyRemark, onAddSubtask, onEditSubtask, onDeleteSubtask, onAddRemarkAttachment, onDeleteRemarkAttachment, defaultOpen = false, jumpToSubtaskId }: {
   task: Task; subtask: SubTask; members: Member[]; canComment: boolean;
   onSetCompletion: (id: number, completed: boolean) => Promise<void>;
   onAddRemark: (id: number, message: string, file?: File) => Promise<void>;
@@ -658,6 +658,7 @@ function SubtaskPanel({ task, subtask, members, canComment, onSetCompletion, onA
   onSetStatus: (id: number, message: string, status: TaskStatus) => Promise<void>;
   onReactRemark: (id: number, remarkId: number, emoji: string) => Promise<void>;
   onAddReplyRemark: (id: number, remarkId: number, message: string) => Promise<void>;
+  onAddSubtask: (title: string, description: string | undefined, parentId: number) => Promise<void>;
   onEditSubtask: (id: number, input: { title?: string; description?: string }) => Promise<void>;
   onDeleteSubtask: (id: number) => Promise<void>;
   onAddRemarkAttachment: (subtaskId: number, remarkId: number, file: File) => Promise<void>;
@@ -672,10 +673,18 @@ function SubtaskPanel({ task, subtask, members, canComment, onSetCompletion, onA
   const [draftTitle, setDraftTitle] = useState(subtask.title);
   const [draftDescription, setDraftDescription] = useState(subtask.description);
   const [savingSubtask, setSavingSubtask] = useState(false);
+  const [addingChildOpen, setAddingChildOpen] = useState(false);
+  const [newChildTitle, setNewChildTitle] = useState("");
+  const [addingChild, setAddingChild] = useState(false);
+  const [childError, setChildError] = useState("");
   const panelRef = useRef<HTMLLIElement>(null);
   const id = subtask.id;
   const canComplete = subtask.can_complete ?? task.can_edit;
   const commentCount = subtask.remarks?.length ?? 0;
+  // Defensive: tolerates an API response from before nested subtasks existed, where a
+  // subtask wouldn't carry a `subtasks` key at all yet — renders as a leaf instead of
+  // crashing until the backend serving this request has the matching deploy.
+  const children = subtask.subtasks ?? [];
   useEffect(() => {
     if (!jumpToSubtaskId || jumpToSubtaskId.id !== id) return;
     // Reacting to an external "jump to this subtask" signal from a remark tag click or a
@@ -738,6 +747,14 @@ function SubtaskPanel({ task, subtask, members, canComment, onSetCompletion, onA
       void Swal.fire({ title: "Couldn't delete subtask", text: progressError(caught), icon: "error" });
     }
   }
+  async function addChildSubtask(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!id || !newChildTitle.trim() || addingChild) return;
+    setAddingChild(true); setChildError("");
+    try { await onAddSubtask(newChildTitle.trim(), undefined, id); setNewChildTitle(""); setAddingChildOpen(false); }
+    catch (caught) { setChildError(progressError(caught)); }
+    finally { setAddingChild(false); }
+  }
   return <li ref={panelRef} className={`etm-subtask-panel ${subtask.is_completed ? "completed" : ""}`}>
     <div className="etm-subtask-panel-summary">
       {editingSubtask ? (
@@ -755,12 +772,27 @@ function SubtaskPanel({ task, subtask, members, canComment, onSetCompletion, onA
         <button type="button" className="etm-subtask-panel-open" aria-expanded={open} onClick={() => setOpen(value => !value)}><span className="etm-details-subtask-text"><strong>{subtask.title}</strong>{subtask.description && <small>{subtask.description}</small>}</span><span className={`etm-badge ${statusSlug(subtask.status)}`}>{subtask.status}</span><span className="etm-subtask-update-count">{commentCount} {commentCount === 1 ? "update" : "updates"}</span><ChevronRight className={open ? "open" : ""} size={16} /></button>
         {task.can_edit && (
           <span className="etm-subtask-panel-actions">
+            {id && <button type="button" className="etm-icon-button" aria-label={`Add a subtask under "${subtask.title}"`} title="Add subtask" onClick={() => setAddingChildOpen(value => !value)}><Plus size={14} /></button>}
             <button type="button" className="etm-icon-button" aria-label={`Edit subtask: ${subtask.title}`} onClick={startEditingSubtask}><Pencil size={14} /></button>
             <button type="button" className="etm-icon-button danger" aria-label={`Delete subtask: ${subtask.title}`} onClick={() => void handleDeleteSubtask()}><Trash2 size={14} /></button>
           </span>
         )}
       </>)}
     </div>
+    {addingChildOpen && id && (
+      <form className="etm-add-subtask-later etm-subtask-add-child" onSubmit={addChildSubtask}>
+        <input autoFocus value={newChildTitle} onChange={event => { setNewChildTitle(event.target.value); setChildError(""); }} placeholder={`Add a subtask under "${subtask.title}"`} maxLength={255} disabled={addingChild} aria-label={`Add a subtask under ${subtask.title}`} />
+        <button type="submit" className="etm-button primary small" disabled={addingChild || !newChildTitle.trim()}>{addingChild ? <Loader2 size={14} className="etm-form-spinner" /> : <Plus size={14} />}Add</button>
+        {childError && <p className="etm-field-error" role="alert">{childError}</p>}
+      </form>
+    )}
+    {children.length > 0 && (
+      <ul className="etm-details-subtasks etm-details-subtasks-nested">
+        {children.map((child, childIndex) => (
+          <SubtaskPanel key={child.id ?? childIndex} task={task} subtask={child} members={members} canComment={canComment} onSetCompletion={onSetCompletion} onAddRemark={onAddRemark} onEditRemark={onEditRemark} onDeleteRemark={onDeleteRemark} onSetStatus={onSetStatus} onReactRemark={onReactRemark} onAddReplyRemark={onAddReplyRemark} onAddSubtask={onAddSubtask} onEditSubtask={onEditSubtask} onDeleteSubtask={onDeleteSubtask} onAddRemarkAttachment={onAddRemarkAttachment} onDeleteRemarkAttachment={onDeleteRemarkAttachment} jumpToSubtaskId={jumpToSubtaskId} />
+        ))}
+      </ul>
+    )}
     {open && <div className="etm-subtask-panel-body">
       {id && <RemarkList
         remarks={subtask.remarks ?? []}
@@ -773,7 +805,7 @@ function SubtaskPanel({ task, subtask, members, canComment, onSetCompletion, onA
         onAddReply={(remarkId, message) => onAddReplyRemark(id, remarkId, message)}
         onAddAttachment={(remarkId, file) => onAddRemarkAttachment(id, remarkId, file)}
         onDeleteAttachment={(remarkId, attachmentId) => onDeleteRemarkAttachment(id, remarkId, attachmentId)}
-        subtasks={task.subtasks}
+        subtasks={flattenSubtasks(task.subtasks)}
         emptyText="No updates on this subtask yet."
         showStatusField
         currentStatus={subtask.status}
@@ -907,7 +939,8 @@ function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const percent = completionPercent(task);
-  const incompleteSubtasks = task.subtasks.filter(subtask => !subtask.is_completed);
+  const allSubtasks = flattenSubtasks(task.subtasks);
+  const incompleteSubtasks = allSubtasks.filter(subtask => !subtask.is_completed);
   const logs = [...task.progress_logs].sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime() || right.id - left.id);
   const activityLogs = [...task.activity_logs].sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime() || right.id - left.id);
   const canComment = task.can_edit || task.my_role === "Commentor";
@@ -1012,11 +1045,11 @@ function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = 
       </section>
 
       <section className="etm-details-section">
-        <div className="etm-details-section-title"><h3><CheckCheck size={17} />Subtasks <span className="etm-form-count">{task.subtasks.length}</span></h3><div className="etm-subtask-section-actions">{task.subtasks.length > 0 && <span>{task.subtasks.filter(subtask => subtask.is_completed).length} of {task.subtasks.length} complete</span>}{canAddSubtasks && <button type="button" className="etm-inline-link-button" onClick={() => document.getElementById(`${fieldId}-new-subtask`)?.focus()}><Plus size={14} />Add subtask</button>}</div></div>
+        <div className="etm-details-section-title"><h3><CheckCheck size={17} />Subtasks <span className="etm-form-count">{allSubtasks.length}</span></h3><div className="etm-subtask-section-actions">{allSubtasks.length > 0 && <span>{allSubtasks.filter(subtask => subtask.is_completed).length} of {allSubtasks.length} complete</span>}{canAddSubtasks && <button type="button" className="etm-inline-link-button" onClick={() => document.getElementById(`${fieldId}-new-subtask`)?.focus()}><Plus size={14} />Add subtask</button>}</div></div>
         {task.is_completed && incompleteSubtasks.length > 0 && <div className="etm-subtask-completion-warning" role="alert"><AlertTriangle size={17} /><span><strong>{incompleteSubtasks.length} subtask{incompleteSubtasks.length === 1 ? "" : "s"} still incomplete.</strong> Reopen this task, finish the remaining subtasks, then complete it again.</span></div>}
         {task.subtasks.length > 0 ? <>
           <div className="etm-details-progress-track" role="progressbar" aria-label="Task completion" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${percent}%` }} /></div>
-          <ul className="etm-details-subtasks">{task.subtasks.map((subtask, index) => <SubtaskPanel key={subtask.id ?? index} task={task} subtask={subtask} members={task.assignments} canComment={canComment} onSetCompletion={onSetSubtaskCompletion} onAddRemark={onAddSubtaskRemark} onEditRemark={onEditSubtaskRemark} onDeleteRemark={onDeleteSubtaskRemark} onReactRemark={onReactSubtaskRemark} onAddReplyRemark={onAddSubtaskRemarkReply} onSetStatus={onSetSubtaskStatus} onEditSubtask={onEditSubtask} onDeleteSubtask={onDeleteSubtask} onAddRemarkAttachment={onAddSubtaskRemarkAttachment} onDeleteRemarkAttachment={onDeleteSubtaskRemarkAttachment} defaultOpen={subtask.id === initialSubtaskId} jumpToSubtaskId={jumpToSubtaskId} />)}</ul>
+          <ul className="etm-details-subtasks">{task.subtasks.map((subtask, index) => <SubtaskPanel key={subtask.id ?? index} task={task} subtask={subtask} members={task.assignments} canComment={canComment} onSetCompletion={onSetSubtaskCompletion} onAddRemark={onAddSubtaskRemark} onEditRemark={onEditSubtaskRemark} onDeleteRemark={onDeleteSubtaskRemark} onReactRemark={onReactSubtaskRemark} onAddReplyRemark={onAddSubtaskRemarkReply} onSetStatus={onSetSubtaskStatus} onAddSubtask={onAddSubtask} onEditSubtask={onEditSubtask} onDeleteSubtask={onDeleteSubtask} onAddRemarkAttachment={onAddSubtaskRemarkAttachment} onDeleteRemarkAttachment={onDeleteSubtaskRemarkAttachment} defaultOpen={subtask.id === initialSubtaskId} jumpToSubtaskId={jumpToSubtaskId} />)}</ul>
         </> : <p className="etm-details-text empty">This task has no subtasks.</p>}
         {canAddSubtasks && <form className="etm-add-subtask-later" onSubmit={addSubtask}><input id={`${fieldId}-new-subtask`} value={newSubtaskTitle} onChange={event => { setNewSubtaskTitle(event.target.value); setSubtaskError(""); }} placeholder="Add a subtask to this task" maxLength={255} disabled={addingSubtask} /><button type="submit" className="etm-button primary small" disabled={addingSubtask || !newSubtaskTitle.trim()}>{addingSubtask ? <Loader2 size={14} className="etm-form-spinner" /> : <Plus size={14} />}Add</button>{subtaskError && <p className="etm-field-error" role="alert">{subtaskError}</p>}</form>}
       </section>
@@ -1040,7 +1073,7 @@ function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = 
           incompleteSubtaskCount={incompleteSubtasks.length}
           onAddAttachment={onAddRemarkAttachment}
           onDeleteAttachment={onDeleteRemarkAttachment}
-          subtasks={task.subtasks}
+          subtasks={allSubtasks}
           onOpenSubtask={openSubtask}
         />
       </section>

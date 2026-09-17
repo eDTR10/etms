@@ -3,6 +3,7 @@ import { Bookmark, Check, CheckCheck, ChevronDown, Flag, Folder, Loader2, MapPin
 import { taskError } from "./taskService";
 import { PRIORITIES, type Priority, type Project, type TaskTemplate, type TaskTemplateInput, type TemplateSubtask } from "./types";
 import { REGION_X_BARANGAYS, REGION_X_CITIES, REGION_X_PROVINCES } from "./regionXLocations";
+import { addChildToSubtaskTree, flattenTree, mapSubtaskTree, removeFromSubtaskTree } from "./subtaskTree";
 import "./forms.css";
 
 const PRIORITY_NOTES: Record<Priority, string> = {
@@ -18,12 +19,29 @@ interface TemplateFormProps {
   onCancel: () => void;
 }
 
-type EditableTemplateSubtask = TemplateSubtask & { localKey: string };
+type EditableTemplateSubtask = Omit<TemplateSubtask, "subtasks"> & { localKey: string; subtasks: EditableTemplateSubtask[] };
 type FormValues = Omit<TaskTemplateInput, "subtasks" | "project"> & {
   subtasks: EditableTemplateSubtask[];
   project: string;
 };
 type FormErrors = Record<string, string>;
+
+let editableTemplateSubtaskSeed = 0;
+function toEditableTemplateSubtasks(subtasks: TemplateSubtask[]): EditableTemplateSubtask[] {
+  return subtasks.map(subtask => ({
+    ...subtask,
+    localKey: `existing-${editableTemplateSubtaskSeed++}`,
+    subtasks: toEditableTemplateSubtasks(subtask.subtasks ?? []),
+  }));
+}
+
+function serializeTemplateSubtasks(subtasks: EditableTemplateSubtask[]): TemplateSubtask[] {
+  return subtasks.map(({ title, description, subtasks: children }) => ({
+    title: title.trim(),
+    description: description.trim(),
+    subtasks: serializeTemplateSubtasks(children),
+  }));
+}
 
 function initialValues(template?: TaskTemplate): FormValues {
   return {
@@ -37,8 +55,34 @@ function initialValues(template?: TaskTemplate): FormValues {
     location_city: template?.location_city ?? "",
     location_barangay: template?.location_barangay ?? "",
     priority: template?.priority ?? "Medium",
-    subtasks: (template?.subtasks ?? []).map((subtask, index) => ({ ...subtask, localKey: `existing-${index}` })),
+    subtasks: toEditableTemplateSubtasks(template?.subtasks ?? []),
   };
+}
+
+function TemplateSubtaskEditorRow({ subtask, index, fieldId, errors, onUpdate, onRemove, onAddChild }: {
+  subtask: EditableTemplateSubtask; index: number; fieldId: string; errors: FormErrors;
+  onUpdate: (localKey: string, change: Partial<Pick<TemplateSubtask, "title" | "description">>) => void;
+  onRemove: (localKey: string) => void;
+  onAddChild: (parentKey: string) => void;
+}) {
+  return (
+    <div className="etm-subtask-editor-item">
+      <div className="etm-subtask-input-row">
+        <input type="text" data-subtask-key={subtask.localKey} value={subtask.title} onChange={event => onUpdate(subtask.localKey, { title: event.target.value })} placeholder={`Subtask ${index + 1}`} aria-label={`Subtask ${index + 1} title`} maxLength={255} aria-invalid={!!errors[subtask.localKey]} />
+        <button className="etm-icon-button" type="button" aria-label={`Add a subtask under "${subtask.title || `subtask ${index + 1}`}"`} title="Add subtask" onClick={() => onAddChild(subtask.localKey)}><Plus size={16} /></button>
+        <button className="etm-icon-button" type="button" aria-label={`Remove subtask ${index + 1}`} onClick={() => onRemove(subtask.localKey)}><Trash2 size={16} /></button>
+      </div>
+      {errors[subtask.localKey] && <p className="etm-field-error">{errors[subtask.localKey]}</p>}
+      <textarea className="etm-subtask-description" value={subtask.description} onChange={event => onUpdate(subtask.localKey, { description: event.target.value })} placeholder="Add a short description for this subtask (optional)…" aria-label={`Subtask ${index + 1} description`} rows={2} maxLength={2000} />
+      {subtask.subtasks.length > 0 && (
+        <div className="etm-subtask-children">
+          {subtask.subtasks.map((child, childIndex) => (
+            <TemplateSubtaskEditorRow key={child.localKey} subtask={child} index={childIndex} fieldId={fieldId} errors={errors} onUpdate={onUpdate} onRemove={onRemove} onAddChild={onAddChild} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function TemplateForm({ template, projects, onSave, onCancel }: TemplateFormProps) {
@@ -53,20 +97,25 @@ export default function TemplateForm({ template, projects, onSave, onCancel }: T
   const [error, setError] = useState("");
 
   const filteredProjects = projects.filter(project => project.name.toLocaleLowerCase().includes(values.project.trim().toLocaleLowerCase()));
+  const allSubtasks = flattenTree(values.subtasks);
 
   function update<K extends keyof FormValues>(field: K, value: FormValues[K]) {
     setValues(current => ({ ...current, [field]: value }));
     if (errors[field as string]) setErrors(current => ({ ...current, [field as string]: "" }));
   }
 
-  function updateSubtask(localKey: string, change: Partial<TemplateSubtask>) {
-    setValues(current => ({ ...current, subtasks: current.subtasks.map(subtask => subtask.localKey === localKey ? { ...subtask, ...change } : subtask) }));
+  function updateSubtask(localKey: string, change: Partial<Pick<TemplateSubtask, "title" | "description">>) {
+    setValues(current => ({ ...current, subtasks: mapSubtaskTree(current.subtasks, localKey, subtask => ({ ...subtask, ...change })) }));
     if (errors[localKey]) setErrors(current => ({ ...current, [localKey]: "" }));
   }
 
-  function addSubtask() {
+  function removeSubtask(localKey: string) {
+    setValues(current => ({ ...current, subtasks: removeFromSubtaskTree(current.subtasks, localKey) }));
+  }
+
+  function addSubtask(parentKey: string | null = null) {
     const localKey = `new-${nextSubtask.current++}`;
-    setValues(current => ({ ...current, subtasks: [...current.subtasks, { localKey, title: "", description: "" }] }));
+    setValues(current => ({ ...current, subtasks: addChildToSubtaskTree(current.subtasks, parentKey, { localKey, title: "", description: "", subtasks: [] }) }));
     requestAnimationFrame(() => formRef.current?.querySelector<HTMLInputElement>(`[data-subtask-key="${localKey}"]`)?.focus());
   }
 
@@ -76,7 +125,7 @@ export default function TemplateForm({ template, projects, onSave, onCancel }: T
     const nextErrors: FormErrors = {};
     if (!values.name.trim()) nextErrors.name = "Give this template a name.";
     if (!values.is_personal && !values.project.trim()) nextErrors.project = "Enter or select a project, or mark this as a personal task template.";
-    values.subtasks.forEach(subtask => {
+    allSubtasks.forEach(subtask => {
       if (!subtask.title.trim()) nextErrors[subtask.localKey] = "Add a subtask title, or remove this row.";
     });
     setErrors(nextErrors);
@@ -98,7 +147,7 @@ export default function TemplateForm({ template, projects, onSave, onCancel }: T
         location_province: values.location_province.trim(),
         location_city: values.location_city.trim(),
         location_barangay: values.location_barangay.trim(),
-        subtasks: values.subtasks.map(({ title, description }) => ({ title: title.trim(), description: description.trim() })),
+        subtasks: serializeTemplateSubtasks(values.subtasks),
       });
     } catch (caught) {
       setError(taskError(caught));
@@ -191,16 +240,11 @@ export default function TemplateForm({ template, projects, onSave, onCancel }: T
 
           <div className="etm-field">
             <label style={{ display: "flex", alignItems: "center", gap: 8 }}><CheckCheck size={16} /> Subtasks <span className="etm-form-optional">(optional)</span></label>
-            {values.subtasks.length === 0 && <div className="etm-subtask-empty"><CheckCheck size={23} /><span>No subtasks yet. Add the first step below.</span></div>}
-            <div className="etm-subtask-editor">{values.subtasks.map((subtask, index) => <div className="etm-subtask-editor-item" key={subtask.localKey}>
-              <div className="etm-subtask-input-row">
-                <input type="text" data-subtask-key={subtask.localKey} value={subtask.title} onChange={event => updateSubtask(subtask.localKey, { title: event.target.value })} placeholder={`Subtask ${index + 1}`} aria-label={`Subtask ${index + 1} title`} maxLength={255} aria-invalid={!!errors[subtask.localKey]} />
-                <button className="etm-icon-button" type="button" aria-label={`Remove subtask ${index + 1}`} onClick={() => update("subtasks", values.subtasks.filter(item => item.localKey !== subtask.localKey))}><Trash2 size={16} /></button>
-              </div>
-              {errors[subtask.localKey] && <p className="etm-field-error">{errors[subtask.localKey]}</p>}
-              <textarea className="etm-subtask-description" value={subtask.description} onChange={event => updateSubtask(subtask.localKey, { description: event.target.value })} placeholder="Add a short description for this subtask (optional)…" aria-label={`Subtask ${index + 1} description`} rows={2} maxLength={2000} />
-            </div>)}</div>
-            <button type="button" className="etm-add-subtask" onClick={addSubtask}><Plus size={16} /> Add subtask</button>
+            {allSubtasks.length === 0 && <div className="etm-subtask-empty"><CheckCheck size={23} /><span>No subtasks yet. Add the first step below.</span></div>}
+            <div className="etm-subtask-editor">{values.subtasks.map((subtask, index) => (
+              <TemplateSubtaskEditorRow key={subtask.localKey} subtask={subtask} index={index} fieldId={fieldId} errors={errors} onUpdate={updateSubtask} onRemove={removeSubtask} onAddChild={addSubtask} />
+            ))}</div>
+            <button type="button" className="etm-add-subtask" onClick={() => addSubtask(null)}><Plus size={16} /> Add subtask</button>
           </div>
         </div>
       </fieldset>

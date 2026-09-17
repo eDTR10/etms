@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { TaskContext } from "./taskContext";
 import { taskError, taskService } from "./taskService";
-import type { Member, Project, Task, TaskInput, TaskStatus, TaskTemplate, TaskTemplateInput } from "./types";
+import { flattenSubtasks, type Member, type Project, type Task, type TaskInput, type TaskStatus, type TaskTemplate, type TaskTemplateInput } from "./types";
 
 export default function TaskProvider({ children }: { children: ReactNode }) {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -96,7 +96,7 @@ export default function TaskProvider({ children }: { children: ReactNode }) {
   };
   const addSubtaskRemark = async (id: number, subtaskId: number, message: string, file?: File) => {
     const updated = await taskService.addSubtaskRemark(id, subtaskId, message);
-    const newRemarkId = file ? updated.subtasks.find(subtask => subtask.id === subtaskId)?.remarks?.[0]?.id : undefined;
+    const newRemarkId = file ? flattenSubtasks(updated.subtasks).find(subtask => subtask.id === subtaskId)?.remarks?.[0]?.id : undefined;
     replace(newRemarkId ? await taskService.addSubtaskRemarkAttachment(id, subtaskId, newRemarkId, file!) : updated);
   };
   const editSubtaskRemark = async (id: number, subtaskId: number, remarkId: number, message: string) => {
@@ -114,8 +114,8 @@ export default function TaskProvider({ children }: { children: ReactNode }) {
   const setSubtaskStatus = async (id: number, subtaskId: number, message: string, status: TaskStatus) => {
     replace(await taskService.setSubtaskStatus(id, subtaskId, message, status));
   };
-  const addSubtask = async (id: number, title: string, description?: string) => {
-    replace(await taskService.addSubtask(id, title, description));
+  const addSubtask = async (id: number, title: string, description?: string, parentId?: number) => {
+    replace(await taskService.addSubtask(id, title, description, parentId));
   };
   const editSubtask = async (id: number, subtaskId: number, input: { title?: string; description?: string }) => {
     replace(await taskService.editSubtask(id, subtaskId, input));

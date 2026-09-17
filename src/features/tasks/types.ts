@@ -94,6 +94,15 @@ export interface SubTask {
   remarks?: Remark[];
   progress_logs?: SubtaskProgressLog[];
   can_complete?: boolean;
+  // Subtasks of this subtask, unlimited depth.
+  subtasks: SubTask[];
+}
+
+// Walks a subtask tree (any depth) into a single flat list — for stats/gates (completion
+// percent, "every subtask must be done before completing the task") that don't care where
+// in the tree a subtask sits, only whether it's done.
+export function flattenSubtasks(subtasks: SubTask[]): SubTask[] {
+  return subtasks.flatMap(subtask => [subtask, ...flattenSubtasks(subtask.subtasks ?? [])]);
 }
 
 export interface SubtaskProgressLog {
@@ -173,6 +182,11 @@ export interface Task {
 export interface TemplateSubtask {
   title: string;
   description: string;
+  subtasks: TemplateSubtask[];
+}
+
+export function flattenTemplateSubtasks(subtasks: TemplateSubtask[]): TemplateSubtask[] {
+  return subtasks.flatMap(subtask => [subtask, ...flattenTemplateSubtasks(subtask.subtasks ?? [])]);
 }
 
 export interface TaskTemplate {
@@ -280,7 +294,8 @@ export function isOverdue(task: Task): boolean {
 }
 
 export function completionPercent(task: Task): number {
-  if (task.subtasks.length) return Math.round(task.subtasks.filter(s => s.is_completed).length / task.subtasks.length * 100);
+  const allSubtasks = flattenSubtasks(task.subtasks);
+  if (allSubtasks.length) return Math.round(allSubtasks.filter(s => s.is_completed).length / allSubtasks.length * 100);
   return task.is_completed ? 100 : 0;
 }
 
@@ -289,7 +304,8 @@ export function formatTaskNumber(id: number): string {
 }
 
 export function statusChipLabel(task: Task): string {
-  if (!task.subtasks.length) return task.status;
-  const done = task.subtasks.filter(s => s.is_completed).length;
-  return `${task.status} (${done}/${task.subtasks.length})`;
+  const allSubtasks = flattenSubtasks(task.subtasks);
+  if (!allSubtasks.length) return task.status;
+  const done = allSubtasks.filter(s => s.is_completed).length;
+  return `${task.status} (${done}/${allSubtasks.length})`;
 }

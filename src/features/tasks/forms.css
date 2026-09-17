@@ -126,6 +126,7 @@
 .etm-subtask-empty svg { flex-shrink: 0; color: #b4c1ca; }
 .etm-subtask-editor { display: grid; gap: 10px; }
 .etm-subtask-editor:empty { display: none; }
+.etm-subtask-children { display: grid; gap: 10px; margin: 10px 0 0 17px; padding-left: 16px; border-left: 2px solid var(--etm-border); }
 .etm-subtask-input-row { display: flex; align-items: center; gap: 10px; padding: 5px 8px 5px 13px; border: 1px solid var(--etm-border); border-radius: 8px; }
 .etm-subtask-input-row > input[type="text"] { width: 100%; min-width: 0; height: 35px; padding: 4px; background: transparent; border: 1px solid transparent; border-radius: 4px; color: var(--etm-ink); font-family: inherit; font-size: 12.5px; }
 .etm-subtask-input-row > input[type="text"]:focus { outline: 1px solid var(--etm-primary); outline-offset: 1px; }
@@ -238,6 +239,8 @@
 .etm-details-subtasks { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
 .etm-details-subtasks li { border: 1px solid #e8eef1; border-radius: 9px; color: #647787; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
 .etm-details-subtasks li.completed { background: #f8fbfa; }
+.etm-details-subtasks-nested { margin: 6px 12px 8px 45px; padding-left: 14px; border-left: 2px solid var(--etm-border); }
+.etm-subtask-add-child { margin: 8px 12px 4px 45px; }
 .etm-subtask-panel-summary { display: flex; align-items: flex-start; gap: 8px; padding: 11px 12px; }
 .etm-details-subtask-toggle { display: inline-flex; align-items: center; justify-content: center; width: 25px; height: 25px; flex: 0 0 25px; margin-top: 1px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #8ca1ac; cursor: pointer; }
 .etm-details-subtask-toggle:hover { background: #e9f3f3; color: var(--etm-primary); }
@@ -436,7 +439,7 @@ button.etm-remark-subtask-tag:hover { background: color-mix(in srgb, var(--etm-p
   .etm-details-progress-actions > .etm-field { width: min(165px, 50%); }
   .etm-details-progress-actions > .etm-button { min-height: 45px; padding-left: 10px; padding-right: 10px; }
   .etm-subtask-section-actions { align-items: flex-end; flex-direction: column; gap: 4px; }
-  .etm-subtask-panel-body { margin-left: 12px; }
+  .etm-subtask-panel-body, .etm-details-subtasks-nested, .etm-subtask-add-child { margin-left: 12px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .etm-form-spinner, .etm-dialog-overlay, .etm-task-details { animation: none; }
