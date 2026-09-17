@@ -73,7 +73,7 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks" }
     addRemarkAttachment, deleteRemarkAttachment, addSubtaskRemarkAttachment, deleteSubtaskRemarkAttachment, markCompletionSeen, markViewed,
   } = useTasks();
   const confirmDelete = useDeleteTaskConfirm();
-  const { confirmDuplicate, isDuplicating } = useDuplicateTask();
+  const { confirmDuplicate, isDuplicating } = useDuplicateTask(basePath);
   const { confirmArchive, confirmDelete: confirmBulkDelete } = useBulkTaskActions();
   const {
     filtered, search, setSearch, deadlineDate, setDeadlineDate, quickFilter, setQuickFilter,

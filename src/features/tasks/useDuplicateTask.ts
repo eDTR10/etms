@@ -5,7 +5,7 @@ import { useTasks } from "./taskContext";
 import { taskError } from "./taskService";
 import type { Task } from "./types";
 
-export function useDuplicateTask() {
+export function useDuplicateTask(basePath = "/etms/tasks") {
   const { duplicateTask, updateTask } = useTasks();
   const navigate = useNavigate();
   const [pendingIds, setPendingIds] = useState<Set<number>>(new Set());
@@ -21,7 +21,11 @@ export function useDuplicateTask() {
     setPendingIds(new Set(pendingRef.current));
     try {
       const copy = await duplicateTask(task.id);
-      navigate(`/etms/tasks/${copy.id}`);
+      // Rename (if any) happens before navigating away, not after — navigating to
+      // /etms/tasks/:taskId mounts that page's own, separate TaskProvider, so an
+      // updateTask() call fired afterwards would land on this now-unmounted provider's
+      // stale closure: the PATCH could still reach the backend, but the new page's
+      // already-fetched data would never learn about it and keep showing the old title.
       const { value: newTitle } = await Swal.fire({
         title: "Name this duplicate",
         text: "Give the duplicated task a new title, or keep the suggested one.",
@@ -40,6 +44,7 @@ export function useDuplicateTask() {
           void Swal.fire({ title: "Title couldn't be saved", text: taskError(renameError), icon: "error" });
         }
       }
+      navigate(`${basePath}/${copy.id}`);
     } catch (error) {
       void Swal.fire({ title: "Couldn't duplicate task", text: taskError(error), icon: "error" });
     } finally {

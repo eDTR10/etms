@@ -62,7 +62,7 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
     addRemarkAttachment, deleteRemarkAttachment, addSubtaskRemarkAttachment, deleteSubtaskRemarkAttachment, markCompletionSeen, markViewed,
   } = useTasks();
   const confirmDelete = useDeleteTaskConfirm();
-  const { confirmDuplicate, isDuplicating } = useDuplicateTask();
+  const { confirmDuplicate, isDuplicating } = useDuplicateTask(basePath);
   const { confirmArchive, confirmDelete: confirmBulkDelete } = useBulkTaskActions();
   const [scope, setScope] = useState<TaskScope>("assigned");
   const [showArchived, setShowArchived] = useState(false);

@@ -15,7 +15,7 @@ export function TaskPageContent({ basePath = "/etms/tasks" }: { basePath?: strin
   const { taskId } = useParams();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { confirmDuplicate, isDuplicating } = useDuplicateTask();
+  const { confirmDuplicate, isDuplicating } = useDuplicateTask(basePath);
   const [editing, setEditing] = useState(false);
   // Captured once on mount — a notification redirect (?hl=task or ?hl=subtask-123)
   // should flash its target only for this one arrival, not again on every re-render
