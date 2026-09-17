@@ -1,6 +1,6 @@
 import axios from "axios";
 import api from "../../plugin/axios";
-import type { GroupedTask, GroupedTaskInput, Member, Project, Task, TaskInput, TaskStatus } from "./types";
+import type { GroupedTask, GroupedTaskInput, Member, Project, Task, TaskInput, TaskStatus, TaskTemplate, TaskTemplateInput } from "./types";
 
 export interface BulkActionResult {
   succeeded: number[];
@@ -90,6 +90,10 @@ export const taskService = {
     (await api.post<Task>(`etm/tasks/${id}/mark-completion-seen/`)).data,
   markViewed: async (id: number) =>
     (await api.post<Task>(`etm/tasks/${id}/mark-viewed/`)).data,
+  listTemplates: async () => (await api.get<TaskTemplate[]>("etm/task-templates/")).data,
+  createTemplate: async (input: TaskTemplateInput) => (await api.post<TaskTemplate>("etm/task-templates/", input)).data,
+  updateTemplate: async (id: number, input: TaskTemplateInput) => (await api.patch<TaskTemplate>(`etm/task-templates/${id}/`, input)).data,
+  deleteTemplate: async (id: number) => { await api.delete(`etm/task-templates/${id}/`); },
 };
 
 export function taskError(error: unknown): string {

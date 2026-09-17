@@ -1,9 +1,10 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import { isAxiosError } from "axios";
-import { AlertTriangle, CalendarDays, Check, CheckCheck, ChevronDown, ClipboardList, Clock3, Flag, Folder, Loader2, MapPin, Plus, Repeat, Search, Trash2, User, UserPlus, Users, X } from "lucide-react";
+import { AlertTriangle, Bookmark, CalendarDays, Check, CheckCheck, ChevronDown, ClipboardList, Clock3, Flag, Folder, Loader2, MapPin, Plus, Repeat, Search, Trash2, User, UserPlus, Users, X } from "lucide-react";
 import { useTasks } from "./taskContext";
 import { taskError } from "./taskService";
-import { ASSIGNMENT_ROLES, formatDate, memberName, PRIORITIES, RECURRENCE_LABELS, RECURRENCES, STATUSES, type AssignmentInput, type AssignmentRole, type Member, type Priority, type Project, type Recurrence, type SubTask, type Task, type TaskInput, type TaskStatus } from "./types";
+import { ASSIGNMENT_ROLES, formatDate, memberName, PRIORITIES, RECURRENCE_LABELS, RECURRENCES, STATUSES, type AssignmentInput, type AssignmentRole, type Member, type Priority, type Project, type Recurrence, type SubTask, type Task, type TaskInput, type TaskStatus, type TaskTemplate } from "./types";
 import { describeRecurrence, WEEKDAYS } from "./recurrence";
 import { REGION_X_BARANGAYS, REGION_X_CITIES, REGION_X_PROVINCES } from "./regionXLocations";
 import "./forms.css";
@@ -105,9 +106,11 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
   const formRef = useRef<HTMLFormElement>(null);
   const projectPickerRef = useRef<HTMLDivElement>(null);
   const nextSubtask = useRef(0);
-  const { addMember } = useTasks();
+  const nextTemplateSubtask = useRef(0);
+  const { addMember, templates } = useTasks();
   const [values, setValues] = useState<FormValues>(() => initialValues(task));
   const [errors, setErrors] = useState<FormErrors>({});
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [memberSearch, setMemberSearch] = useState("");
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -199,6 +202,32 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
     const localKey = `new-${nextSubtask.current++}`;
     setValues(current => ({ ...current, subtasks: [...current.subtasks, { localKey, title: "", description: "", status: "Pending", is_completed: false }] }));
     requestAnimationFrame(() => formRef.current?.querySelector<HTMLInputElement>(`[data-subtask-key="${localKey}"]`)?.focus());
+  }
+
+  function applyTemplate(template: TaskTemplate) {
+    setValues(current => ({
+      ...current,
+      title: template.title || current.title,
+      isPersonal: template.is_personal,
+      project: template.is_personal ? "" : template.project,
+      details: template.details,
+      requestor: template.requestor,
+      location_province: template.location_province,
+      location_city: template.location_city,
+      location_barangay: template.location_barangay,
+      priority: template.priority,
+      assignments: template.is_personal ? [] : current.assignments,
+      subtasks: template.subtasks.map(subtask => ({ ...subtask, status: "Pending", is_completed: false, localKey: `template-${template.id}-${nextTemplateSubtask.current++}` })),
+    }));
+    setSelectedTemplateId(String(template.id));
+    setErrors({});
+  }
+
+  function handleTemplateChange(rawId: string) {
+    setSelectedTemplateId(rawId);
+    if (!rawId) return;
+    const template = templates.find(item => item.id === Number(rawId));
+    if (template) applyTemplate(template);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -305,6 +334,20 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
                   <label htmlFor={`${fieldId}-details`}>Details</label>
                   <textarea id={`${fieldId}-details`} value={values.details} onChange={event => update("details", event.target.value)} placeholder="Add context, deliverables, or anything the team should know…" rows={4} maxLength={10000} />
                 </div>
+                {!task && (
+                  <div className="etm-field etm-template-picker">
+                    <label htmlFor={`${fieldId}-template`}><Bookmark size={15} /> Start from a template <span className="etm-form-optional">(optional)</span></label>
+                    {templates.length > 0 ? (
+                      <select id={`${fieldId}-template`} value={selectedTemplateId} onChange={event => handleTemplateChange(event.target.value)}>
+                        <option value="">Add task manually — start from scratch</option>
+                        {templates.map(template => <option key={template.id} value={template.id}>{template.name}</option>)}
+                      </select>
+                    ) : (
+                      <p className="etm-form-helper">You don't have any saved templates yet.</p>
+                    )}
+                    <p className="etm-form-helper">Choosing a template fills in the details and subtasks below — you can still edit anything before saving. <Link to="/etms/templates">Manage templates</Link></p>
+                  </div>
+                )}
                 <fieldset className="etm-priority-field">
                   <legend>Priority</legend>
                   <div className="etm-priority-options">{PRIORITIES.map(priority => <label key={priority} data-howto={`priority-${priority.toLowerCase()}`} className={`etm-priority-option ${priority.toLowerCase()} ${values.priority === priority ? "selected" : ""}`}>

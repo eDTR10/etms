@@ -1,17 +1,21 @@
 import { createContext, useContext } from "react";
 import type { BulkActionResult } from "./taskService";
-import type { Member, Project, Task, TaskInput, TaskStatus } from "./types";
+import type { Member, Project, Task, TaskInput, TaskStatus, TaskTemplate, TaskTemplateInput } from "./types";
 
 export interface TaskContextValue {
   tasks: Task[];
   members: Member[];
   projects: Project[];
+  templates: TaskTemplate[];
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
   listArchivedTasks: () => Promise<Task[]>;
   addMember: (input: { first_name: string; last_name: string; email: string; position?: string }) => Promise<Member>;
   createTask: (input: TaskInput) => Promise<Task>;
+  createTemplate: (input: TaskTemplateInput) => Promise<TaskTemplate>;
+  updateTemplate: (id: number, input: TaskTemplateInput) => Promise<TaskTemplate>;
+  deleteTemplate: (id: number) => Promise<void>;
   updateTask: (id: number, input: Partial<TaskInput>) => Promise<Task>;
   deleteTask: (id: number) => Promise<void>;
   duplicateTask: (id: number) => Promise<Task>;

@@ -83,6 +83,12 @@
 .etm-specific-date-chip button { display: inline-flex; align-items: center; justify-content: center; width: 19px; height: 19px; flex-shrink: 0; border: 0; border-radius: 4px; background: transparent; color: #52878b; cursor: pointer; }
 .etm-specific-date-chip button:hover { background: #dceeee; }
 .etm-form-helper { margin: 0; color: var(--etm-muted); font-size: 12px; font-weight: 400; line-height: 1.65; }
+.etm-form-helper a { color: var(--etm-primary); font-weight: 600; text-decoration: none; }
+.etm-form-helper a:hover { text-decoration: underline; }
+.etm-template-picker { padding: 14px; border: 1px solid var(--etm-border); border-radius: 9px; background: var(--etm-surface-alt); }
+.etm-template-picker > label { display: flex; align-items: center; gap: 7px; }
+.etm-template-picker > label svg { color: var(--etm-primary); }
+.etm-template-picker > select { margin-top: 2px; }
 .etm-form-count { display: inline-block; padding: 2px 6px; margin-left: 5px; border-radius: 5px; background: #f0f4f6; color: #7d8d99; font-size: 12px; font-weight: 500; vertical-align: middle; }
 .etm-member-field > legend > .etm-form-count { float: right; }
 .etm-selected-members { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
@@ -121,7 +127,7 @@
 .etm-subtask-editor { display: grid; gap: 10px; }
 .etm-subtask-editor:empty { display: none; }
 .etm-subtask-input-row { display: flex; align-items: center; gap: 10px; padding: 5px 8px 5px 13px; border: 1px solid var(--etm-border); border-radius: 8px; }
-.etm-subtask-input-row > input[type="text"] { width: 100%; min-width: 0; height: 35px; padding: 4px; background: transparent; border: 1px solid transparent; border-radius: 4px; color: var(--etm-ink); font-family: inherit; font-size: 13px; }
+.etm-subtask-input-row > input[type="text"] { width: 100%; min-width: 0; height: 35px; padding: 4px; background: transparent; border: 1px solid transparent; border-radius: 4px; color: var(--etm-ink); font-family: inherit; font-size: 12.5px; }
 .etm-subtask-input-row > input[type="text"]:focus { outline: 1px solid var(--etm-primary); outline-offset: 1px; }
 .etm-subtask-input-row > input[type="text"]::placeholder { color: #94a0aa; }
 .etm-subtask-input-row.completed { background: #f8fbfa; }
@@ -143,7 +149,7 @@
 .etm-subtask-completion-warning svg { flex: 0 0 auto; margin-top: 1px; }
 .etm-subtask-completion-warning strong { display: block; color: #795016; }
 .etm-subtask-editor-item > .etm-field-error { margin-top: 5px; }
-.etm-subtask-description { width: 100%; min-width: 0; margin-top: 7px; padding: 8px 10px; border: 1px solid var(--etm-border); border-radius: 7px; background: var(--etm-surface-alt); color: #647787; font-family: inherit; font-size: 13px; line-height: 1.6; resize: vertical; box-sizing: border-box; }
+.etm-subtask-description { width: 100%; min-width: 0; margin-top: 7px; padding: 8px 10px; border: 1px solid var(--etm-border); border-radius: 7px; background: var(--etm-surface-alt); color: #647787; font-family: inherit; font-size: 12.5px; line-height: 1.6; resize: vertical; box-sizing: border-box; }
 .etm-subtask-description::placeholder { color: #9aa7b1; }
 .etm-subtask-description:focus { outline: none; border-color: var(--etm-primary); box-shadow: 0 0 0 3px #087e8b12; }
 .etm-form-error-banner { margin: 20px 0 0; padding: 13px 16px; border: 1px solid #f1ceca; border-radius: 8px; background: #fff5f3; color: #b15750; font-size: 14px; line-height: 1.65; }

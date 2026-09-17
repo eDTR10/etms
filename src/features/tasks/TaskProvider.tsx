@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { TaskContext } from "./taskContext";
 import { taskError, taskService } from "./taskService";
-import type { Member, Project, Task, TaskInput, TaskStatus } from "./types";
+import type { Member, Project, Task, TaskInput, TaskStatus, TaskTemplate, TaskTemplateInput } from "./types";
 
 export default function TaskProvider({ children }: { children: ReactNode }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [templates, setTemplates] = useState<TaskTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,6 +23,14 @@ export default function TaskProvider({ children }: { children: ReactNode }) {
       setError(taskError(err));
     } finally {
       setLoading(false);
+    }
+    // Kept out of the Promise.all above and failing silently: templates are an enhancement
+    // on top of task creation, not something the rest of the app (dashboard, task list, add
+    // task) should ever be blocked on if this endpoint is slow, missing, or errors out.
+    try {
+      setTemplates(await taskService.listTemplates());
+    } catch {
+      setTemplates([]);
     }
   }, []);
 
@@ -145,6 +154,20 @@ export default function TaskProvider({ children }: { children: ReactNode }) {
   const markViewed = async (id: number) => {
     replace(await taskService.markViewed(id));
   };
+  const createTemplate = async (input: TaskTemplateInput) => {
+    const template = await taskService.createTemplate(input);
+    setTemplates(current => [...current, template].sort((a, b) => a.name.localeCompare(b.name)));
+    return template;
+  };
+  const updateTemplate = async (id: number, input: TaskTemplateInput) => {
+    const template = await taskService.updateTemplate(id, input);
+    setTemplates(current => current.map(item => item.id === id ? template : item).sort((a, b) => a.name.localeCompare(b.name)));
+    return template;
+  };
+  const deleteTemplate = async (id: number) => {
+    await taskService.deleteTemplate(id);
+    setTemplates(current => current.filter(item => item.id !== id));
+  };
 
-  return <TaskContext.Provider value={{ tasks, members, projects, loading, error, refresh, listArchivedTasks, addMember, createTask, updateTask, deleteTask, duplicateTask, toggleOccurrence, addProgress, editProgress, deleteProgress, addRemark, editRemark, deleteRemark, reactToRemark, addRemarkReply, addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, bulkArchive, bulkDelete, addRemarkAttachment, deleteRemarkAttachment, addSubtaskRemarkAttachment, deleteSubtaskRemarkAttachment, markCompletionSeen, markViewed }}>{children}</TaskContext.Provider>;
+  return <TaskContext.Provider value={{ tasks, members, projects, templates, loading, error, refresh, listArchivedTasks, addMember, createTask, createTemplate, updateTemplate, deleteTemplate, updateTask, deleteTask, duplicateTask, toggleOccurrence, addProgress, editProgress, deleteProgress, addRemark, editRemark, deleteRemark, reactToRemark, addRemarkReply, addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, bulkArchive, bulkDelete, addRemarkAttachment, deleteRemarkAttachment, addSubtaskRemarkAttachment, deleteSubtaskRemarkAttachment, markCompletionSeen, markViewed }}>{children}</TaskContext.Provider>;
 }

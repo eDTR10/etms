@@ -170,6 +170,42 @@ export interface Task {
   can_manage_assignments: boolean;
 }
 
+export interface TemplateSubtask {
+  title: string;
+  description: string;
+}
+
+export interface TaskTemplate {
+  id: number;
+  name: string;
+  title: string;
+  is_personal: boolean;
+  project: string;
+  details: string;
+  requestor: string;
+  location_province: string;
+  location_city: string;
+  location_barangay: string;
+  priority: Priority;
+  subtasks: TemplateSubtask[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TaskTemplateInput {
+  name: string;
+  title: string;
+  is_personal: boolean;
+  project: string;
+  details: string;
+  requestor: string;
+  location_province: string;
+  location_city: string;
+  location_barangay: string;
+  priority: Priority;
+  subtasks: TemplateSubtask[];
+}
+
 export interface TaskInput {
   title: string;
   project: string | null;
