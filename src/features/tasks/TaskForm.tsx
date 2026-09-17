@@ -402,14 +402,16 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
                 {!task && (
                   <div className="etm-field etm-template-picker">
                     <label htmlFor={`${fieldId}-template`}><Bookmark size={15} /> Start from a template <span className="etm-form-optional">(optional)</span></label>
-                    {templates.length > 0 ? (
-                      <select id={`${fieldId}-template`} value={selectedTemplateId} onChange={event => handleTemplateChange(event.target.value)}>
-                        <option value="">Add task manually — start from scratch</option>
-                        {templates.map(template => <option key={template.id} value={template.id}>{template.name}</option>)}
-                      </select>
-                    ) : (
-                      <p className="etm-form-helper">You don't have any saved templates yet.</p>
-                    )}
+                    <select id={`${fieldId}-template`} value={selectedTemplateId} onChange={event => handleTemplateChange(event.target.value)} disabled={templates.length === 0}>
+                      {templates.length > 0 ? (
+                        <>
+                          <option value="">Add task manually — start from scratch</option>
+                          {templates.map(template => <option key={template.id} value={template.id}>{template.name}</option>)}
+                        </>
+                      ) : (
+                        <option value="">No templates saved yet</option>
+                      )}
+                    </select>
                     <p className="etm-form-helper">Choosing a template fills in the details and subtasks below — you can still edit anything before saving. <Link to="/etms/templates">Manage templates</Link></p>
                   </div>
                 )}
