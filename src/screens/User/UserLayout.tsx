@@ -9,6 +9,7 @@ import {
   LogOut,
   UserCircle,
   Bookmark,
+  Link2,
 } from "lucide-react";
 import { ModeToggle } from "../../components/mode-toggle";
 import { useAuth } from "../Auth/AuthContext";
@@ -22,6 +23,7 @@ const NAV_ITEMS = [
   { label: "Calendar", icon: <Calendar className="w-4 h-4" />, to: "/etms/calendar" },
   { label: "All Tasks", icon: <ListChecks className="w-4 h-4" />, to: "/etms/tasks" },
   { label: "Templates", icon: <Bookmark className="w-4 h-4" />, to: "/etms/templates" },
+  { label: "Quick Links", icon: <Link2 className="w-4 h-4" />, to: "/etms/quick-links" },
   { label: "Reports", icon: <BarChart3 className="w-4 h-4" />, to: "/etms/reports" },
   { label: "How To?", icon: <HelpCircle className="w-4 h-4" />, to: "/etms/how-to" },
 ];

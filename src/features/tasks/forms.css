@@ -242,6 +242,10 @@
 .etm-details-subtasks-nested { margin: 6px 12px 8px 45px; padding-left: 14px; border-left: 2px solid var(--etm-border); }
 .etm-subtask-add-child { margin: 8px 12px 4px 45px; }
 .etm-subtask-panel-summary { display: flex; align-items: flex-start; gap: 8px; padding: 11px 12px; }
+.etm-subtask-drag-handle { flex-shrink: 0; margin-top: 3px; color: var(--etm-muted); opacity: .5; cursor: grab; }
+.etm-subtask-panel:hover > .etm-subtask-panel-summary .etm-subtask-drag-handle { opacity: 1; }
+.etm-subtask-panel.dragging { opacity: .45; }
+.etm-subtask-panel.drag-over { outline: 2px dashed var(--etm-primary); outline-offset: 2px; border-radius: 9px; }
 .etm-details-subtask-toggle { display: inline-flex; align-items: center; justify-content: center; width: 25px; height: 25px; flex: 0 0 25px; margin-top: 1px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #8ca1ac; cursor: pointer; }
 .etm-details-subtask-toggle:hover { background: #e9f3f3; color: var(--etm-primary); }
 .etm-details-subtask-toggle.checked { background: #75b29f; color: #fff; }

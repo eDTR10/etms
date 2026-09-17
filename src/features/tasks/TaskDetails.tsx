@@ -1,10 +1,10 @@
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type DragEvent, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { isAxiosError } from "axios";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
-import { AlertTriangle, Bold, CalendarDays, Check, CheckCheck, ChevronRight, Circle, ClipboardList, Clock3, Copy, Download, Edit3, Flag, Folder, History, Italic, List, Loader2, MapPin, MessageSquare, Paperclip, Pencil, Plus, Repeat, Reply, Send, SmilePlus, Trash2, Underline, User, Users, X } from "lucide-react";
+import { AlertTriangle, Bold, CalendarDays, Check, CheckCheck, ChevronRight, Circle, ClipboardList, Clock3, Copy, Download, Edit3, Flag, Folder, GripVertical, History, Italic, List, Loader2, MapPin, MessageSquare, Paperclip, Pencil, Plus, Repeat, Reply, Send, SmilePlus, Trash2, Underline, User, Users, X } from "lucide-react";
 import MentionField from "./MentionField";
 import { useAuth } from "../../screens/Auth/AuthContext";
 import { useTasks } from "./taskContext";
@@ -37,6 +37,7 @@ interface TaskDetailsProps {
   onEditSubtask: (subtaskId: number, input: { title?: string; description?: string }) => Promise<void>;
   onDeleteSubtask: (subtaskId: number) => Promise<void>;
   onSetSubtaskCompletion: (subtaskId: number, isCompleted: boolean) => Promise<void>;
+  onReorderSubtasks: (parentId: number | null, order: number[]) => Promise<void>;
   onAddRemarkAttachment: (remarkId: number, file: File) => Promise<void>;
   onDeleteRemarkAttachment: (remarkId: number, attachmentId: number) => Promise<void>;
   onAddSubtaskRemarkAttachment: (subtaskId: number, remarkId: number, file: File) => Promise<void>;
@@ -52,6 +53,61 @@ interface TaskDetailsProps {
 // Progress History (and its dedicated status form) is superseded by the status
 // field now built into the Remarks composer — hidden for now, not removed.
 const SHOW_PROGRESS_HISTORY = false;
+
+interface SubtaskDragProps {
+  draggable: boolean;
+  onDragStart?: (event: DragEvent) => void;
+  onDragEnd?: () => void;
+  onDragOver?: (event: DragEvent) => void;
+  onDragLeave?: () => void;
+  onDrop?: (event: DragEvent) => void;
+  className: string;
+}
+
+// Drag-and-drop reordering within one sibling list (top-level subtasks, or one subtask's
+// own children — never across lists, i.e. no re-parenting via drag). `onReorder` receives
+// the full resulting id order for that list, matching what the reorder endpoint expects.
+function useSubtaskDragReorder(items: SubTask[], enabled: boolean, onReorder: (order: number[]) => void) {
+  const [dragId, setDragId] = useState<number | null>(null);
+  const [overId, setOverId] = useState<number | null>(null);
+
+  function dragProps(id: number | undefined): SubtaskDragProps {
+    if (!enabled || id == null) return { draggable: false, className: "" };
+    return {
+      draggable: true,
+      onDragStart: (event: DragEvent) => {
+        // Firefox requires setData to be called for the drag to actually start — the id
+        // itself is never read back from dataTransfer, reordering relies only on React state.
+        event.dataTransfer?.setData("text/plain", String(id));
+        setDragId(id);
+      },
+      onDragEnd: () => { setDragId(null); setOverId(null); },
+      onDragOver: (event: DragEvent) => {
+        if (dragId === null || dragId === id) return;
+        event.preventDefault();
+        if (overId !== id) setOverId(id);
+      },
+      onDragLeave: () => setOverId(current => current === id ? null : current),
+      onDrop: (event: DragEvent) => {
+        event.preventDefault();
+        setOverId(null);
+        const draggedId = dragId;
+        setDragId(null);
+        if (draggedId === null || draggedId === id) return;
+        const ids = items.map(item => item.id).filter((item): item is number => item != null);
+        const from = ids.indexOf(draggedId);
+        const to = ids.indexOf(id);
+        if (from === -1 || to === -1) return;
+        const next = [...ids];
+        next.splice(from, 1);
+        next.splice(to, 0, draggedId);
+        onReorder(next);
+      },
+      className: dragId === id ? "dragging" : overId === id ? "drag-over" : "",
+    };
+  }
+  return dragProps;
+}
 
 function progressError(error: unknown): string {
   if (isAxiosError(error)) {
@@ -649,7 +705,7 @@ function ProgressHistoryItem({ log, onEdit, onDelete }: ProgressHistoryItemProps
   );
 }
 
-function SubtaskPanel({ task, subtask, members, canComment, onSetCompletion, onAddRemark, onEditRemark, onDeleteRemark, onSetStatus, onReactRemark, onAddReplyRemark, onAddSubtask, onEditSubtask, onDeleteSubtask, onAddRemarkAttachment, onDeleteRemarkAttachment, defaultOpen = false, jumpToSubtaskId }: {
+function SubtaskPanel({ task, subtask, members, canComment, onSetCompletion, onAddRemark, onEditRemark, onDeleteRemark, onSetStatus, onReactRemark, onAddReplyRemark, onAddSubtask, onEditSubtask, onDeleteSubtask, onReorderSubtasks, onAddRemarkAttachment, onDeleteRemarkAttachment, defaultOpen = false, jumpToSubtaskId, dragHandleProps }: {
   task: Task; subtask: SubTask; members: Member[]; canComment: boolean;
   onSetCompletion: (id: number, completed: boolean) => Promise<void>;
   onAddRemark: (id: number, message: string, file?: File) => Promise<void>;
@@ -661,10 +717,12 @@ function SubtaskPanel({ task, subtask, members, canComment, onSetCompletion, onA
   onAddSubtask: (title: string, description: string | undefined, parentId: number) => Promise<void>;
   onEditSubtask: (id: number, input: { title?: string; description?: string }) => Promise<void>;
   onDeleteSubtask: (id: number) => Promise<void>;
+  onReorderSubtasks: (parentId: number | null, order: number[]) => Promise<void>;
   onAddRemarkAttachment: (subtaskId: number, remarkId: number, file: File) => Promise<void>;
   onDeleteRemarkAttachment: (subtaskId: number, remarkId: number, attachmentId: number) => Promise<void>;
   defaultOpen?: boolean;
   jumpToSubtaskId?: { id: number; token: number } | null;
+  dragHandleProps?: SubtaskDragProps;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [saving, setSaving] = useState(false);
@@ -685,6 +743,7 @@ function SubtaskPanel({ task, subtask, members, canComment, onSetCompletion, onA
   // subtask wouldn't carry a `subtasks` key at all yet — renders as a leaf instead of
   // crashing until the backend serving this request has the matching deploy.
   const children = subtask.subtasks ?? [];
+  const childDragProps = useSubtaskDragReorder(children, task.can_edit, order => { void onReorderSubtasks(id ?? null, order); });
   useEffect(() => {
     if (!jumpToSubtaskId || jumpToSubtaskId.id !== id) return;
     // Reacting to an external "jump to this subtask" signal from a remark tag click or a
@@ -755,8 +814,9 @@ function SubtaskPanel({ task, subtask, members, canComment, onSetCompletion, onA
     catch (caught) { setChildError(progressError(caught)); }
     finally { setAddingChild(false); }
   }
-  return <li ref={panelRef} className={`etm-subtask-panel ${subtask.is_completed ? "completed" : ""}`}>
+  return <li ref={panelRef} className={`etm-subtask-panel ${subtask.is_completed ? "completed" : ""} ${dragHandleProps?.className ?? ""}`} draggable={!editingSubtask && dragHandleProps?.draggable} onDragStart={dragHandleProps?.onDragStart} onDragEnd={dragHandleProps?.onDragEnd} onDragOver={dragHandleProps?.onDragOver} onDragLeave={dragHandleProps?.onDragLeave} onDrop={dragHandleProps?.onDrop}>
     <div className="etm-subtask-panel-summary">
+      {task.can_edit && !editingSubtask && <GripVertical size={14} className="etm-subtask-drag-handle" aria-hidden="true" />}
       {editingSubtask ? (
         <div className="etm-subtask-edit-inline">
           <input value={draftTitle} onChange={event => setDraftTitle(event.target.value)} maxLength={255} disabled={savingSubtask} aria-label="Subtask title" placeholder="Subtask title" />
@@ -774,7 +834,7 @@ function SubtaskPanel({ task, subtask, members, canComment, onSetCompletion, onA
           <span className="etm-subtask-panel-actions">
             {id && <button type="button" className="etm-icon-button" aria-label={`Add a subtask under "${subtask.title}"`} title="Add subtask" onClick={() => setAddingChildOpen(value => !value)}><Plus size={14} /></button>}
             <button type="button" className="etm-icon-button" aria-label={`Edit subtask: ${subtask.title}`} onClick={startEditingSubtask}><Pencil size={14} /></button>
-            <button type="button" className="etm-icon-button danger" aria-label={`Delete subtask: ${subtask.title}`} onClick={() => void handleDeleteSubtask()}><Trash2 size={14} /></button>
+            {subtask.can_delete && <button type="button" className="etm-icon-button danger" aria-label={`Delete subtask: ${subtask.title}`} onClick={() => void handleDeleteSubtask()}><Trash2 size={14} /></button>}
           </span>
         )}
       </>)}
@@ -789,7 +849,7 @@ function SubtaskPanel({ task, subtask, members, canComment, onSetCompletion, onA
     {children.length > 0 && (
       <ul className="etm-details-subtasks etm-details-subtasks-nested">
         {children.map((child, childIndex) => (
-          <SubtaskPanel key={child.id ?? childIndex} task={task} subtask={child} members={members} canComment={canComment} onSetCompletion={onSetCompletion} onAddRemark={onAddRemark} onEditRemark={onEditRemark} onDeleteRemark={onDeleteRemark} onSetStatus={onSetStatus} onReactRemark={onReactRemark} onAddReplyRemark={onAddReplyRemark} onAddSubtask={onAddSubtask} onEditSubtask={onEditSubtask} onDeleteSubtask={onDeleteSubtask} onAddRemarkAttachment={onAddRemarkAttachment} onDeleteRemarkAttachment={onDeleteRemarkAttachment} jumpToSubtaskId={jumpToSubtaskId} />
+          <SubtaskPanel key={child.id ?? childIndex} task={task} subtask={child} members={members} canComment={canComment} onSetCompletion={onSetCompletion} onAddRemark={onAddRemark} onEditRemark={onEditRemark} onDeleteRemark={onDeleteRemark} onSetStatus={onSetStatus} onReactRemark={onReactRemark} onAddReplyRemark={onAddReplyRemark} onAddSubtask={onAddSubtask} onEditSubtask={onEditSubtask} onDeleteSubtask={onDeleteSubtask} onReorderSubtasks={onReorderSubtasks} onAddRemarkAttachment={onAddRemarkAttachment} onDeleteRemarkAttachment={onDeleteRemarkAttachment} jumpToSubtaskId={jumpToSubtaskId} dragHandleProps={childDragProps(child.id)} />
         ))}
       </ul>
     )}
@@ -913,7 +973,7 @@ function useHighlightFlash<T extends HTMLElement>(active: boolean) {
   return ref;
 }
 
-function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = false, onProgress, onEditProgress, onDeleteProgress, onAddRemark, onEditRemark, onDeleteRemark, onReactRemark, onAddRemarkReply, onAddSubtaskRemark, onEditSubtaskRemark, onDeleteSubtaskRemark, onReactSubtaskRemark, onAddSubtaskRemarkReply, onSetSubtaskStatus, onAddSubtask, onEditSubtask, onDeleteSubtask, onSetSubtaskCompletion, onAddRemarkAttachment, onDeleteRemarkAttachment, onAddSubtaskRemarkAttachment, onDeleteSubtaskRemarkAttachment, onMarkCompletionSeen, onMarkViewed, initialSubtaskId, highlightHeader = false, highlightRemarks = false, page = false }: Omit<TaskDetailsProps, "open">) {
+function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = false, onProgress, onEditProgress, onDeleteProgress, onAddRemark, onEditRemark, onDeleteRemark, onReactRemark, onAddRemarkReply, onAddSubtaskRemark, onEditSubtaskRemark, onDeleteSubtaskRemark, onReactSubtaskRemark, onAddSubtaskRemarkReply, onSetSubtaskStatus, onAddSubtask, onEditSubtask, onDeleteSubtask, onSetSubtaskCompletion, onReorderSubtasks, onAddRemarkAttachment, onDeleteRemarkAttachment, onAddSubtaskRemarkAttachment, onDeleteSubtaskRemarkAttachment, onMarkCompletionSeen, onMarkViewed, initialSubtaskId, highlightHeader = false, highlightRemarks = false, page = false }: Omit<TaskDetailsProps, "open">) {
   const fieldId = useId();
   const [taskInfoOpen, setTaskInfoOpen] = useState(false);
   const [activityLogOpen, setActivityLogOpen] = useState(false);
@@ -941,6 +1001,7 @@ function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = 
   const percent = completionPercent(task);
   const allSubtasks = flattenSubtasks(task.subtasks);
   const incompleteSubtasks = allSubtasks.filter(subtask => !subtask.is_completed);
+  const topDragProps = useSubtaskDragReorder(task.subtasks, task.can_edit, order => { void onReorderSubtasks(null, order); });
   const logs = [...task.progress_logs].sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime() || right.id - left.id);
   const activityLogs = [...task.activity_logs].sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime() || right.id - left.id);
   const canComment = task.can_edit || task.my_role === "Commentor";
@@ -1049,7 +1110,7 @@ function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = 
         {task.is_completed && incompleteSubtasks.length > 0 && <div className="etm-subtask-completion-warning" role="alert"><AlertTriangle size={17} /><span><strong>{incompleteSubtasks.length} subtask{incompleteSubtasks.length === 1 ? "" : "s"} still incomplete.</strong> Reopen this task, finish the remaining subtasks, then complete it again.</span></div>}
         {task.subtasks.length > 0 ? <>
           <div className="etm-details-progress-track" role="progressbar" aria-label="Task completion" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${percent}%` }} /></div>
-          <ul className="etm-details-subtasks">{task.subtasks.map((subtask, index) => <SubtaskPanel key={subtask.id ?? index} task={task} subtask={subtask} members={task.assignments} canComment={canComment} onSetCompletion={onSetSubtaskCompletion} onAddRemark={onAddSubtaskRemark} onEditRemark={onEditSubtaskRemark} onDeleteRemark={onDeleteSubtaskRemark} onReactRemark={onReactSubtaskRemark} onAddReplyRemark={onAddSubtaskRemarkReply} onSetStatus={onSetSubtaskStatus} onAddSubtask={onAddSubtask} onEditSubtask={onEditSubtask} onDeleteSubtask={onDeleteSubtask} onAddRemarkAttachment={onAddSubtaskRemarkAttachment} onDeleteRemarkAttachment={onDeleteSubtaskRemarkAttachment} defaultOpen={subtask.id === initialSubtaskId} jumpToSubtaskId={jumpToSubtaskId} />)}</ul>
+          <ul className="etm-details-subtasks">{task.subtasks.map((subtask, index) => <SubtaskPanel key={subtask.id ?? index} task={task} subtask={subtask} members={task.assignments} canComment={canComment} onSetCompletion={onSetSubtaskCompletion} onAddRemark={onAddSubtaskRemark} onEditRemark={onEditSubtaskRemark} onDeleteRemark={onDeleteSubtaskRemark} onReactRemark={onReactSubtaskRemark} onAddReplyRemark={onAddSubtaskRemarkReply} onSetStatus={onSetSubtaskStatus} onAddSubtask={onAddSubtask} onEditSubtask={onEditSubtask} onDeleteSubtask={onDeleteSubtask} onReorderSubtasks={onReorderSubtasks} onAddRemarkAttachment={onAddSubtaskRemarkAttachment} onDeleteRemarkAttachment={onDeleteSubtaskRemarkAttachment} defaultOpen={subtask.id === initialSubtaskId} jumpToSubtaskId={jumpToSubtaskId} dragHandleProps={topDragProps(subtask.id)} />)}</ul>
         </> : <p className="etm-details-text empty">This task has no subtasks.</p>}
         {canAddSubtasks && <form className="etm-add-subtask-later" onSubmit={addSubtask}><input id={`${fieldId}-new-subtask`} value={newSubtaskTitle} onChange={event => { setNewSubtaskTitle(event.target.value); setSubtaskError(""); }} placeholder="Add a subtask to this task" maxLength={255} disabled={addingSubtask} /><button type="submit" className="etm-button primary small" disabled={addingSubtask || !newSubtaskTitle.trim()}>{addingSubtask ? <Loader2 size={14} className="etm-form-spinner" /> : <Plus size={14} />}Add</button>{subtaskError && <p className="etm-field-error" role="alert">{subtaskError}</p>}</form>}
       </section>
@@ -1122,8 +1183,8 @@ function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = 
   </>;
 }
 
-export default function TaskDetails({ task, open, onClose, onEdit, onDuplicate, duplicating, onProgress, onEditProgress, onDeleteProgress, onAddRemark, onEditRemark, onDeleteRemark, onReactRemark, onAddRemarkReply, onAddSubtaskRemark, onEditSubtaskRemark, onDeleteSubtaskRemark, onReactSubtaskRemark, onAddSubtaskRemarkReply, onSetSubtaskStatus, onAddSubtask, onEditSubtask, onDeleteSubtask, onSetSubtaskCompletion, onAddRemarkAttachment, onDeleteRemarkAttachment, onAddSubtaskRemarkAttachment, onDeleteSubtaskRemarkAttachment, onMarkCompletionSeen, onMarkViewed, initialSubtaskId, highlightHeader, highlightRemarks, page = false }: TaskDetailsProps) {
-  if (page) return <div className="etm-task-details-page"><TaskDetailsContent task={task} onClose={onClose} onEdit={onEdit} onDuplicate={onDuplicate} duplicating={duplicating} onProgress={onProgress} onEditProgress={onEditProgress} onDeleteProgress={onDeleteProgress} onAddRemark={onAddRemark} onEditRemark={onEditRemark} onDeleteRemark={onDeleteRemark} onReactRemark={onReactRemark} onAddRemarkReply={onAddRemarkReply} onAddSubtaskRemark={onAddSubtaskRemark} onEditSubtaskRemark={onEditSubtaskRemark} onDeleteSubtaskRemark={onDeleteSubtaskRemark} onReactSubtaskRemark={onReactSubtaskRemark} onAddSubtaskRemarkReply={onAddSubtaskRemarkReply} onSetSubtaskStatus={onSetSubtaskStatus} onAddSubtask={onAddSubtask} onEditSubtask={onEditSubtask} onDeleteSubtask={onDeleteSubtask} onSetSubtaskCompletion={onSetSubtaskCompletion} onAddRemarkAttachment={onAddRemarkAttachment} onDeleteRemarkAttachment={onDeleteRemarkAttachment} onAddSubtaskRemarkAttachment={onAddSubtaskRemarkAttachment} onDeleteSubtaskRemarkAttachment={onDeleteSubtaskRemarkAttachment} onMarkCompletionSeen={onMarkCompletionSeen} onMarkViewed={onMarkViewed} initialSubtaskId={initialSubtaskId} highlightHeader={highlightHeader} highlightRemarks={highlightRemarks} page /></div>;
+export default function TaskDetails({ task, open, onClose, onEdit, onDuplicate, duplicating, onProgress, onEditProgress, onDeleteProgress, onAddRemark, onEditRemark, onDeleteRemark, onReactRemark, onAddRemarkReply, onAddSubtaskRemark, onEditSubtaskRemark, onDeleteSubtaskRemark, onReactSubtaskRemark, onAddSubtaskRemarkReply, onSetSubtaskStatus, onAddSubtask, onEditSubtask, onDeleteSubtask, onSetSubtaskCompletion, onReorderSubtasks, onAddRemarkAttachment, onDeleteRemarkAttachment, onAddSubtaskRemarkAttachment, onDeleteSubtaskRemarkAttachment, onMarkCompletionSeen, onMarkViewed, initialSubtaskId, highlightHeader, highlightRemarks, page = false }: TaskDetailsProps) {
+  if (page) return <div className="etm-task-details-page"><TaskDetailsContent task={task} onClose={onClose} onEdit={onEdit} onDuplicate={onDuplicate} duplicating={duplicating} onProgress={onProgress} onEditProgress={onEditProgress} onDeleteProgress={onDeleteProgress} onAddRemark={onAddRemark} onEditRemark={onEditRemark} onDeleteRemark={onDeleteRemark} onReactRemark={onReactRemark} onAddRemarkReply={onAddRemarkReply} onAddSubtaskRemark={onAddSubtaskRemark} onEditSubtaskRemark={onEditSubtaskRemark} onDeleteSubtaskRemark={onDeleteSubtaskRemark} onReactSubtaskRemark={onReactSubtaskRemark} onAddSubtaskRemarkReply={onAddSubtaskRemarkReply} onSetSubtaskStatus={onSetSubtaskStatus} onAddSubtask={onAddSubtask} onEditSubtask={onEditSubtask} onDeleteSubtask={onDeleteSubtask} onSetSubtaskCompletion={onSetSubtaskCompletion} onReorderSubtasks={onReorderSubtasks} onAddRemarkAttachment={onAddRemarkAttachment} onDeleteRemarkAttachment={onDeleteRemarkAttachment} onAddSubtaskRemarkAttachment={onAddSubtaskRemarkAttachment} onDeleteSubtaskRemarkAttachment={onDeleteSubtaskRemarkAttachment} onMarkCompletionSeen={onMarkCompletionSeen} onMarkViewed={onMarkViewed} initialSubtaskId={initialSubtaskId} highlightHeader={highlightHeader} highlightRemarks={highlightRemarks} page /></div>;
   function ignoreWhileSwalOpen(event: { preventDefault: () => void }) {
     // A SweetAlert popup renders outside this Dialog.Content in the DOM, so Radix sees
     // clicks/Escape on it as "outside" and would otherwise close this dialog underneath it.
@@ -1137,6 +1198,6 @@ export default function TaskDetails({ task, open, onClose, onEdit, onDuplicate, 
       onPointerDownOutside={ignoreWhileSwalOpen}
       onInteractOutside={ignoreWhileSwalOpen}
       onEscapeKeyDown={ignoreWhileSwalOpen}
-    ><TaskDetailsContent key={`${task.id}-${initialSubtaskId ?? "task"}`} task={task} onClose={onClose} onEdit={onEdit} onDuplicate={onDuplicate} duplicating={duplicating} onProgress={onProgress} onEditProgress={onEditProgress} onDeleteProgress={onDeleteProgress} onAddRemark={onAddRemark} onEditRemark={onEditRemark} onDeleteRemark={onDeleteRemark} onReactRemark={onReactRemark} onAddRemarkReply={onAddRemarkReply} onAddSubtaskRemark={onAddSubtaskRemark} onEditSubtaskRemark={onEditSubtaskRemark} onDeleteSubtaskRemark={onDeleteSubtaskRemark} onReactSubtaskRemark={onReactSubtaskRemark} onAddSubtaskRemarkReply={onAddSubtaskRemarkReply} onSetSubtaskStatus={onSetSubtaskStatus} onAddSubtask={onAddSubtask} onEditSubtask={onEditSubtask} onDeleteSubtask={onDeleteSubtask} onSetSubtaskCompletion={onSetSubtaskCompletion} onAddRemarkAttachment={onAddRemarkAttachment} onDeleteRemarkAttachment={onDeleteRemarkAttachment} onAddSubtaskRemarkAttachment={onAddSubtaskRemarkAttachment} onDeleteSubtaskRemarkAttachment={onDeleteSubtaskRemarkAttachment} onMarkCompletionSeen={onMarkCompletionSeen} onMarkViewed={onMarkViewed} initialSubtaskId={initialSubtaskId} highlightHeader={highlightHeader} highlightRemarks={highlightRemarks} /></Dialog.Content></Dialog.Portal>
+    ><TaskDetailsContent key={`${task.id}-${initialSubtaskId ?? "task"}`} task={task} onClose={onClose} onEdit={onEdit} onDuplicate={onDuplicate} duplicating={duplicating} onProgress={onProgress} onEditProgress={onEditProgress} onDeleteProgress={onDeleteProgress} onAddRemark={onAddRemark} onEditRemark={onEditRemark} onDeleteRemark={onDeleteRemark} onReactRemark={onReactRemark} onAddRemarkReply={onAddRemarkReply} onAddSubtaskRemark={onAddSubtaskRemark} onEditSubtaskRemark={onEditSubtaskRemark} onDeleteSubtaskRemark={onDeleteSubtaskRemark} onReactSubtaskRemark={onReactSubtaskRemark} onAddSubtaskRemarkReply={onAddSubtaskRemarkReply} onSetSubtaskStatus={onSetSubtaskStatus} onAddSubtask={onAddSubtask} onEditSubtask={onEditSubtask} onDeleteSubtask={onDeleteSubtask} onSetSubtaskCompletion={onSetSubtaskCompletion} onReorderSubtasks={onReorderSubtasks} onAddRemarkAttachment={onAddRemarkAttachment} onDeleteRemarkAttachment={onDeleteRemarkAttachment} onAddSubtaskRemarkAttachment={onAddSubtaskRemarkAttachment} onDeleteSubtaskRemarkAttachment={onDeleteSubtaskRemarkAttachment} onMarkCompletionSeen={onMarkCompletionSeen} onMarkViewed={onMarkViewed} initialSubtaskId={initialSubtaskId} highlightHeader={highlightHeader} highlightRemarks={highlightRemarks} /></Dialog.Content></Dialog.Portal>
   </Dialog.Root>;
 }

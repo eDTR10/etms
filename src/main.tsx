@@ -35,6 +35,7 @@ const UserTaskDetails = lazy(() => import("./screens/User/TaskDetailsPage.tsx"))
 const UserDocuments  = lazy(() => import("./screens/User/Documents.tsx"));
 const UserProfile    = lazy(() => import("./screens/User/Profile.tsx"));
 const UserTemplates  = lazy(() => import("./screens/User/Templates.tsx"));
+const UserQuickLinks = lazy(() => import("./screens/User/QuickLinks.tsx"));
 
 // Sends "/" to the right place: dashboard if logged in, login otherwise.
 const Home = () => {
@@ -91,6 +92,10 @@ const router = createBrowserRouter([
   {
     path: "/etms/templates",
     element: <ProtectedRoute><Suspense fallback={<Loader />}><UserTemplates /></Suspense></ProtectedRoute>,
+  },
+  {
+    path: "/etms/quick-links",
+    element: <ProtectedRoute><Suspense fallback={<Loader />}><UserQuickLinks /></Suspense></ProtectedRoute>,
   },
   {
     path: "/etms/reports",

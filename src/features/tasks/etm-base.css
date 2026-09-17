@@ -118,6 +118,7 @@
 .etm-report-task-picker-row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .etm-report-task-picker-row small { flex: 0 0 auto; color: var(--etm-muted); }
 .etm-report-form input:not([type="radio"]):not([type="checkbox"]), .etm-report-form select { box-sizing: border-box; width: 100%; min-height: 39px; padding: 0 10px; border: 1px solid var(--etm-border); border-radius: 8px; background: var(--etm-surface-alt); color: var(--etm-ink); font: inherit; font-size: 14px; font-weight: 400; }
+.etm-report-form textarea { box-sizing: border-box; width: 100%; padding: 9px 10px; border: 1px solid var(--etm-border); border-radius: 8px; background: var(--etm-surface-alt); color: var(--etm-ink); font: inherit; font-size: 14px; font-weight: 400; resize: vertical; }
 .etm-report-form input[readonly] { color: var(--etm-muted); cursor: default; }
 .etm-report-project-picker { position: relative; }
 .etm-report-project-picker input { padding-right: 39px !important; }
@@ -232,3 +233,21 @@
 :root.dark .etm-assignment-chip > button:hover { background: #1f3d3d; }
 :root.dark .etm-role-toggle-option.selected { color: #06201f; }
 :root.dark .etm-field input[type="date"], :root.dark .etm-filter-date-field input[type="date"], :root.dark .etm-filter-select { color-scheme: dark; }
+
+/* ── Quick Links ───────────────────────────────────────────────────────── */
+.etm-quicklinks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.etm-quicklink-card { display: flex; align-items: flex-start; gap: 8px; padding: 14px; }
+.etm-quicklink-card-open { display: flex; align-items: flex-start; gap: 12px; flex: 1; min-width: 0; text-decoration: none; }
+.etm-quicklink-card-icon { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; flex: 0 0 36px; border-radius: 10px; background: #eaf5f5; color: var(--etm-primary); }
+.etm-quicklink-card-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.etm-quicklink-card-body strong { color: var(--etm-ink); font-size: 14px; font-weight: 650; overflow-wrap: anywhere; }
+.etm-quicklink-card-body small { color: var(--etm-muted); font-size: 12.5px; line-height: 1.5; overflow-wrap: anywhere; }
+.etm-quicklink-card-url { display: inline-flex; align-items: center; gap: 4px; margin-top: 2px; color: #8a97a1; font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.etm-quicklink-card:hover .etm-quicklink-card-body strong { color: var(--etm-primary-dark); }
+.etm-quicklink-card-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.etm-quicklink-icon-field { display: block; min-width: 0; padding: 0; margin: 0; border: 0; }
+.etm-quicklink-icon-options { display: flex; flex-wrap: wrap; gap: 7px; }
+.etm-quicklink-icon-option { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: 1px solid var(--etm-border); border-radius: 9px; background: var(--etm-surface-alt); color: var(--etm-muted); cursor: pointer; transition: border-color .15s, color .15s, background .15s; }
+.etm-quicklink-icon-option:hover { color: var(--etm-primary); border-color: var(--etm-primary); }
+.etm-quicklink-icon-option.selected { border-color: var(--etm-primary); background: color-mix(in srgb, var(--etm-primary) 14%, var(--etm-surface-alt)); color: var(--etm-primary); }
+:root.dark .etm-quicklink-card-icon { background: #163639; }

@@ -1,10 +1,17 @@
 import { useMemo, useState } from "react";
-import { memberName, type Priority, type Task, type TaskStatus } from "./types";
+import { isOverdue, memberName, type Priority, type Task, type TaskStatus } from "./types";
 
 export type StatusFilterValue = "all" | TaskStatus;
 export type PriorityFilterValue = "all" | Priority;
 export type ProjectFilterValue = "all" | "personal" | number;
 export type QuickDeadlineFilterValue = "" | "day" | "week" | "month";
+export type AssignedFilterValue = "all" | "unassigned";
+
+export interface TaskFilterOptions {
+  initialStatus?: StatusFilterValue;
+  initialAssignedFilter?: AssignedFilterValue;
+  initialOverdueOnly?: boolean;
+}
 
 function toDateStr(date: Date): string {
   const year = date.getFullYear();
@@ -32,13 +39,15 @@ function quickFilterRange(value: QuickDeadlineFilterValue): { from: string; to: 
   return { from: toDateStr(start), to: toDateStr(end) };
 }
 
-export function useTaskFilters(tasks: Task[]) {
+export function useTaskFilters(tasks: Task[], options?: TaskFilterOptions) {
   const [search, setSearch] = useState("");
   const [deadlineDate, setDeadlineDateState] = useState("");
   const [quickFilter, setQuickFilterState] = useState<QuickDeadlineFilterValue>("");
-  const [status, setStatus] = useState<StatusFilterValue>("all");
+  const [status, setStatus] = useState<StatusFilterValue>(options?.initialStatus ?? "all");
   const [priority, setPriority] = useState<PriorityFilterValue>("all");
   const [projectFilter, setProjectFilter] = useState<ProjectFilterValue>("all");
+  const [assignedFilter, setAssignedFilter] = useState<AssignedFilterValue>(options?.initialAssignedFilter ?? "all");
+  const [overdueOnly, setOverdueOnly] = useState(options?.initialOverdueOnly ?? false);
 
   const setDeadlineDate = (value: string) => {
     setDeadlineDateState(value);
@@ -73,13 +82,15 @@ export function useTaskFilters(tasks: Task[]) {
       } else if (projectFilter !== "all") {
         if (!task.project || task.project.id !== projectFilter) return false;
       }
+      if (assignedFilter === "unassigned" && task.assignments.length > 0) return false;
+      if (overdueOnly && !isOverdue(task)) return false;
       return true;
     });
-  }, [tasks, search, deadlineRange, status, priority, projectFilter]);
+  }, [tasks, search, deadlineRange, status, priority, projectFilter, assignedFilter, overdueOnly]);
 
-  const hasActiveFilters = !!search.trim() || !!deadlineDate || !!quickFilter || status !== "all" || priority !== "all" || projectFilter !== "all";
+  const hasActiveFilters = !!search.trim() || !!deadlineDate || !!quickFilter || status !== "all" || priority !== "all" || projectFilter !== "all" || assignedFilter !== "all" || overdueOnly;
   const clearFilters = () => {
-    setSearch(""); setDeadlineDateState(""); setQuickFilterState(""); setStatus("all"); setPriority("all"); setProjectFilter("all");
+    setSearch(""); setDeadlineDateState(""); setQuickFilterState(""); setStatus("all"); setPriority("all"); setProjectFilter("all"); setAssignedFilter("all"); setOverdueOnly(false);
   };
 
   return {
@@ -90,6 +101,8 @@ export function useTaskFilters(tasks: Task[]) {
     status, setStatus,
     priority, setPriority,
     projectFilter, setProjectFilter,
+    assignedFilter, setAssignedFilter,
+    overdueOnly, setOverdueOnly,
     hasActiveFilters, clearFilters,
   };
 }

@@ -94,6 +94,8 @@ export interface SubTask {
   remarks?: Remark[];
   progress_logs?: SubtaskProgressLog[];
   can_complete?: boolean;
+  // Creator-only — narrower than can_complete, which any editor also gets.
+  can_delete?: boolean;
   // Subtasks of this subtask, unlimited depth.
   subtasks: SubTask[];
 }

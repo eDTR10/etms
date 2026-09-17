@@ -1,8 +1,8 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Archive, ChevronRight, Circle, Check, Clock, PlayCircle, PauseCircle, CheckCircle2 } from "lucide-react";
 import { useTasks } from "../../features/tasks/taskContext";
-import { useTaskFilters } from "../../features/tasks/useTaskFilters";
+import { useTaskFilters, type AssignedFilterValue } from "../../features/tasks/useTaskFilters";
 import TaskFilterBar from "../../features/tasks/TaskFilterBar";
 import StatusChips from "../../features/tasks/StatusChips";
 import TaskDetails from "../../features/tasks/TaskDetails";
@@ -14,7 +14,7 @@ import { useDeleteTaskConfirm } from "../../features/tasks/useDeleteTaskConfirm"
 import { useDuplicateTask } from "../../features/tasks/useDuplicateTask";
 import { useBulkTaskActions } from "../../features/tasks/useBulkTaskActions";
 import { useRowSelection } from "../../features/tasks/useRowSelection";
-import { formatDate, memberName, RECURRENCE_LABELS, remarkPreview, statusChipLabel, statusSlug, type Task, type TaskStatus } from "../../features/tasks/types";
+import { formatDate, memberName, RECURRENCE_LABELS, remarkPreview, STATUSES, statusChipLabel, statusSlug, type Task, type TaskStatus } from "../../features/tasks/types";
 
 type TaskScope = "assigned" | "personal";
 
@@ -32,11 +32,27 @@ const STATUS_KPIS: { status: TaskStatus; icon: typeof PlayCircle; variant: strin
 
 export default function MajorTasks() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Computed once via the lazy useState initializer — a Dashboard KPI tap links here with
+  // e.g. ?status=Completed or ?unassigned=1 to arrive pre-filtered, and this needs to survive
+  // the URL being cleared right after (below) without forgetting the filter it just set.
+  const [initialFilters] = useState(() => ({
+    status: (() => {
+      const raw = searchParams.get("status");
+      return raw && (STATUSES as string[]).includes(raw) ? raw as TaskStatus : "all";
+    })() as TaskStatus | "all",
+    assignedFilter: (searchParams.get("unassigned") === "1" ? "unassigned" : "all") as AssignedFilterValue,
+    overdueOnly: searchParams.get("overdue") === "1",
+  }));
+  useEffect(() => {
+    if ([...searchParams.keys()].length) setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const {
     tasks, members, projects, updateTask, listArchivedTasks,
     addProgress, editProgress, deleteProgress,
     addRemark, editRemark, deleteRemark, reactToRemark, addRemarkReply,
-    addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion,
+    addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, reorderSubtasks,
     addRemarkAttachment, deleteRemarkAttachment, addSubtaskRemarkAttachment, deleteSubtaskRemarkAttachment, markCompletionSeen, markViewed,
   } = useTasks();
   const confirmDelete = useDeleteTaskConfirm();
@@ -73,8 +89,9 @@ export default function MajorTasks() {
   const {
     filtered, search, setSearch, deadlineDate, setDeadlineDate, quickFilter, setQuickFilter,
     status, setStatus, priority, setPriority, projectFilter, setProjectFilter,
+    assignedFilter, setAssignedFilter, overdueOnly, setOverdueOnly,
     hasActiveFilters, clearFilters,
-  } = useTaskFilters(scopedTasks);
+  } = useTaskFilters(scopedTasks, { initialStatus: initialFilters.status, initialAssignedFilter: initialFilters.assignedFilter, initialOverdueOnly: initialFilters.overdueOnly });
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [viewingId, setViewingId] = useState<number | null>(null);
   const [viewingSubtaskId, setViewingSubtaskId] = useState<number | null>(null);
@@ -140,6 +157,10 @@ export default function MajorTasks() {
         projectFilter={projectFilter}
         onProjectFilterChange={setProjectFilter}
         projects={projects}
+        assignedFilter={assignedFilter}
+        onAssignedFilterChange={setAssignedFilter}
+        overdueOnly={overdueOnly}
+        onOverdueOnlyChange={setOverdueOnly}
         hasActiveFilters={hasActiveFilters}
         onClear={clearFilters}
       />
@@ -295,6 +316,7 @@ export default function MajorTasks() {
         onEditSubtask={(subtaskId, input) => editSubtask(viewingTask.id, subtaskId, input)}
         onDeleteSubtask={subtaskId => deleteSubtask(viewingTask.id, subtaskId)}
         onSetSubtaskCompletion={(subtaskId, isCompleted) => setSubtaskCompletion(viewingTask.id, subtaskId, isCompleted)}
+        onReorderSubtasks={(parentId, order) => reorderSubtasks(viewingTask.id, parentId, order)}
         onAddRemarkAttachment={(remarkId, file) => addRemarkAttachment(viewingTask.id, remarkId, file)}
         onDeleteRemarkAttachment={(remarkId, attachmentId) => deleteRemarkAttachment(viewingTask.id, remarkId, attachmentId)}
         onAddSubtaskRemarkAttachment={(subtaskId, remarkId, file) => addSubtaskRemarkAttachment(viewingTask.id, subtaskId, remarkId, file)}

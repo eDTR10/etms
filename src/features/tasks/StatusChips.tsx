@@ -9,7 +9,6 @@ interface StatusChipsProps {
 export default function StatusChips({ value, onChange, badges }: StatusChipsProps) {
   return (
     <div className="etm-status-chips" role="tablist" aria-label="Filter by status">
-      <button type="button" role="tab" aria-selected={value === "all"} className={`etm-status-chip ${value === "all" ? "active" : ""}`} onClick={() => onChange("all")}>All</button>
       {STATUSES.map(status => {
         const badge = badges?.[status] ?? 0;
         return (
@@ -19,6 +18,7 @@ export default function StatusChips({ value, onChange, badges }: StatusChipsProp
           </button>
         );
       })}
+      <button type="button" role="tab" aria-selected={value === "all"} className={`etm-status-chip ${value === "all" ? "active" : ""}`} onClick={() => onChange("all")}>All</button>
     </div>
   );
 }

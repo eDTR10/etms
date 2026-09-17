@@ -66,7 +66,7 @@ export default function Dashboard({ onViewMajorTasks }: DashboardOverviewProps) 
     tasks, members, projects, updateTask,
     addProgress, editProgress, deleteProgress,
     addRemark, editRemark, deleteRemark, reactToRemark, addRemarkReply,
-    addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion,
+    addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, reorderSubtasks,
     addRemarkAttachment, deleteRemarkAttachment, addSubtaskRemarkAttachment, deleteSubtaskRemarkAttachment, markCompletionSeen, markViewed,
   } = useTasks();
   const confirmDelete = useDeleteTaskConfirm();
@@ -75,8 +75,9 @@ export default function Dashboard({ onViewMajorTasks }: DashboardOverviewProps) 
   const {
     filtered, search, setSearch, deadlineDate, setDeadlineDate, quickFilter, setQuickFilter,
     status, setStatus, priority, setPriority, projectFilter, setProjectFilter,
+    assignedFilter, setAssignedFilter, overdueOnly, setOverdueOnly,
     hasActiveFilters, clearFilters,
-  } = useTaskFilters(tasks);
+  } = useTaskFilters(tasks, { initialStatus: "Pending" });
   const [viewingId, setViewingId] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null);
@@ -135,22 +136,22 @@ export default function Dashboard({ onViewMajorTasks }: DashboardOverviewProps) 
   return (
     <div>
       <div className="etm-kpi-grid">
-        <div className="etm-panel etm-kpi-card">
+        <button type="button" className="etm-panel etm-kpi-card etm-kpi-card-button" onClick={() => navigate("/etms/tasks")}>
           <div className="etm-kpi-card-top"><span className="etm-kpi-label">Total Tasks</span><span className="etm-kpi-icon"><ClipboardList size={17} /></span></div>
           <span className="etm-kpi-value">{totalTasks}</span>
-        </div>
-        <div className="etm-panel etm-kpi-card warn">
+        </button>
+        <button type="button" className="etm-panel etm-kpi-card etm-kpi-card-button warn" onClick={() => navigate("/etms/tasks?unassigned=1")}>
           <div className="etm-kpi-card-top"><span className="etm-kpi-label">Unassigned Tasks</span><span className="etm-kpi-icon"><UserX size={17} /></span></div>
           <span className="etm-kpi-value">{totalUnassigned}</span>
-        </div>
-        <div className="etm-panel etm-kpi-card success">
+        </button>
+        <button type="button" className="etm-panel etm-kpi-card etm-kpi-card-button success" onClick={() => navigate("/etms/tasks?status=Completed")}>
           <div className="etm-kpi-card-top"><span className="etm-kpi-label">Completed Tasks</span><span className="etm-kpi-icon"><CheckCircle2 size={17} /></span></div>
           <span className="etm-kpi-value">{totalCompleted}</span>
-        </div>
-        <div className="etm-panel etm-kpi-card danger">
+        </button>
+        <button type="button" className="etm-panel etm-kpi-card etm-kpi-card-button danger" onClick={() => navigate("/etms/tasks?overdue=1")}>
           <div className="etm-kpi-card-top"><span className="etm-kpi-label">Past Due Tasks</span><span className="etm-kpi-icon"><AlertTriangle size={17} /></span></div>
           <span className="etm-kpi-value">{totalPastDue}</span>
-        </div>
+        </button>
       </div>
 
       <div className="etm-section">
@@ -193,6 +194,10 @@ export default function Dashboard({ onViewMajorTasks }: DashboardOverviewProps) 
           projectFilter={projectFilter}
           onProjectFilterChange={setProjectFilter}
           projects={projects}
+          assignedFilter={assignedFilter}
+          onAssignedFilterChange={setAssignedFilter}
+          overdueOnly={overdueOnly}
+          onOverdueOnlyChange={setOverdueOnly}
           hasActiveFilters={hasActiveFilters}
           onClear={clearFilters}
         />
@@ -286,6 +291,7 @@ export default function Dashboard({ onViewMajorTasks }: DashboardOverviewProps) 
         onEditSubtask={(subtaskId, input) => editSubtask(viewingTask.id, subtaskId, input)}
         onDeleteSubtask={subtaskId => deleteSubtask(viewingTask.id, subtaskId)}
         onSetSubtaskCompletion={(subtaskId, isCompleted) => setSubtaskCompletion(viewingTask.id, subtaskId, isCompleted)}
+        onReorderSubtasks={(parentId, order) => reorderSubtasks(viewingTask.id, parentId, order)}
         onAddRemarkAttachment={(remarkId, file) => addRemarkAttachment(viewingTask.id, remarkId, file)}
         onDeleteRemarkAttachment={(remarkId, attachmentId) => deleteRemarkAttachment(viewingTask.id, remarkId, attachmentId)}
         onAddSubtaskRemarkAttachment={(subtaskId, remarkId, file) => addSubtaskRemarkAttachment(viewingTask.id, subtaskId, remarkId, file)}

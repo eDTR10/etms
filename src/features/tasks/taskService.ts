@@ -68,6 +68,8 @@ export const taskService = {
     (await api.delete<Task>(`etm/tasks/${id}/subtasks/${subtaskId}/`)).data,
   setSubtaskCompletion: async (id: number, subtaskId: number, is_completed: boolean) =>
     (await api.post<Task>(`etm/tasks/${id}/subtasks/${subtaskId}/completion/`, { is_completed })).data,
+  reorderSubtasks: async (id: number, parentId: number | null, order: number[]) =>
+    (await api.post<Task>(`etm/tasks/${id}/subtasks/reorder/`, { parent: parentId, order })).data,
   bulkArchive: async (ids: number[]) =>
     (await api.post<BulkActionResult>("etm/tasks/bulk-archive/", { ids })).data,
   bulkDelete: async (ids: number[]) =>

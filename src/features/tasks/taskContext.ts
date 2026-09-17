@@ -38,6 +38,7 @@ export interface TaskContextValue {
   editSubtask: (id: number, subtaskId: number, input: { title?: string; description?: string }) => Promise<void>;
   deleteSubtask: (id: number, subtaskId: number) => Promise<void>;
   setSubtaskCompletion: (id: number, subtaskId: number, isCompleted: boolean) => Promise<void>;
+  reorderSubtasks: (id: number, parentId: number | null, order: number[]) => Promise<void>;
   bulkArchive: (ids: number[]) => Promise<BulkActionResult>;
   bulkDelete: (ids: number[]) => Promise<BulkActionResult>;
   addRemarkAttachment: (id: number, remarkId: number, file: File) => Promise<void>;

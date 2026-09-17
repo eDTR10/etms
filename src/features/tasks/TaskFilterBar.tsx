@@ -1,6 +1,6 @@
-import { Search, X } from "lucide-react";
+import { AlertTriangle, Search, UserX, X } from "lucide-react";
 import { PRIORITIES, type Priority, type Project } from "./types";
-import type { PriorityFilterValue, ProjectFilterValue, QuickDeadlineFilterValue } from "./useTaskFilters";
+import type { AssignedFilterValue, PriorityFilterValue, ProjectFilterValue, QuickDeadlineFilterValue } from "./useTaskFilters";
 
 const QUICK_DEADLINE_FILTERS: { value: QuickDeadlineFilterValue; label: string }[] = [
   { value: "day", label: "This Day" },
@@ -20,6 +20,10 @@ interface TaskFilterBarProps {
   projectFilter: ProjectFilterValue;
   onProjectFilterChange: (value: ProjectFilterValue) => void;
   projects: Project[];
+  assignedFilter: AssignedFilterValue;
+  onAssignedFilterChange: (value: AssignedFilterValue) => void;
+  overdueOnly: boolean;
+  onOverdueOnlyChange: (value: boolean) => void;
   hasActiveFilters: boolean;
   onClear: () => void;
 }
@@ -31,6 +35,8 @@ export default function TaskFilterBar({
   priority, onPriorityChange,
   projectFilter, onProjectFilterChange,
   projects,
+  assignedFilter, onAssignedFilterChange,
+  overdueOnly, onOverdueOnlyChange,
   hasActiveFilters, onClear,
 }: TaskFilterBarProps) {
   return (
@@ -75,6 +81,8 @@ export default function TaskFilterBar({
           ))}
         </div>
       </div>
+      <button type="button" className={`etm-button ghost small etm-filter-quick-date ${assignedFilter === "unassigned" ? "active" : ""}`} aria-pressed={assignedFilter === "unassigned"} onClick={() => onAssignedFilterChange(assignedFilter === "unassigned" ? "all" : "unassigned")}><UserX size={13} />Unassigned</button>
+      <button type="button" className={`etm-button ghost small etm-filter-quick-date ${overdueOnly ? "active" : ""}`} aria-pressed={overdueOnly} onClick={() => onOverdueOnlyChange(!overdueOnly)}><AlertTriangle size={13} />Overdue</button>
       {hasActiveFilters && <button type="button" className="etm-button ghost small etm-filter-clear" onClick={onClear}><X size={13} />Clear</button>}
     </div>
   );
