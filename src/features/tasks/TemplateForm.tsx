@@ -1,7 +1,7 @@
 import { useId, useRef, useState, type FormEvent } from "react";
-import { Bookmark, Check, CheckCheck, ChevronDown, Flag, Folder, Loader2, MapPin, Plus, Trash2, User } from "lucide-react";
+import { Bookmark, Check, CheckCheck, ChevronDown, Flag, Folder, Loader2, MapPin, Plus, Search, Trash2, User, Users, X } from "lucide-react";
 import { taskError } from "./taskService";
-import { PRIORITIES, type Priority, type Project, type TaskTemplate, type TaskTemplateInput, type TemplateSubtask } from "./types";
+import { ASSIGNMENT_ROLES, memberName, PRIORITIES, type AssignmentRole, type Member, type Priority, type Project, type TaskTemplate, type TaskTemplateInput, type TemplateSubtask } from "./types";
 import { REGION_X_BARANGAYS, REGION_X_CITIES, REGION_X_PROVINCES } from "./regionXLocations";
 import { addChildToSubtaskTree, flattenTree, mapSubtaskTree, removeFromSubtaskTree } from "./subtaskTree";
 import "./forms.css";
@@ -14,6 +14,7 @@ const PRIORITY_NOTES: Record<Priority, string> = {
 
 interface TemplateFormProps {
   template?: TaskTemplate;
+  members: Member[];
   projects: Project[];
   onSave: (input: TaskTemplateInput) => Promise<void>;
   onCancel: () => void;
@@ -56,6 +57,7 @@ function initialValues(template?: TaskTemplate): FormValues {
     location_barangay: template?.location_barangay ?? "",
     priority: template?.priority ?? "Medium",
     subtasks: toEditableTemplateSubtasks(template?.subtasks ?? []),
+    assignments: template?.assignments ?? [],
   };
 }
 
@@ -85,7 +87,7 @@ function TemplateSubtaskEditorRow({ subtask, index, fieldId, errors, onUpdate, o
   );
 }
 
-export default function TemplateForm({ template, projects, onSave, onCancel }: TemplateFormProps) {
+export default function TemplateForm({ template, members, projects, onSave, onCancel }: TemplateFormProps) {
   const fieldId = useId();
   const formRef = useRef<HTMLFormElement>(null);
   const projectPickerRef = useRef<HTMLDivElement>(null);
@@ -93,10 +95,12 @@ export default function TemplateForm({ template, projects, onSave, onCancel }: T
   const [values, setValues] = useState<FormValues>(() => initialValues(template));
   const [errors, setErrors] = useState<FormErrors>({});
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
+  const [memberSearch, setMemberSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   const filteredProjects = projects.filter(project => project.name.toLocaleLowerCase().includes(values.project.trim().toLocaleLowerCase()));
+  const filteredMembers = members.filter(member => `${memberName(member)} ${member.position ?? ""}`.toLowerCase().includes(memberSearch.trim().toLowerCase()));
   const allSubtasks = flattenTree(values.subtasks);
 
   function update<K extends keyof FormValues>(field: K, value: FormValues[K]) {
@@ -117,6 +121,19 @@ export default function TemplateForm({ template, projects, onSave, onCancel }: T
     const localKey = `new-${nextSubtask.current++}`;
     setValues(current => ({ ...current, subtasks: addChildToSubtaskTree(current.subtasks, parentKey, { localKey, title: "", description: "", subtasks: [] }) }));
     requestAnimationFrame(() => formRef.current?.querySelector<HTMLInputElement>(`[data-subtask-key="${localKey}"]`)?.focus());
+  }
+
+  function toggleAssignment(id: number) {
+    setValues(current => ({
+      ...current,
+      assignments: current.assignments.some(assignment => assignment.user === id)
+        ? current.assignments.filter(assignment => assignment.user !== id)
+        : [...current.assignments, { user: id, role: "Viewer" as AssignmentRole }],
+    }));
+  }
+
+  function updateAssignmentRole(id: number, role: AssignmentRole) {
+    setValues(current => ({ ...current, assignments: current.assignments.map(assignment => assignment.user === id ? { ...assignment, role } : assignment) }));
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -180,7 +197,7 @@ export default function TemplateForm({ template, projects, onSave, onCancel }: T
                 <Folder size={15} /><span>Project task</span>
               </label>
               <label className={`etm-tasktype-option ${values.is_personal ? "selected" : ""}`}>
-                <input type="radio" name={`${fieldId}-tasktype`} checked={values.is_personal} onChange={() => update("is_personal", true)} />
+                <input type="radio" name={`${fieldId}-tasktype`} checked={values.is_personal} onChange={() => setValues(current => ({ ...current, is_personal: true, assignments: [] }))} />
                 <User size={15} /><span>Personal</span>
               </label>
             </div>
@@ -228,6 +245,35 @@ export default function TemplateForm({ template, projects, onSave, onCancel }: T
               </label>
             </div>
           </fieldset>
+
+          {!values.is_personal && (
+            <fieldset className="etm-member-field">
+              <legend><Users size={15} style={{ verticalAlign: "-3px", marginRight: 6 }} />Default assignees <span className="etm-form-count">{values.assignments.length} selected</span></legend>
+              <p className="etm-form-helper">Prefill who's usually assigned to this kind of task — still editable before the task is saved.</p>
+              {values.assignments.length > 0 && <div className="etm-selected-members">{values.assignments.map(assignment => {
+                const person = members.find(member => member.id === assignment.user);
+                const name = person ? memberName(person) : `Member #${assignment.user}`;
+                return <div className="etm-assignment-chip" key={assignment.user}>
+                  <span className="etm-assignment-chip-name">{name}</span>
+                  <div className="etm-role-toggle" role="radiogroup" aria-label={`Role for ${name}`}>
+                    {ASSIGNMENT_ROLES.map(role => <button type="button" key={role} className={`etm-role-toggle-option ${assignment.role === role ? "selected" : ""}`} onClick={() => updateAssignmentRole(assignment.user, role)}>{role}</button>)}
+                  </div>
+                  <button type="button" onClick={() => toggleAssignment(assignment.user)} aria-label={`Remove ${name}`}><X size={13} /></button>
+                </div>;
+              })}</div>}
+              <div className="etm-member-picker">
+                <div className="etm-member-search"><Search size={16} /><input aria-label="Search members to assign" placeholder="Search team members…" value={memberSearch} onChange={event => setMemberSearch(event.target.value)} /></div>
+                <div className="etm-member-options">
+                  {filteredMembers.map(member => <label key={member.id} className={`etm-member-option ${values.assignments.some(a => a.user === member.id) ? "selected" : ""}`}>
+                    <input type="checkbox" checked={values.assignments.some(a => a.user === member.id)} onChange={() => toggleAssignment(member.id)} />
+                    <span className="etm-member-initials" aria-hidden="true">{member.first_name?.charAt(0)}{member.last_name?.charAt(0)}</span>
+                    <span className="etm-member-option-name">{memberName(member)}{member.position && <small>{member.position}</small>}</span>
+                  </label>)}
+                  {!filteredMembers.length && <p className="etm-member-empty">{memberSearch ? "No members match your search." : "No team members available."}</p>}
+                </div>
+              </div>
+            </fieldset>
+          )}
 
           <fieldset className="etm-priority-field">
             <legend>Default priority</legend>

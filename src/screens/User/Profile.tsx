@@ -5,7 +5,7 @@ import UserLayout from "./UserLayout";
 import { ProfileSkeleton } from "../../components/ui/skeleton";
 import { useAuth } from "../Auth/AuthContext";
 
-const Profile = () => {
+export const ProfileContent = () => {
   const { user, isLoading, logout } = useAuth();
   const navigate = useNavigate();
   const [saved, setSaved] = useState(false);
@@ -39,8 +39,6 @@ const Profile = () => {
   };
 
   return (
-    <UserLayout title="Profile" subtitle="Manage your account">
-
       <div className="max-w-2xl flex flex-col gap-6">
 
         {isLoading ? (
@@ -165,8 +163,13 @@ const Profile = () => {
           </>
         )}
       </div>
-    </UserLayout>
   );
 };
+
+const Profile = () => (
+  <UserLayout title="Profile" subtitle="Manage your account">
+    <ProfileContent />
+  </UserLayout>
+);
 
 export default Profile;

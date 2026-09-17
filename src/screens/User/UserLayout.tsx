@@ -10,9 +10,11 @@ import {
   UserCircle,
   Bookmark,
   Link2,
+  ArrowLeftRight,
 } from "lucide-react";
 import { ModeToggle } from "../../components/mode-toggle";
 import { useAuth } from "../Auth/AuthContext";
+import { isAdmin } from "../Auth/roles";
 import NotificationBell from "../../features/notifications/NotificationBell";
 import etmsLogo from "../../assets/eTMS-icon.png";
 
@@ -95,6 +97,16 @@ const UserLayout = ({ title, subtitle, children }: UserLayoutProps) => {
               <p className="text-xs text-muted-foreground truncate">{user?.email ?? ""}</p>
             </div>
           </Link>
+
+          {isAdmin(user) && (
+            <Link
+              to="/etms/admin/dashboard"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            >
+              <ArrowLeftRight className="w-4 h-4" />
+              Switch to Admin View
+            </Link>
+          )}
 
           <button
             onClick={handleLogout}

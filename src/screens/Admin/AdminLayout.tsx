@@ -7,6 +7,7 @@ import {
   LogOut,
   UserCircle,
   ShieldCheck,
+  ArrowLeftRight,
 } from "lucide-react";
 import { ModeToggle } from "../../components/mode-toggle";
 import { useAuth } from "../Auth/AuthContext";
@@ -68,18 +69,11 @@ const AdminLayout = ({ title, subtitle, children }: AdminLayoutProps) => {
               </Link>
             );
           })}
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors w-full"
-          >
-            <LogOut className="w-4 h-4" />
-            Log Out
-          </button>
         </nav>
 
-        <div className="px-3 pb-5 border-t border-border pt-4">
+        <div className="px-3 pb-5 border-t border-border pt-4 flex flex-col gap-2">
           <Link
-            to="/etms/user/profile"
+            to="/etms/admin/profile"
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-accent hover:opacity-80 transition-opacity"
           >
             <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold uppercase">
@@ -92,6 +86,20 @@ const AdminLayout = ({ title, subtitle, children }: AdminLayoutProps) => {
               <p className="text-xs text-muted-foreground truncate">{user?.email ?? ""}</p>
             </div>
           </Link>
+          <Link
+            to="/etms/dashboard"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+          >
+            <ArrowLeftRight className="w-4 h-4" />
+            Switch to User View
+          </Link>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors w-full"
+          >
+            <LogOut className="w-4 h-4" />
+            Log Out
+          </button>
         </div>
       </aside>
 
@@ -106,9 +114,9 @@ const AdminLayout = ({ title, subtitle, children }: AdminLayoutProps) => {
           <div className="flex items-center gap-2">
             <ModeToggle />
             <Link
-              to="/etms/user/profile"
+              to="/etms/admin/profile"
               aria-label="Open profile"
-              className={`hidden md:inline-flex items-center justify-center w-9 h-9 rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground ${pathname === "/etms/user/profile" ? "bg-accent text-[#0d8a92] dark:text-[#17b3ac]" : ""}`}
+              className={`hidden md:inline-flex items-center justify-center w-9 h-9 rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground ${pathname === "/etms/admin/profile" ? "bg-accent text-[#0d8a92] dark:text-[#17b3ac]" : ""}`}
             >
               <UserCircle className="w-5 h-5" />
             </Link>

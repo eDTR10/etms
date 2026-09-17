@@ -12,7 +12,7 @@ import "../../features/tasks/etm-base.css";
 import "../Etm/etm-app.css";
 
 export function TemplatesContent() {
-  const { templates, projects, loading, error, createTemplate, updateTemplate, deleteTemplate } = useTasks();
+  const { templates, members, projects, loading, error, createTemplate, updateTemplate, deleteTemplate } = useTasks();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<TaskTemplate | undefined>(undefined);
 
@@ -79,6 +79,7 @@ export function TemplatesContent() {
 
       <TemplateFormDialog
         template={editingTemplate}
+        members={members}
         projects={projects}
         open={dialogOpen}
         onClose={closeDialog}

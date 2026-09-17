@@ -1,17 +1,18 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import TemplateForm from "./TemplateForm";
-import type { Project, TaskTemplate, TaskTemplateInput } from "./types";
+import type { Member, Project, TaskTemplate, TaskTemplateInput } from "./types";
 
 interface TemplateFormDialogProps {
   template?: TaskTemplate;
+  members: Member[];
   projects: Project[];
   open: boolean;
   onClose: () => void;
   onSave: (input: TaskTemplateInput) => Promise<void>;
 }
 
-export default function TemplateFormDialog({ template, projects, open, onClose, onSave }: TemplateFormDialogProps) {
+export default function TemplateFormDialog({ template, members, projects, open, onClose, onSave }: TemplateFormDialogProps) {
   if (!open) return null;
   return (
     <Dialog.Root open={open} onOpenChange={next => { if (!next) onClose(); }}>
@@ -23,7 +24,7 @@ export default function TemplateFormDialog({ template, projects, open, onClose, 
             <Dialog.Close asChild><button type="button" className="etm-icon-button" aria-label="Close"><X size={18} /></button></Dialog.Close>
           </div>
           <div className="etm-taskform-dialog-body">
-            <TemplateForm template={template} projects={projects} onSave={async input => { await onSave(input); onClose(); }} onCancel={onClose} />
+            <TemplateForm template={template} members={members} projects={projects} onSave={async input => { await onSave(input); onClose(); }} onCancel={onClose} />
           </div>
         </Dialog.Content>
       </Dialog.Portal>

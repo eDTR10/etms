@@ -204,6 +204,7 @@ export interface TaskTemplate {
   location_barangay: string;
   priority: Priority;
   subtasks: TemplateSubtask[];
+  assignments: AssignmentInput[];
   created_at: string;
   updated_at: string;
 }
@@ -220,6 +221,7 @@ export interface TaskTemplateInput {
   location_barangay: string;
   priority: Priority;
   subtasks: TemplateSubtask[];
+  assignments: AssignmentInput[];
 }
 
 export interface TaskInput {

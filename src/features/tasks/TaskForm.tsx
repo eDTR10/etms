@@ -281,7 +281,7 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
       location_city: template.location_city,
       location_barangay: template.location_barangay,
       priority: template.priority,
-      assignments: template.is_personal ? [] : current.assignments,
+      assignments: template.is_personal ? [] : template.assignments,
       subtasks: templateToEditableSubtasks(template.id, template.subtasks),
     }));
     setSelectedTemplateId(String(template.id));
@@ -412,7 +412,7 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
                         <option value="">No templates saved yet</option>
                       )}
                     </select>
-                    <p className="etm-form-helper">Choosing a template fills in the details and subtasks below — you can still edit anything before saving. <Link to="/etms/templates">Manage templates</Link></p>
+                    <p className="etm-form-helper">Choosing a template fills in the details, subtasks, and assignees below — you can still edit anything before saving. <Link to="/etms/templates">Manage templates</Link></p>
                   </div>
                 )}
                 <fieldset className="etm-priority-field">

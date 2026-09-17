@@ -45,6 +45,7 @@ const AdminTasks       = lazy(() => import("./screens/Admin/Tasks.tsx"));
 const AdminTaskDetails = lazy(() => import("./screens/Admin/TaskDetailsPage.tsx"));
 const AdminTemplates   = lazy(() => import("./screens/Admin/Templates.tsx"));
 const AdminQuickLinks  = lazy(() => import("./screens/Admin/QuickLinks.tsx"));
+const AdminProfile     = lazy(() => import("./screens/Admin/Profile.tsx"));
 
 // Sends "/" to the right place: dashboard if logged in, login otherwise.
 const Home = () => {
@@ -155,6 +156,10 @@ const router = createBrowserRouter([
   {
     path: "/etms/admin/quick-links",
     element: <AdminRoute><Suspense fallback={<Loader />}><AdminQuickLinks /></Suspense></AdminRoute>,
+  },
+  {
+    path: "/etms/admin/profile",
+    element: <AdminRoute><Suspense fallback={<Loader />}><AdminProfile /></Suspense></AdminRoute>,
   },
 
   // ── Main app with navbar ──────────────────────────────
