@@ -1,5 +1,6 @@
 import axios from "axios";
 import api from "../../plugin/axios";
+import { CancelledError } from "./blockingLoader";
 import type { GroupedTask, GroupedTaskInput, Member, Project, Task, TaskInput, TaskStatus, TaskTemplate, TaskTemplateInput } from "./types";
 
 export interface BulkActionResult {
@@ -102,6 +103,7 @@ export const taskService = {
 };
 
 export function taskError(error: unknown): string {
+  if (error instanceof CancelledError) return error.message;
   if (axios.isAxiosError(error)) {
     const data = error.response?.data;
     if (typeof data?.detail === "string") return data.detail;

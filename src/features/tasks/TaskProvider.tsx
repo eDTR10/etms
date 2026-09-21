@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { TaskContext } from "./taskContext";
+import { withBlockingLoader } from "./blockingLoader";
 import { taskError, taskService } from "./taskService";
 import { flattenSubtasks, type Member, type Project, type Task, type TaskInput, type TaskStatus, type TaskTemplate, type TaskTemplateInput } from "./types";
 
@@ -50,21 +51,21 @@ export default function TaskProvider({ children }: { children: ReactNode }) {
     setTasks(current => current.map(row => row.id === task.id ? task : row));
     return task;
   };
-  const createTask = async (input: TaskInput) => {
+  const createTask = async (input: TaskInput) => withBlockingLoader("Creating task…", async () => {
     const task = await taskService.create(input);
     setTasks(current => [task, ...current]);
     return task;
-  };
-  const updateTask = async (id: number, input: Partial<TaskInput>) => replace(await taskService.update(id, input));
-  const deleteTask = async (id: number) => {
+  });
+  const updateTask = async (id: number, input: Partial<TaskInput>) => withBlockingLoader("Saving changes…", async () => replace(await taskService.update(id, input)));
+  const deleteTask = async (id: number) => withBlockingLoader("Deleting task…", async () => {
     await taskService.remove(id);
     setTasks(current => current.filter(task => task.id !== id));
-  };
-  const duplicateTask = async (id: number) => {
+  });
+  const duplicateTask = async (id: number) => withBlockingLoader("Duplicating task…", async () => {
     const task = await taskService.duplicate(id);
     setTasks(current => [task, ...current]);
     return task;
-  };
+  });
   const toggleOccurrence = async (id: number, date: string) => {
     replace(await taskService.toggleOccurrence(id, date));
   };
@@ -114,27 +115,27 @@ export default function TaskProvider({ children }: { children: ReactNode }) {
   const setSubtaskStatus = async (id: number, subtaskId: number, message: string, status: TaskStatus) => {
     replace(await taskService.setSubtaskStatus(id, subtaskId, message, status));
   };
-  const addSubtask = async (id: number, title: string, description?: string, parentId?: number) => {
+  const addSubtask = async (id: number, title: string, description?: string, parentId?: number) => withBlockingLoader("Adding subtask…", async () => {
     replace(await taskService.addSubtask(id, title, description, parentId));
-  };
-  const editSubtask = async (id: number, subtaskId: number, input: { title?: string; description?: string }) => {
+  });
+  const editSubtask = async (id: number, subtaskId: number, input: { title?: string; description?: string }) => withBlockingLoader("Saving subtask…", async () => {
     replace(await taskService.editSubtask(id, subtaskId, input));
-  };
-  const deleteSubtask = async (id: number, subtaskId: number) => {
+  });
+  const deleteSubtask = async (id: number, subtaskId: number) => withBlockingLoader("Deleting subtask…", async () => {
     replace(await taskService.deleteSubtask(id, subtaskId));
-  };
+  });
   const setSubtaskCompletion = async (id: number, subtaskId: number, isCompleted: boolean) => {
     replace(await taskService.setSubtaskCompletion(id, subtaskId, isCompleted));
   };
   const reorderSubtasks = async (id: number, parentId: number | null, order: number[]) => {
     replace(await taskService.reorderSubtasks(id, parentId, order));
   };
-  const completeTask = async (id: number) => {
+  const completeTask = async (id: number) => withBlockingLoader("Completing task…", async () => {
     replace(await taskService.completeTask(id));
-  };
-  const assignSubtask = async (id: number, subtaskId: number, userId: number | null) => {
+  });
+  const assignSubtask = async (id: number, subtaskId: number, userId: number | null) => withBlockingLoader("Assigning subtask…", async () => {
     replace(await taskService.assignSubtask(id, subtaskId, userId));
-  };
+  });
   const bulkArchive = async (ids: number[]) => {
     const result = await taskService.bulkArchive(ids);
     setTasks(current => current.filter(task => !result.succeeded.includes(task.id)));
@@ -163,20 +164,20 @@ export default function TaskProvider({ children }: { children: ReactNode }) {
   const markViewed = async (id: number) => {
     replace(await taskService.markViewed(id));
   };
-  const createTemplate = async (input: TaskTemplateInput) => {
+  const createTemplate = async (input: TaskTemplateInput) => withBlockingLoader("Creating template…", async () => {
     const template = await taskService.createTemplate(input);
     setTemplates(current => [...current, template].sort((a, b) => a.name.localeCompare(b.name)));
     return template;
-  };
-  const updateTemplate = async (id: number, input: TaskTemplateInput) => {
+  });
+  const updateTemplate = async (id: number, input: TaskTemplateInput) => withBlockingLoader("Saving template…", async () => {
     const template = await taskService.updateTemplate(id, input);
     setTemplates(current => current.map(item => item.id === id ? template : item).sort((a, b) => a.name.localeCompare(b.name)));
     return template;
-  };
-  const deleteTemplate = async (id: number) => {
+  });
+  const deleteTemplate = async (id: number) => withBlockingLoader("Deleting template…", async () => {
     await taskService.deleteTemplate(id);
     setTemplates(current => current.filter(item => item.id !== id));
-  };
+  });
 
   return <TaskContext.Provider value={{ tasks, members, projects, templates, loading, error, refresh, listArchivedTasks, addMember, createTask, createTemplate, updateTemplate, deleteTemplate, updateTask, deleteTask, duplicateTask, toggleOccurrence, addProgress, editProgress, deleteProgress, addRemark, editRemark, deleteRemark, reactToRemark, addRemarkReply, addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, reorderSubtasks, assignSubtask, completeTask, bulkArchive, bulkDelete, addRemarkAttachment, deleteRemarkAttachment, addSubtaskRemarkAttachment, deleteSubtaskRemarkAttachment, markCompletionSeen, markViewed }}>{children}</TaskContext.Provider>;
 }

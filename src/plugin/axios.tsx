@@ -1,5 +1,6 @@
 import axios from "axios";
 import { secureStorage } from "../lib/secureStorage";
+import { getMutationSignal } from "./mutationSignal";
 
 const baseURL = `${import.meta.env.VITE_BACKEND_URL}/api/v1/`;
 
@@ -10,6 +11,8 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Token ${token}`;
   }
+  const signal = getMutationSignal();
+  if (signal && config.method !== "get" && !config.signal) config.signal = signal;
   return config;
 });
 
