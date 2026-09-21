@@ -241,6 +241,8 @@
 .etm-details-subtasks li.completed { background: #f8fbfa; }
 .etm-details-subtasks-nested { margin: 6px 12px 8px 45px; padding-left: 14px; border-left: 2px solid var(--etm-border); }
 .etm-subtask-add-child { margin: 8px 12px 4px 45px; }
+.etm-subtask-assign-picker { margin: 8px 12px 4px 45px; max-height: 260px; }
+.etm-subtask-assignee-chip { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; padding: 2px 8px; border-radius: 20px; background: color-mix(in srgb, var(--etm-primary) 12%, var(--etm-surface)); color: var(--etm-primary); font-size: 11px; font-weight: 600; }
 .etm-subtask-panel-summary { display: flex; align-items: flex-start; gap: 8px; padding: 11px 12px; }
 .etm-subtask-drag-handle { flex-shrink: 0; margin-top: 3px; color: var(--etm-muted); opacity: .5; cursor: grab; }
 .etm-subtask-panel:hover > .etm-subtask-panel-summary .etm-subtask-drag-handle { opacity: 1; }
@@ -268,11 +270,12 @@
 .etm-details-subtask-text small { color: #93a3ad; font-size: 12px; line-height: 1.6; font-weight: 400; }
 .etm-details-subtasks li.completed .etm-details-subtask-check { border-radius: 50%; background: #75b29f; color: #fff; }
 .etm-activity-log { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
-.etm-activity-log > li { padding: 10px 0; border-bottom: 1px solid #eef2f4; }
+.etm-activity-log > li { padding: 8px 0 8px 9px; border-bottom: 1px solid #eef2f4; border-left: 3px solid transparent; }
 .etm-activity-log > li:last-child { border-bottom: 0; }
-.etm-activity-log-entry { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.etm-activity-log-entry { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; min-width: 0; }
+.etm-activity-log-category { flex-shrink: 0; display: inline-flex; align-items: center; padding: 1px 7px; border-radius: 20px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em; }
 .etm-activity-log-chip { flex-shrink: 0; display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 20px; background: color-mix(in srgb, var(--etm-primary) 12%, var(--etm-surface)); color: var(--etm-primary); font-size: 12px; font-weight: 700; }
-.etm-activity-log-message { color: #566673; font-size: 13.5px; line-height: 1.6; }
+.etm-activity-log-message { flex: 1; min-width: 0; color: #566673; font-size: 12px; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .etm-activity-log-time { display: block; margin-top: 4px; color: #9aa7b1; font-size: 11.5px; }
 
 .etm-attachments { display: flex; flex-direction: column; gap: 10px; }
@@ -443,7 +446,7 @@ button.etm-remark-subtask-tag:hover { background: color-mix(in srgb, var(--etm-p
   .etm-details-progress-actions > .etm-field { width: min(165px, 50%); }
   .etm-details-progress-actions > .etm-button { min-height: 45px; padding-left: 10px; padding-right: 10px; }
   .etm-subtask-section-actions { align-items: flex-end; flex-direction: column; gap: 4px; }
-  .etm-subtask-panel-body, .etm-details-subtasks-nested, .etm-subtask-add-child { margin-left: 12px; }
+  .etm-subtask-panel-body, .etm-details-subtasks-nested, .etm-subtask-add-child, .etm-subtask-assign-picker { margin-left: 12px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .etm-form-spinner, .etm-dialog-overlay, .etm-task-details { animation: none; }

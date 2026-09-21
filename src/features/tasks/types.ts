@@ -96,6 +96,11 @@ export interface SubTask {
   can_complete?: boolean;
   // Creator-only — narrower than can_complete, which any editor also gets.
   can_delete?: boolean;
+  // Who this subtask is assigned to, if anyone.
+  assignee?: Member | null;
+  // The standalone task auto-created for `assignee` so it shows up on their own
+  // Dashboard/All Tasks — present once this subtask has ever had an assignee.
+  spawned_task_id?: number | null;
   // Subtasks of this subtask, unlimited depth.
   subtasks: SubTask[];
 }
@@ -179,6 +184,9 @@ export interface Task {
   can_edit: boolean;
   can_delete: boolean;
   can_manage_assignments: boolean;
+  // Null means "assigned to me but I've never opened it" — the "New" signal. Only ever set
+  // for a non-creator assignee's own view of the task (see mark_viewed on the backend).
+  my_last_viewed_at: string | null;
 }
 
 export interface TemplateSubtask {
@@ -295,6 +303,10 @@ export function formatDate(value: string | null | undefined, withTime = false): 
 
 export function isOverdue(task: Task): boolean {
   return !task.is_completed && !!task.deadline && new Date(`${task.deadline}T23:59:59`) < new Date();
+}
+
+export function isUnseenAssignment(task: Task, userId: number | undefined): boolean {
+  return !task.is_creator && !task.my_last_viewed_at && task.assignments.some(a => a.id === userId);
 }
 
 export function completionPercent(task: Task): number {

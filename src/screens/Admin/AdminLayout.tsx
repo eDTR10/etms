@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { ModeToggle } from "../../components/mode-toggle";
 import { useAuth } from "../Auth/AuthContext";
+import { useUnseenAssignedCount } from "../../features/tasks/useUnseenAssignedCount";
 import etmsLogo from "../../assets/eTMS-icon.png";
 
 // ── Nav config ────────────────────────────────────────────────────────────
@@ -33,6 +34,7 @@ const AdminLayout = ({ title, subtitle, children }: AdminLayoutProps) => {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const unseenAssignedCount = useUnseenAssignedCount();
 
   const handleLogout = async () => {
     await logout();
@@ -66,6 +68,11 @@ const AdminLayout = ({ title, subtitle, children }: AdminLayoutProps) => {
               >
                 {item.icon}
                 {item.label}
+                {item.to === "/etms/admin/tasks" && unseenAssignedCount > 0 && (
+                  <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-[#e0453c] text-white text-[10px] font-bold flex items-center justify-center">
+                    {unseenAssignedCount > 9 ? "9+" : unseenAssignedCount}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -134,9 +141,16 @@ const AdminLayout = ({ title, subtitle, children }: AdminLayoutProps) => {
           <Link
             key={item.label}
             to={item.to}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 text-[10px] font-semibold ${pathname === item.to ? "text-[#0d8a92] dark:text-[#17b3ac]" : "text-muted-foreground"}`}
+            className={`relative flex-1 flex flex-col items-center justify-center gap-1 py-2.5 text-[10px] font-semibold ${pathname === item.to ? "text-[#0d8a92] dark:text-[#17b3ac]" : "text-muted-foreground"}`}
           >
-            {item.icon}
+            <span className="relative">
+              {item.icon}
+              {item.to === "/etms/admin/tasks" && unseenAssignedCount > 0 && (
+                <span className="absolute -top-1 -right-2 min-w-[14px] h-[14px] px-0.5 rounded-full bg-[#e0453c] text-white text-[8px] font-bold flex items-center justify-center">
+                  {unseenAssignedCount > 9 ? "9+" : unseenAssignedCount}
+                </span>
+              )}
+            </span>
             {item.label}
           </Link>
         ))}

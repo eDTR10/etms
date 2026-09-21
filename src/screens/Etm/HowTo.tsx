@@ -500,6 +500,7 @@ export default function HowTo() {
     can_edit: true,
     can_delete: true,
     can_manage_assignments: true,
+    my_last_viewed_at: null,
   }), [members]);
 
   function showNextStepSnackbar(index: number) {

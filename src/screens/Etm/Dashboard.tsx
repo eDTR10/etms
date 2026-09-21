@@ -69,7 +69,7 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks" }
     tasks, members, projects, updateTask,
     addProgress, editProgress, deleteProgress,
     addRemark, editRemark, deleteRemark, reactToRemark, addRemarkReply,
-    addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, reorderSubtasks,
+    addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, reorderSubtasks, assignSubtask,
     addRemarkAttachment, deleteRemarkAttachment, addSubtaskRemarkAttachment, deleteSubtaskRemarkAttachment, markCompletionSeen, markViewed,
   } = useTasks();
   const confirmDelete = useDeleteTaskConfirm();
@@ -295,6 +295,7 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks" }
         onDeleteSubtask={subtaskId => deleteSubtask(viewingTask.id, subtaskId)}
         onSetSubtaskCompletion={(subtaskId, isCompleted) => setSubtaskCompletion(viewingTask.id, subtaskId, isCompleted)}
         onReorderSubtasks={(parentId, order) => reorderSubtasks(viewingTask.id, parentId, order)}
+        onAssignSubtask={(subtaskId, userId) => assignSubtask(viewingTask.id, subtaskId, userId)}
         onAddRemarkAttachment={(remarkId, file) => addRemarkAttachment(viewingTask.id, remarkId, file)}
         onDeleteRemarkAttachment={(remarkId, attachmentId) => deleteRemarkAttachment(viewingTask.id, remarkId, attachmentId)}
         onAddSubtaskRemarkAttachment={(subtaskId, remarkId, file) => addSubtaskRemarkAttachment(viewingTask.id, subtaskId, remarkId, file)}
