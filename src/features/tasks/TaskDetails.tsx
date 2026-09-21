@@ -4,7 +4,7 @@ import { isAxiosError } from "axios";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
-import { AlertTriangle, Bold, CalendarDays, Check, CheckCheck, ChevronRight, Circle, ClipboardList, Clock3, Copy, Download, Edit3, ExternalLink, Flag, Folder, GripVertical, History, Italic, List, Loader2, MessageSquare, Paperclip, Pencil, Plus, Repeat, Reply, Search, Send, SmilePlus, Trash2, Underline, User, UserPlus, Users, X } from "lucide-react";
+import { AlertTriangle, Bold, CalendarDays, Check, CheckCheck, ChevronRight, Circle, ClipboardList, Clock3, Copy, Download, Edit3, ExternalLink, Link2, Flag, Folder, GripVertical, History, Italic, List, Loader2, MessageSquare, Paperclip, Pencil, Plus, Repeat, Reply, Search, Send, SmilePlus, Trash2, Underline, User, UserPlus, Users, X } from "lucide-react";
 import MentionField from "./MentionField";
 import { useAuth } from "../../screens/Auth/AuthContext";
 import { useTasks } from "./taskContext";
@@ -1185,6 +1185,16 @@ function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = 
         </> : <p className="etm-details-text empty">This task has no subtasks.</p>}
         {canAddSubtasks && <form className="etm-add-subtask-later" onSubmit={addSubtask}><input id={`${fieldId}-new-subtask`} value={newSubtaskTitle} onChange={event => { setNewSubtaskTitle(event.target.value); setSubtaskError(""); }} placeholder="Add a subtask to this task" maxLength={255} disabled={addingSubtask} /><textarea className="etm-add-subtask-description" aria-label="Subtask description" rows={2} value={newSubtaskDescription} onChange={event => setNewSubtaskDescription(event.target.value)} placeholder="Add a short description for this subtask (optional)..." maxLength={1000} disabled={addingSubtask} /><button type="submit" className="etm-button primary small" disabled={addingSubtask || !newSubtaskTitle.trim()}>{addingSubtask ? <Loader2 size={14} className="etm-form-spinner" /> : <Plus size={14} />}Add</button>{subtaskError && <p className="etm-field-error" role="alert">{subtaskError}</p>}</form>}
       </section>
+
+      {(task.links ?? []).length > 0 && <section className="etm-details-section">
+        <div className="etm-details-section-title"><h3><Link2 size={17} />Links <span className="etm-form-count">{task.links.length}</span></h3></div>
+        <ul className="etm-task-links-list etm-task-links-readonly">{task.links.map(link => <li key={link.id}>
+          <Link2 size={14} aria-hidden="true" />
+          <a href={link.url} target="_blank" rel="noopener noreferrer" className="etm-task-links-text"><strong>{link.title || link.url}</strong>{link.title && <small>{link.url}</small>}</a>
+          {link.quick_link && <span className="etm-task-links-tag">Quick link</span>}
+          <a className="etm-icon-button" href={link.url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${link.title || link.url} in a new tab`}><ExternalLink size={14} /></a>
+        </li>)}</ul>
+      </section>}
 
       <section className="etm-details-section etm-details-section-highlight" ref={remarksRef}>
         <div className="etm-details-section-title"><h3><MessageSquare size={17} />Remarks <span className="etm-form-count">{task.remarks.length}</span></h3></div>

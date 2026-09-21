@@ -187,6 +187,17 @@ export interface Task {
   // Null means "assigned to me but I've never opened it" — the "New" signal. Only ever set
   // for a non-creator assignee's own view of the task (see mark_viewed on the backend).
   my_last_viewed_at: string | null;
+  links: TaskLink[];
+}
+
+export interface TaskLinkInput {
+  title: string;
+  url: string;
+  quick_link?: number | null;
+}
+
+export interface TaskLink extends TaskLinkInput {
+  id: number;
 }
 
 export interface TemplateSubtask {
@@ -250,6 +261,7 @@ export interface TaskInput {
   is_completed: boolean;
   assignments: AssignmentInput[];
   subtasks: SubTask[];
+  links?: TaskLinkInput[];
   progress_message?: string;
 }
 

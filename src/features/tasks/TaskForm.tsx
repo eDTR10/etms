@@ -1,11 +1,12 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { isAxiosError } from "axios";
-import { AlertTriangle, Bookmark, CalendarDays, Check, CheckCheck, ChevronDown, ClipboardList, Clock3, Flag, Folder, Loader2, MapPin, Plus, Repeat, Search, Trash2, User, UserPlus, Users, X } from "lucide-react";
+import { AlertTriangle, Bookmark, CalendarDays, Check, CheckCheck, ChevronDown, ClipboardList, Clock3, Flag, Folder, Link2, Loader2, MapPin, Plus, Repeat, Search, Trash2, User, UserPlus, Users, X } from "lucide-react";
 import { useTasks } from "./taskContext";
 import { taskError } from "./taskService";
-import { ASSIGNMENT_ROLES, formatDate, memberName, PRIORITIES, RECURRENCE_LABELS, RECURRENCES, STATUSES, type AssignmentInput, type AssignmentRole, type Member, type Priority, type Project, type Recurrence, type SubTask, type Task, type TaskInput, type TaskStatus, type TaskTemplate, type TemplateSubtask } from "./types";
+import { ASSIGNMENT_ROLES, formatDate, memberName, PRIORITIES, RECURRENCE_LABELS, RECURRENCES, STATUSES, type AssignmentInput, type AssignmentRole, type Member, type Priority, type Project, type TaskLinkInput, type Recurrence, type SubTask, type Task, type TaskInput, type TaskStatus, type TaskTemplate, type TemplateSubtask } from "./types";
 import { describeRecurrence, WEEKDAYS } from "./recurrence";
+import TaskLinksField from "./TaskLinksField";
 import { REGION_X_BARANGAYS, REGION_X_CITIES, REGION_X_PROVINCES } from "./regionXLocations";
 import { addChildToSubtaskTree, flattenTree, mapSubtaskTree, removeFromSubtaskTree } from "./subtaskTree";
 import "./forms.css";
@@ -35,7 +36,8 @@ interface TaskFormProps {
 }
 
 type EditableSubtask = Omit<SubTask, "subtasks"> & { localKey: string; subtasks: EditableSubtask[] };
-type FormValues = Omit<TaskInput, "subtasks" | "assignments" | "project"> & {
+type FormValues = Omit<TaskInput, "subtasks" | "assignments" | "project" | "links"> & {
+  links: TaskLinkInput[];
   subtasks: EditableSubtask[];
   assignments: AssignmentInput[];
   isPersonal: boolean;
@@ -82,6 +84,7 @@ function initialValues(task?: Task): FormValues {
     is_completed: task?.is_completed ?? task?.status === "Completed",
     assignments: (task?.assignments ?? []).map(person => ({ user: person.id, role: person.role })),
     subtasks: toEditableSubtasks(task?.subtasks ?? [], "existing"),
+    links: (task?.links ?? []).map(({ title, url, quick_link }) => ({ title, url, quick_link: quick_link ?? null })),
     progress_message: "",
   };
 }
@@ -534,6 +537,12 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
                   <SubtaskEditorRow key={subtask.localKey} subtask={subtask} index={index} depth={0} fieldId={fieldId} errors={errors} onUpdate={updateSubtask} onRemove={removeSubtask} onAddChild={addSubtask} />
                 ))}</div>
                 <button type="button" className="etm-add-subtask" onClick={() => addSubtask(null)}><Plus size={16} /> Add subtask</button>
+              </div>
+            </section>
+            <section className="etm-panel etm-form-section" aria-labelledby={`${fieldId}-links-heading`}>
+              <div className="etm-form-section-heading"><span className="etm-form-section-icon"><Link2 size={19} /></span><div><h2 id={`${fieldId}-links-heading`}>Links &amp; attachments <span className="etm-form-optional">(optional)</span></h2><p>Add a URL, or tag a quick link that already exists.</p></div></div>
+              <div className="etm-form-section-body">
+                <TaskLinksField idPrefix={fieldId} value={values.links} onChange={links => setValues(current => ({ ...current, links }))} />
               </div>
             </section>
           </div>

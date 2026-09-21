@@ -501,6 +501,7 @@ export default function HowTo() {
     can_delete: true,
     can_manage_assignments: true,
     my_last_viewed_at: null,
+    links: [],
   }), [members]);
 
   function showNextStepSnackbar(index: number) {
