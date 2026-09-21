@@ -1042,6 +1042,7 @@ function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = 
   const [success, setSuccess] = useState("");
   const [messageError, setMessageError] = useState("");
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
+  const [newSubtaskDescription, setNewSubtaskDescription] = useState("");
   const [addingSubtask, setAddingSubtask] = useState(false);
   const [subtaskError, setSubtaskError] = useState("");
   // Seeded from `initialSubtaskId` so a notification redirect that names a subtask
@@ -1086,7 +1087,7 @@ function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = 
     event.preventDefault();
     if (!newSubtaskTitle.trim() || addingSubtask) return;
     setAddingSubtask(true); setSubtaskError("");
-    try { await onAddSubtask(newSubtaskTitle.trim()); setNewSubtaskTitle(""); }
+    try { await onAddSubtask(newSubtaskTitle.trim(), newSubtaskDescription.trim() || undefined); setNewSubtaskTitle(""); setNewSubtaskDescription(""); }
     catch (caught) { setSubtaskError(progressError(caught)); }
     finally { setAddingSubtask(false); }
   }
@@ -1154,10 +1155,10 @@ function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = 
       {page ? <h1 className={`etm-details-title ${task.is_completed ? "completed" : ""}`}>{task.title}</h1> : <Dialog.Title className={`etm-details-title ${task.is_completed ? "completed" : ""}`}>{task.title}</Dialog.Title>}
       {page ? <p className="etm-details-description">{task.details || "No description provided."}</p> : <Dialog.Description className="etm-details-description">{task.details || "No description provided."}</Dialog.Description>}
       <div className="etm-details-badges"><span className={`etm-badge ${statusSlug(task.status)}`}><span className="etm-details-status-dot" />{task.status}</span><span className={`etm-details-priority ${task.priority.toLowerCase()}`}><Flag size={13} />{task.priority} priority</span>{task.recurrence !== "None" && <span className="etm-badge"><Repeat size={13} />{describeRecurrence(task)}</span>}</div>
+      {task.can_edit && onComplete && !task.is_completed && <button type="button" className={`etm-button primary small etm-details-complete ${page ? "page" : ""}`} onClick={() => void markComplete()} disabled={completing}>{completing ? <Loader2 size={14} className="etm-form-spinner" /> : <CheckCheck size={14} />}Mark as complete</button>}
       {!page && <button type="button" className="etm-icon-button etm-details-close" onClick={onClose} aria-label="Close task details"><X size={21} /></button>}
     </div>
     <div className="etm-details-body">
-      {task.can_edit && onComplete && !task.is_completed && <div className="etm-details-complete-bar"><button type="button" className="etm-button primary small" onClick={() => void markComplete()} disabled={completing}>{completing ? <Loader2 size={14} className="etm-form-spinner" /> : <CheckCheck size={14} />}Mark as complete</button><span>Completes all subtasks and this task.</span></div>}
       <section className="etm-details-section etm-task-info">
         <button type="button" className="etm-task-info-toggle" aria-expanded={taskInfoOpen} aria-controls={`${fieldId}-task-info`} onClick={() => setTaskInfoOpen(value => !value)}>
           <span>Task Info</span>
@@ -1182,7 +1183,7 @@ function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = 
           <div className="etm-details-progress-track" role="progressbar" aria-label="Task completion" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${percent}%` }} /></div>
           <ul className="etm-details-subtasks">{task.subtasks.map((subtask, index) => <SubtaskPanel key={subtask.id ?? index} task={task} subtask={subtask} members={assignableMembers ?? task.assignments} canComment={canComment} onSetCompletion={onSetSubtaskCompletion} onAddRemark={onAddSubtaskRemark} onEditRemark={onEditSubtaskRemark} onDeleteRemark={onDeleteSubtaskRemark} onReactRemark={onReactSubtaskRemark} onAddReplyRemark={onAddSubtaskRemarkReply} onSetStatus={onSetSubtaskStatus} onAddSubtask={onAddSubtask} onEditSubtask={onEditSubtask} onDeleteSubtask={onDeleteSubtask} onReorderSubtasks={onReorderSubtasks} onAssignSubtask={onAssignSubtask} onAddRemarkAttachment={onAddSubtaskRemarkAttachment} onDeleteRemarkAttachment={onDeleteSubtaskRemarkAttachment} defaultOpen={subtask.id === initialSubtaskId} jumpToSubtaskId={jumpToSubtaskId} dragHandleProps={topDragProps(subtask.id)} />)}</ul>
         </> : <p className="etm-details-text empty">This task has no subtasks.</p>}
-        {canAddSubtasks && <form className="etm-add-subtask-later" onSubmit={addSubtask}><input id={`${fieldId}-new-subtask`} value={newSubtaskTitle} onChange={event => { setNewSubtaskTitle(event.target.value); setSubtaskError(""); }} placeholder="Add a subtask to this task" maxLength={255} disabled={addingSubtask} /><button type="submit" className="etm-button primary small" disabled={addingSubtask || !newSubtaskTitle.trim()}>{addingSubtask ? <Loader2 size={14} className="etm-form-spinner" /> : <Plus size={14} />}Add</button>{subtaskError && <p className="etm-field-error" role="alert">{subtaskError}</p>}</form>}
+        {canAddSubtasks && <form className="etm-add-subtask-later" onSubmit={addSubtask}><input id={`${fieldId}-new-subtask`} value={newSubtaskTitle} onChange={event => { setNewSubtaskTitle(event.target.value); setSubtaskError(""); }} placeholder="Add a subtask to this task" maxLength={255} disabled={addingSubtask} /><input className="etm-add-subtask-description" aria-label="Subtask description" value={newSubtaskDescription} onChange={event => setNewSubtaskDescription(event.target.value)} placeholder="Description (optional)" maxLength={1000} disabled={addingSubtask} /><button type="submit" className="etm-button primary small" disabled={addingSubtask || !newSubtaskTitle.trim()}>{addingSubtask ? <Loader2 size={14} className="etm-form-spinner" /> : <Plus size={14} />}Add</button>{subtaskError && <p className="etm-field-error" role="alert">{subtaskError}</p>}</form>}
       </section>
 
       <section className="etm-details-section etm-details-section-highlight" ref={remarksRef}>

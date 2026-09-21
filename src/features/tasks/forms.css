@@ -508,3 +508,10 @@ button.etm-remark-subtask-tag:hover { background: color-mix(in srgb, var(--etm-p
 :root.dark .etm-progress-history-empty { border-color: var(--etm-border); }
 :root.dark .etm-form-success { color: #7fd6ac; }
 .etm-details-complete-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; color: var(--etm-muted); font-size: 12px; }
+.etm-details-complete { position: absolute; top: 21px; right: 66px; white-space: nowrap; }
+.etm-details-complete.page { right: 22px; }
+.etm-add-subtask-later .etm-add-subtask-description { grid-column: 1 / 2; }
+@media (max-width: 720px) { .etm-details-complete { top: 15px; right: 56px; } .etm-details-complete.page { right: 13px; } }
+.etm-add-subtask-later > input:first-child { grid-column: 1; grid-row: 1; }
+.etm-add-subtask-later .etm-add-subtask-description { grid-column: 1; grid-row: 2; }
+.etm-add-subtask-later > button { grid-column: 2; grid-row: 1 / span 2; align-self: stretch; }

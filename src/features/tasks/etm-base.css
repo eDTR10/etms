@@ -206,7 +206,7 @@
 .etm-filter-quick-dates { display: flex; align-items: flex-end; gap: 6px; }
 .etm-filter-quick-date.active { background: var(--etm-primary); border-color: var(--etm-primary); color: #fff; }
 .etm-filter-quick-date.active:hover { background: var(--etm-primary); }
-.etm-filter-clear { align-self: flex-end; }
+.etm-filter-clear { align-self: flex-end; flex-shrink: 0; white-space: nowrap; }
 @media (max-width: 619px) {
   .etm-filter-bar { flex-direction: column; align-items: stretch; }
   .etm-filter-search { flex: none; width: 100%; }
