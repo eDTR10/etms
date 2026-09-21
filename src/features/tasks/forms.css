@@ -507,3 +507,4 @@ button.etm-remark-subtask-tag:hover { background: color-mix(in srgb, var(--etm-p
 :root.dark .etm-progress-history p { color: #c3ced5; }
 :root.dark .etm-progress-history-empty { border-color: var(--etm-border); }
 :root.dark .etm-form-success { color: #7fd6ac; }
+.etm-details-complete-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; color: var(--etm-muted); font-size: 12px; }

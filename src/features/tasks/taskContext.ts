@@ -39,6 +39,7 @@ export interface TaskContextValue {
   deleteSubtask: (id: number, subtaskId: number) => Promise<void>;
   setSubtaskCompletion: (id: number, subtaskId: number, isCompleted: boolean) => Promise<void>;
   reorderSubtasks: (id: number, parentId: number | null, order: number[]) => Promise<void>;
+  completeTask: (id: number) => Promise<void>;
   assignSubtask: (id: number, subtaskId: number, userId: number | null) => Promise<void>;
   bulkArchive: (ids: number[]) => Promise<BulkActionResult>;
   bulkDelete: (ids: number[]) => Promise<BulkActionResult>;

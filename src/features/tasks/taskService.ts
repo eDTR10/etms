@@ -70,6 +70,7 @@ export const taskService = {
     (await api.post<Task>(`etm/tasks/${id}/subtasks/${subtaskId}/completion/`, { is_completed })).data,
   reorderSubtasks: async (id: number, parentId: number | null, order: number[]) =>
     (await api.post<Task>(`etm/tasks/${id}/subtasks/reorder/`, { parent: parentId, order })).data,
+  completeTask: async (id: number) => (await api.post<Task>(`etm/tasks/${id}/complete/`)).data,
   assignSubtask: async (id: number, subtaskId: number, userId: number | null) =>
     (await api.post<Task>(`etm/tasks/${id}/subtasks/${subtaskId}/assign/`, { user: userId })).data,
   bulkArchive: async (ids: number[]) =>

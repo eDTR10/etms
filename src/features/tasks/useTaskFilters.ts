@@ -11,6 +11,9 @@ export interface TaskFilterOptions {
   initialStatus?: StatusFilterValue;
   initialAssignedFilter?: AssignedFilterValue;
   initialOverdueOnly?: boolean;
+  // Completed tasks are hidden under the "All" chip and only appear via the Completed filter,
+  // except where the whole list is already archived tasks.
+  showCompletedInAll?: boolean;
 }
 
 function toDateStr(date: Date): string {
@@ -76,6 +79,7 @@ export function useTaskFilters(tasks: Task[], options?: TaskFilterOptions) {
         if (task.deadline < deadlineRange.from || task.deadline > deadlineRange.to) return false;
       }
       if (status !== "all" && task.status !== status) return false;
+      if (status === "all" && task.is_completed && !options?.showCompletedInAll) return false;
       if (priority !== "all" && task.priority !== priority) return false;
       if (projectFilter === "personal") {
         if (task.project) return false;
@@ -86,7 +90,7 @@ export function useTaskFilters(tasks: Task[], options?: TaskFilterOptions) {
       if (overdueOnly && !isOverdue(task)) return false;
       return true;
     });
-  }, [tasks, search, deadlineRange, status, priority, projectFilter, assignedFilter, overdueOnly]);
+  }, [tasks, search, deadlineRange, status, priority, projectFilter, assignedFilter, overdueOnly, options?.showCompletedInAll]);
 
   const hasActiveFilters = !!search.trim() || !!deadlineDate || !!quickFilter || status !== "all" || priority !== "all" || projectFilter !== "all" || assignedFilter !== "all" || overdueOnly;
   const clearFilters = () => {

@@ -58,7 +58,7 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
     tasks, members, projects, updateTask, listArchivedTasks,
     addProgress, editProgress, deleteProgress,
     addRemark, editRemark, deleteRemark, reactToRemark, addRemarkReply,
-    addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, reorderSubtasks, assignSubtask,
+    addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, reorderSubtasks, assignSubtask, completeTask,
     addRemarkAttachment, deleteRemarkAttachment, addSubtaskRemarkAttachment, deleteSubtaskRemarkAttachment, markCompletionSeen, markViewed,
   } = useTasks();
   const confirmDelete = useDeleteTaskConfirm();
@@ -97,7 +97,7 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
     status, setStatus, priority, setPriority, projectFilter, setProjectFilter,
     assignedFilter, setAssignedFilter, overdueOnly, setOverdueOnly,
     hasActiveFilters, clearFilters,
-  } = useTaskFilters(scopedTasks, { initialStatus: initialFilters.status, initialAssignedFilter: initialFilters.assignedFilter, initialOverdueOnly: initialFilters.overdueOnly });
+  } = useTaskFilters(scopedTasks, { initialStatus: initialFilters.status, initialAssignedFilter: initialFilters.assignedFilter, initialOverdueOnly: initialFilters.overdueOnly, showCompletedInAll: showArchived });
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [viewingId, setViewingId] = useState<number | null>(null);
   const [viewingSubtaskId, setViewingSubtaskId] = useState<number | null>(null);
@@ -324,6 +324,8 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
         onSetSubtaskCompletion={(subtaskId, isCompleted) => setSubtaskCompletion(viewingTask.id, subtaskId, isCompleted)}
         onReorderSubtasks={(parentId, order) => reorderSubtasks(viewingTask.id, parentId, order)}
         onAssignSubtask={(subtaskId, userId) => assignSubtask(viewingTask.id, subtaskId, userId)}
+        onComplete={() => completeTask(viewingTask.id)}
+        assignableMembers={members}
         onAddRemarkAttachment={(remarkId, file) => addRemarkAttachment(viewingTask.id, remarkId, file)}
         onDeleteRemarkAttachment={(remarkId, attachmentId) => deleteRemarkAttachment(viewingTask.id, remarkId, attachmentId)}
         onAddSubtaskRemarkAttachment={(subtaskId, remarkId, file) => addSubtaskRemarkAttachment(viewingTask.id, subtaskId, remarkId, file)}
