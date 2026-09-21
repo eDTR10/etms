@@ -349,7 +349,7 @@ function ReportsContent() {
       <div className="etm-report-column">
         <section className="etm-report-groups-section">
           <div className="etm-report-section-title "><div><p className="etm-report-eyebrow"><FolderKanban size={15} /> Activity reports</p><h2>Grouped Tasks</h2></div><div className="etm-report-section-title-actions"><span>{groups.length} {groups.length === 1 ? "group" : "groups"}</span><button type="button" className="etm-button ghost small" onClick={openGroupDialog}><Plus size={14} /> New Group</button></div></div>
-          <p className={`etm-report-drag-hint mb-12 ${dragTaskId !== null ? "active" : ""}`}><GripVertical size={14} aria-hidden="true" />{dragTaskId !== null ? "Drop it on a group to add it." : "Tip: drag a completed task from the left and drop it on a group to add it directly."}</p>
+          <p className={`etm-report-drag-hint ${dragTaskId !== null ? "active" : ""}`}><GripVertical size={14} aria-hidden="true" />{dragTaskId !== null ? "Drop it on a group to add it." : "Tip: drag a completed task from the left and drop it on a group to add it directly."}</p>
           {groupsError && <p className="etm-report-error">{groupsError}</p>}
           {groupsLoading ? <p className="etm-empty-row">Loading grouped tasks…</p> : (
             <div className="etm-panel etm-table-wrap etm-report-groups">
