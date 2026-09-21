@@ -299,132 +299,132 @@ function ReportsContent() {
   return (
     <div className="etm-reports etm-report-split">
       <div className="etm-report-column">
-      <section className="etm-report-heading">
-        <div>
-          <p className="etm-report-eyebrow"><CheckCircle2 size={15} /> Completed work</p>
-          <h2>Completed Tasks</h2>
-          <p>Select completed tasks, then collect them into a grouped activity report.</p>
-        </div>
-        {selectedCompleted.length > 0 && (
-          <button type="button" className="etm-button" onClick={openGroupDialog}><Layers size={16} /> Group Activity ({selectedCompleted.length})</button>
-        )}
-      </section>
-
-      <TaskFeedback />
-      {!loading && !error && (
-        <section className="etm-panel etm-table-wrap">
-          <table className="etm-tasks-table etm-report-table">
-            <thead><tr>
-              <th className="etm-report-check"><input type="checkbox" aria-label="Select all completed tasks" checked={allSelected} onChange={toggleAll} /></th>
-              <th>Task Title</th><th>Date and Time Finished</th><th>Description</th>
-            </tr></thead>
-            <tbody>
-              {completedTasks.length ? completedTasks.map(task => (
-                <tr
-                  key={task.id}
-                  draggable
-                  title="Drag onto a group below to add it there"
-                  onDragStart={event => {
-                    event.dataTransfer.setData(DRAG_TASK_TYPE, String(task.id));
-                    event.dataTransfer.setData("text/plain", String(task.id));
-                    event.dataTransfer.effectAllowed = "copy";
-                    setDragTaskId(task.id);
-                  }}
-                  onDragEnd={() => setDragTaskId(null)}
-                  className={dragTaskId === task.id ? "etm-report-row-dragging" : undefined}
-                >
-                  <td className="etm-report-check"><input type="checkbox" aria-label={`Select ${task.title}`} checked={selectedIds.has(task.id)} onChange={() => toggleTask(task.id)} /></td>
-                  <td className="etm-report-task-title"><GripVertical size={13} className="etm-report-drag-handle" aria-hidden="true" />{task.title}</td>
-                  <td>{formatDate(task.updated_at, true)}</td>
-                  <td className="etm-tasks-table-details-col">{task.details ? <span title={task.details}>{task.details}</span> : <span className="etm-tasks-table-unassigned">No details</span>}</td>
-                </tr>
-              )) : <tr><td colSpan={4} className="etm-empty-row">No completed tasks are available yet.</td></tr>}
-            </tbody>
-          </table>
+        <section className="etm-report-heading">
+          <div>
+            <p className="etm-report-eyebrow"><CheckCircle2 size={15} /> Completed work</p>
+            <h2>Completed Tasks</h2>
+            <p>Select completed tasks, then collect them into a grouped activity report.</p>
+          </div>
+          {selectedCompleted.length > 0 && (
+            <button type="button" className="etm-button" onClick={openGroupDialog}><Layers size={16} /> Group Activity ({selectedCompleted.length})</button>
+          )}
         </section>
-      )}
+
+        <TaskFeedback />
+        {!loading && !error && (
+          <section className="etm-panel etm-table-wrap">
+            <table className="etm-tasks-table etm-report-table">
+              <thead><tr>
+                <th className="etm-report-check"><input type="checkbox" aria-label="Select all completed tasks" checked={allSelected} onChange={toggleAll} /></th>
+                <th>Task Title</th><th>Date and Time Finished</th><th>Description</th>
+              </tr></thead>
+              <tbody>
+                {completedTasks.length ? completedTasks.map(task => (
+                  <tr
+                    key={task.id}
+                    draggable
+                    title="Drag onto a group below to add it there"
+                    onDragStart={event => {
+                      event.dataTransfer.setData(DRAG_TASK_TYPE, String(task.id));
+                      event.dataTransfer.setData("text/plain", String(task.id));
+                      event.dataTransfer.effectAllowed = "copy";
+                      setDragTaskId(task.id);
+                    }}
+                    onDragEnd={() => setDragTaskId(null)}
+                    className={dragTaskId === task.id ? "etm-report-row-dragging" : undefined}
+                  >
+                    <td className="etm-report-check"><input type="checkbox" aria-label={`Select ${task.title}`} checked={selectedIds.has(task.id)} onChange={() => toggleTask(task.id)} /></td>
+                    <td className="etm-report-task-title"><GripVertical size={13} className="etm-report-drag-handle" aria-hidden="true" />{task.title}</td>
+                    <td>{formatDate(task.updated_at, true)}</td>
+                    <td className="etm-tasks-table-details-col">{task.details ? <span title={task.details}>{task.details}</span> : <span className="etm-tasks-table-unassigned">No details</span>}</td>
+                  </tr>
+                )) : <tr><td colSpan={4} className="etm-empty-row">No completed tasks are available yet.</td></tr>}
+              </tbody>
+            </table>
+          </section>
+        )}
 
       </div>
 
       <div className="etm-report-column">
-      <section className="etm-report-groups-section">
-        <div className="etm-report-section-title"><div><p className="etm-report-eyebrow"><FolderKanban size={15} /> Activity reports</p><h2>Grouped Tasks</h2></div><div className="etm-report-section-title-actions"><span>{groups.length} {groups.length === 1 ? "group" : "groups"}</span><button type="button" className="etm-button ghost small" onClick={openGroupDialog}><Plus size={14} /> New Group</button></div></div>
-        <p className={`etm-report-drag-hint ${dragTaskId !== null ? "active" : ""}`}><GripVertical size={14} aria-hidden="true" />{dragTaskId !== null ? "Drop it on a group to add it." : "Tip: drag a completed task from the left and drop it on a group to add it directly."}</p>
-        {groupsError && <p className="etm-report-error">{groupsError}</p>}
-        {groupsLoading ? <p className="etm-empty-row">Loading grouped tasks…</p> : (
-          <div className="etm-panel etm-table-wrap etm-report-groups">
-            <table className="etm-tasks-table etm-report-groups-table">
-              <thead><tr><th>Grouped Task</th><th>Project</th><th>Created</th><th className="etm-tasks-table-actions-col">Action Buttons</th></tr></thead>
-              <tbody>{groups.length ? groups.map(group => {
-                const expanded = expandedGroupId === group.id;
-                return <Fragment key={group.id}>
-                  <tr
-                    onDragOver={event => {
-                      if (dragTaskId === null) return;
-                      event.preventDefault();
-                      event.dataTransfer.dropEffect = "copy";
-                      if (dragOverGroupId !== group.id) setDragOverGroupId(group.id);
-                    }}
-                    onDragLeave={() => setDragOverGroupId(current => current === group.id ? null : current)}
-                    onDrop={event => {
-                      event.preventDefault();
-                      setDragOverGroupId(null);
-                      setDragTaskId(null);
-                      const raw = event.dataTransfer.getData(DRAG_TASK_TYPE) || event.dataTransfer.getData("text/plain");
-                      void addTaskToGroupByDrag(group, Number(raw));
-                    }}
-                    className={dragOverGroupId === group.id ? "etm-report-group-drag-over" : undefined}
-                  >
-                    <td><button type="button" className="etm-report-group-row" onClick={() => setExpandedGroupId(expanded ? null : group.id)} aria-expanded={expanded} aria-controls={`group-tasks-${group.id}`}><ChevronRight className={expanded ? "open" : ""} size={18} /><span className="etm-report-group-name-block"><small className="etm-report-group-id">{group.grouped_task_id}</small><span className="etm-report-group-name">{group.name} <strong>({groupProgress(group)})</strong></span></span></button></td>
-                    <td>{group.project_name || <span className="etm-tasks-table-unassigned">Personal</span>}</td>
-                    <td>{formatDate(group.created_at)}</td>
-                    <td className="etm-report-group-actions">
-                      <button type="button" className="etm-icon-button" aria-label={`Edit ${group.name}`} onClick={() => openEditGroupDialog(group)}><Pencil size={15} /></button>
-                      <button type="button" className="etm-icon-button danger" aria-label={`Delete ${group.name}`} onClick={() => void confirmDeleteGroup(group)}><Trash2 size={15} /></button>
-                    </td>
-                  </tr>
-                  {expanded && <tr className="etm-report-group-expanded"><td colSpan={4}><div className="etm-report-group-tasks" id={`group-tasks-${group.id}`}>{group.tasks.length ? group.tasks.map(task => {
-                    const isRenaming = renamingTaskId === task.id;
-                    return (
-                      <div key={task.id}>
-                        <CheckCircle2 size={15} />
-                        {isRenaming ? (
-                          <div className="etm-report-group-task-rename">
-                            <input
-                              autoFocus
-                              className="etm-report-group-task-rename-input"
-                              value={renameValue}
-                              onChange={event => setRenameValue(event.target.value)}
-                              onKeyDown={event => {
-                                if (event.key === "Escape") cancelRenameTask();
-                                else if (event.key === "Enter") { event.preventDefault(); void saveRenameTask(task.id); }
-                              }}
-                              maxLength={255}
-                              disabled={renaming}
-                              aria-label={`New title for ${task.title}`}
-                            />
-                            <button type="button" className="etm-icon-button" aria-label="Save title" onClick={() => void saveRenameTask(task.id)} disabled={renaming}><Check size={14} /></button>
-                            <button type="button" className="etm-icon-button" aria-label="Cancel rename" onClick={cancelRenameTask} disabled={renaming}><X size={14} /></button>
+        <section className="etm-report-groups-section">
+          <div className="etm-report-section-title "><div><p className="etm-report-eyebrow"><FolderKanban size={15} /> Activity reports</p><h2>Grouped Tasks</h2></div><div className="etm-report-section-title-actions"><span>{groups.length} {groups.length === 1 ? "group" : "groups"}</span><button type="button" className="etm-button ghost small" onClick={openGroupDialog}><Plus size={14} /> New Group</button></div></div>
+          <p className={`etm-report-drag-hint mb-12 ${dragTaskId !== null ? "active" : ""}`}><GripVertical size={14} aria-hidden="true" />{dragTaskId !== null ? "Drop it on a group to add it." : "Tip: drag a completed task from the left and drop it on a group to add it directly."}</p>
+          {groupsError && <p className="etm-report-error">{groupsError}</p>}
+          {groupsLoading ? <p className="etm-empty-row">Loading grouped tasks…</p> : (
+            <div className="etm-panel etm-table-wrap etm-report-groups">
+              <table className="etm-tasks-table etm-report-groups-table">
+                <thead><tr><th>Grouped Task</th><th>Project</th><th>Created</th><th className="etm-tasks-table-actions-col">Action Buttons</th></tr></thead>
+                <tbody>{groups.length ? groups.map(group => {
+                  const expanded = expandedGroupId === group.id;
+                  return <Fragment key={group.id}>
+                    <tr
+                      onDragOver={event => {
+                        if (dragTaskId === null) return;
+                        event.preventDefault();
+                        event.dataTransfer.dropEffect = "copy";
+                        if (dragOverGroupId !== group.id) setDragOverGroupId(group.id);
+                      }}
+                      onDragLeave={() => setDragOverGroupId(current => current === group.id ? null : current)}
+                      onDrop={event => {
+                        event.preventDefault();
+                        setDragOverGroupId(null);
+                        setDragTaskId(null);
+                        const raw = event.dataTransfer.getData(DRAG_TASK_TYPE) || event.dataTransfer.getData("text/plain");
+                        void addTaskToGroupByDrag(group, Number(raw));
+                      }}
+                      className={dragOverGroupId === group.id ? "etm-report-group-drag-over" : undefined}
+                    >
+                      <td><button type="button" className="etm-report-group-row" onClick={() => setExpandedGroupId(expanded ? null : group.id)} aria-expanded={expanded} aria-controls={`group-tasks-${group.id}`}><ChevronRight className={expanded ? "open" : ""} size={18} /><span className="etm-report-group-name-block"><small className="etm-report-group-id">{group.grouped_task_id}</small><span className="etm-report-group-name">{group.name} <strong>({groupProgress(group)})</strong></span></span></button></td>
+                      <td>{group.project_name || <span className="etm-tasks-table-unassigned">Personal</span>}</td>
+                      <td>{formatDate(group.created_at)}</td>
+                      <td className="etm-report-group-actions">
+                        <button type="button" className="etm-icon-button" aria-label={`Edit ${group.name}`} onClick={() => openEditGroupDialog(group)}><Pencil size={15} /></button>
+                        <button type="button" className="etm-icon-button danger" aria-label={`Delete ${group.name}`} onClick={() => void confirmDeleteGroup(group)}><Trash2 size={15} /></button>
+                      </td>
+                    </tr>
+                    {expanded && <tr className="etm-report-group-expanded"><td colSpan={4}><div className="etm-report-group-tasks" id={`group-tasks-${group.id}`}>{group.tasks.length ? group.tasks.map(task => {
+                      const isRenaming = renamingTaskId === task.id;
+                      return (
+                        <div key={task.id}>
+                          <CheckCircle2 size={15} />
+                          {isRenaming ? (
+                            <div className="etm-report-group-task-rename">
+                              <input
+                                autoFocus
+                                className="etm-report-group-task-rename-input"
+                                value={renameValue}
+                                onChange={event => setRenameValue(event.target.value)}
+                                onKeyDown={event => {
+                                  if (event.key === "Escape") cancelRenameTask();
+                                  else if (event.key === "Enter") { event.preventDefault(); void saveRenameTask(task.id); }
+                                }}
+                                maxLength={255}
+                                disabled={renaming}
+                                aria-label={`New title for ${task.title}`}
+                              />
+                              <button type="button" className="etm-icon-button" aria-label="Save title" onClick={() => void saveRenameTask(task.id)} disabled={renaming}><Check size={14} /></button>
+                              <button type="button" className="etm-icon-button" aria-label="Cancel rename" onClick={cancelRenameTask} disabled={renaming}><X size={14} /></button>
+                            </div>
+                          ) : (
+                            <>
+                              <span>{task.title}</span>
+                              <button type="button" className="etm-icon-button etm-report-group-task-rename-trigger" aria-label={`Rename ${task.title}`} onClick={() => startRenameTask(task.id, task.title)}><Pencil size={12} /></button>
+                            </>
+                          )}
+                          <div className="etm-report-group-task-meta">
+                            <small>{task.project_name || "Personal"}</small>
+                            <button type="button" className="etm-icon-button" aria-label={`Remove ${task.title} from ${group.name}`} onClick={() => void removeTaskFromGroup(group, task.id)}><X size={13} /></button>
                           </div>
-                        ) : (
-                          <>
-                            <span>{task.title}</span>
-                            <button type="button" className="etm-icon-button etm-report-group-task-rename-trigger" aria-label={`Rename ${task.title}`} onClick={() => startRenameTask(task.id, task.title)}><Pencil size={12} /></button>
-                          </>
-                        )}
-                        <div className="etm-report-group-task-meta">
-                          <small>{task.project_name || "Personal"}</small>
-                          <button type="button" className="etm-icon-button" aria-label={`Remove ${task.title} from ${group.name}`} onClick={() => void removeTaskFromGroup(group, task.id)}><X size={13} /></button>
                         </div>
-                      </div>
-                    );
-                  }) : <p className="etm-report-group-tasks-empty">No tasks tagged yet. Drag a completed task from the list on the left onto this row to add one.</p>}</div></td></tr>}
-                </Fragment>;
-              }) : <tr><td colSpan={4} className="etm-empty-row">No grouped activities yet. Select completed tasks to create one.</td></tr>}</tbody>
-            </table>
-          </div>
-        )}
-      </section>
+                      );
+                    }) : <p className="etm-report-group-tasks-empty">No tasks tagged yet. Drag a completed task from the list on the left onto this row to add one.</p>}</div></td></tr>}
+                  </Fragment>;
+                }) : <tr><td colSpan={4} className="etm-empty-row">No grouped activities yet. Select completed tasks to create one.</td></tr>}</tbody>
+              </table>
+            </div>
+          )}
+        </section>
       </div>
 
       <Modal open={groupDialogOpen} onClose={closeGroupDialog} title={editingGroup ? "Edit Grouped Task" : "Group Activity"}>
