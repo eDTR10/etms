@@ -349,3 +349,5 @@
   .etm-report-split .etm-report-table th:nth-child(4), .etm-report-split .etm-report-table td:nth-child(4),
   .etm-report-split .etm-report-groups-table th:nth-child(3), .etm-report-split .etm-report-groups-table td:nth-child(3) { display: table-cell; }
 }
+.etm-report-drag-hint { display: flex; align-items: center; gap: 8px; margin: 0; padding: 9px 12px; border: 1px dashed var(--etm-border); border-radius: 9px; color: var(--etm-muted); font-size: 12.5px; }
+.etm-report-drag-hint.active { border-color: var(--etm-primary); color: var(--etm-primary); background: color-mix(in srgb, var(--etm-primary) 8%, transparent); }
