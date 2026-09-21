@@ -5,6 +5,7 @@ export interface QuickLink {
   url: string;
   icon: string;
   created_at: string;
+  can_manage: boolean;
 }
 
 export interface QuickLinkInput {

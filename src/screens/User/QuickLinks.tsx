@@ -149,8 +149,10 @@ export function QuickLinksContent() {
                     </span>
                   </a>
                   <div className="etm-quicklink-card-actions">
+                    {link.can_manage && <>
                     <button type="button" className="etm-icon-button" aria-label={`Edit ${link.title}`} onClick={() => openEdit(link)}><Pencil size={15} /></button>
                     <button type="button" className="etm-icon-button danger" aria-label={`Delete ${link.title}`} onClick={() => void confirmDelete(link)}><Trash2 size={15} /></button>
+                    </>}
                   </div>
                 </div>
               );

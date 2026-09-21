@@ -67,8 +67,10 @@ export function TemplatesContent() {
                   <td className={template.priority.toLowerCase()}>{template.priority}</td>
                   <td>{template.subtasks.length ? <span><CheckCheck size={13} style={{ verticalAlign: "-2px", marginRight: 5 }} />{flattenTemplateSubtasks(template.subtasks).length}</span> : <span className="etm-tasks-table-unassigned">None</span>}</td>
                   <td className="etm-report-group-actions">
+                    {template.can_manage ? <>
                     <button type="button" className="etm-icon-button" aria-label={`Edit ${template.name}`} onClick={() => openEdit(template)}><Pencil size={15} /></button>
                     <button type="button" className="etm-icon-button danger" aria-label={`Delete ${template.name}`} onClick={() => void confirmDelete(template)}><Trash2 size={15} /></button>
+                    </> : <span className="etm-tasks-table-unassigned">Shared</span>}
                   </td>
                 </tr>
               )) : <tr><td colSpan={6} className="etm-empty-row">No templates yet. Create one to speed up task creation next time.</td></tr>}
