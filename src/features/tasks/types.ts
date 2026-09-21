@@ -188,6 +188,7 @@ export interface Task {
   // for a non-creator assignee's own view of the task (see mark_viewed on the backend).
   my_last_viewed_at: string | null;
   links: TaskLink[];
+  created_by_name?: string | null;
 }
 
 export interface TaskLinkInput {

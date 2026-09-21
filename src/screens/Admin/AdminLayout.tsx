@@ -3,6 +3,7 @@ import {
   LayoutDashboard,
   ListChecks,
   Bookmark,
+  Calendar,
   Link2,
   LogOut,
   UserCircle,
@@ -20,6 +21,7 @@ import etmsLogo from "../../assets/eTMS-icon.png";
 const NAV_ITEMS = [
   { label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, to: "/etms/admin/dashboard" },
   { label: "Tasks", icon: <ListChecks className="w-4 h-4" />, to: "/etms/admin/tasks" },
+  { label: "Calendar", icon: <Calendar className="w-4 h-4" />, to: "/etms/admin/calendar" },
   { label: "Templates", icon: <Bookmark className="w-4 h-4" />, to: "/etms/admin/templates" },
   { label: "Quick Links", icon: <Link2 className="w-4 h-4" />, to: "/etms/admin/quick-links" },
 ];

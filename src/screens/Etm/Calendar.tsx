@@ -35,7 +35,13 @@ function monthMatrix(viewDate: Date): Date[] {
   return cells;
 }
 
-export default function Calendar() {
+interface CalendarProps {
+  // Lets the admin calendar link into /etms/admin/tasks and show whose task each entry is.
+  basePath?: string;
+  showOwner?: boolean;
+}
+
+export default function Calendar({ basePath = "/etms/tasks", showOwner = false }: CalendarProps) {
   const { tasks, projects, toggleOccurrence } = useTasks();
   const navigate = useNavigate();
 
@@ -105,7 +111,7 @@ export default function Calendar() {
     setViewDate(new Date());
   }
   function openTask(taskId: number) {
-    navigate(`/etms/tasks/${taskId}`);
+    navigate(`${basePath}/${taskId}`);
   }
 
   const selectedTasks = selectedDate ? (tasksByDate.get(selectedDate) ?? []) : [];
@@ -226,6 +232,7 @@ export default function Calendar() {
                     <span className={`etm-priority-pill ${task.priority.toLowerCase()}`}>{task.priority}</span>
                     <span className="etm-calendar-daylist-title">{task.title}</span>
                     {repeating && <span className="etm-calendar-daylist-recurrence" title={describeRecurrence(task)}><Repeat size={11} />{describeRecurrence(task)}</span>}
+                    {showOwner && <span className="etm-calendar-daylist-assignee" title="Created by"><User size={12} />By {task.created_by_name || "Unknown"}</span>}
                     <span className="etm-calendar-daylist-assignee" title={assigneeLabel}><User size={12} />{assigneeLabel}</span>
                     <span className={`etm-badge ${statusSlug(task.status)}`}>{statusChipLabel(task)}</span>
                     <span className="etm-calendar-daylist-date">{formatDate(selectedDate)}</span>

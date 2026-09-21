@@ -44,6 +44,7 @@ const AdminAddTask     = lazy(() => import("./screens/Admin/AddTask.tsx"));
 const AdminTasks       = lazy(() => import("./screens/Admin/Tasks.tsx"));
 const AdminTaskDetails = lazy(() => import("./screens/Admin/TaskDetailsPage.tsx"));
 const AdminTemplates   = lazy(() => import("./screens/Admin/Templates.tsx"));
+const AdminCalendar    = lazy(() => import("./screens/Admin/Calendar.tsx"));
 const AdminQuickLinks  = lazy(() => import("./screens/Admin/QuickLinks.tsx"));
 const AdminProfile     = lazy(() => import("./screens/Admin/Profile.tsx"));
 
@@ -148,6 +149,10 @@ const router = createBrowserRouter([
   {
     path: "/etms/admin/tasks/:taskId",
     element: <AdminRoute><Suspense fallback={<Loader />}><AdminTaskDetails /></Suspense></AdminRoute>,
+  },
+  {
+    path: "/etms/admin/calendar",
+    element: <AdminRoute><Suspense fallback={<Loader />}><AdminCalendar /></Suspense></AdminRoute>,
   },
   {
     path: "/etms/admin/templates",
