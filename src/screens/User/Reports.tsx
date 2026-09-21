@@ -297,7 +297,8 @@ function ReportsContent() {
   };
 
   return (
-    <div className="etm-reports">
+    <div className="etm-reports etm-report-split">
+      <div className="etm-report-column">
       <section className="etm-report-heading">
         <div>
           <p className="etm-report-eyebrow"><CheckCircle2 size={15} /> Completed work</p>
@@ -343,6 +344,9 @@ function ReportsContent() {
         </section>
       )}
 
+      </div>
+
+      <div className="etm-report-column">
       <section className="etm-report-groups-section">
         <div className="etm-report-section-title"><div><p className="etm-report-eyebrow"><FolderKanban size={15} /> Activity reports</p><h2>Grouped Tasks</h2></div><div className="etm-report-section-title-actions"><span>{groups.length} {groups.length === 1 ? "group" : "groups"}</span><button type="button" className="etm-button ghost small" onClick={openGroupDialog}><Plus size={14} /> New Group</button></div></div>
         {groupsError && <p className="etm-report-error">{groupsError}</p>}
@@ -413,13 +417,14 @@ function ReportsContent() {
                         </div>
                       </div>
                     );
-                  }) : <p className="etm-report-group-tasks-empty">No tasks tagged yet. Drag a completed task from the table above onto this row to add one.</p>}</div></td></tr>}
+                  }) : <p className="etm-report-group-tasks-empty">No tasks tagged yet. Drag a completed task from the list on the left onto this row to add one.</p>}</div></td></tr>}
                 </Fragment>;
-              }) : <tr><td colSpan={4} className="etm-empty-row">No grouped activities yet. Select completed tasks above to create one.</td></tr>}</tbody>
+              }) : <tr><td colSpan={4} className="etm-empty-row">No grouped activities yet. Select completed tasks to create one.</td></tr>}</tbody>
             </table>
           </div>
         )}
       </section>
+      </div>
 
       <Modal open={groupDialogOpen} onClose={closeGroupDialog} title={editingGroup ? "Edit Grouped Task" : "Group Activity"}>
         <form className="etm-report-form" onSubmit={submitGroup}>

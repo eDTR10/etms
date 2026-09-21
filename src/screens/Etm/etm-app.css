@@ -336,3 +336,16 @@
     overflow-y: auto;
   }
 }
+
+/* Reports: completed tasks on the left, groups on the right so a task can be dragged straight across. */
+.etm-report-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.etm-report-column { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+.etm-report-split .etm-report-table th:nth-child(4), .etm-report-split .etm-report-table td:nth-child(4) { display: none; }
+.etm-report-split .etm-report-groups-table th:nth-child(3), .etm-report-split .etm-report-groups-table td:nth-child(3) { display: none; }
+.etm-report-split .etm-report-group-expanded td { display: table-cell; }
+@media (min-width: 1101px) { .etm-report-column:last-of-type { position: sticky; top: 76px; } }
+@media (max-width: 1100px) {
+  .etm-report-split { grid-template-columns: minmax(0, 1fr); }
+  .etm-report-split .etm-report-table th:nth-child(4), .etm-report-split .etm-report-table td:nth-child(4),
+  .etm-report-split .etm-report-groups-table th:nth-child(3), .etm-report-split .etm-report-groups-table td:nth-child(3) { display: table-cell; }
+}
