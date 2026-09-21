@@ -289,8 +289,28 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
   }
 
   function handleTemplateChange(rawId: string) {
+    const previous = templates.find(item => item.id === Number(selectedTemplateId));
     setSelectedTemplateId(rawId);
-    if (!rawId) return;
+    if (!rawId) {
+      // Back to "add manually": undo everything the template filled in.
+      const blank = initialValues();
+      setValues(current => ({
+        ...current,
+        title: previous && current.title === previous.title ? blank.title : current.title,
+        isPersonal: blank.isPersonal,
+        project: blank.project,
+        details: blank.details,
+        requestor: blank.requestor,
+        location_province: blank.location_province,
+        location_city: blank.location_city,
+        location_barangay: blank.location_barangay,
+        priority: blank.priority,
+        assignments: blank.assignments,
+        subtasks: blank.subtasks,
+      }));
+      setErrors({});
+      return;
+    }
     const template = templates.find(item => item.id === Number(rawId));
     if (template) applyTemplate(template);
   }
