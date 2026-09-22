@@ -1,18 +1,33 @@
-export type IPCRRowKind = "program" | "function" | "kra" | "data";
+export type IPCRFieldType = "text" | "textarea" | "date" | "number" | "rating" | "grouped_tasks";
 
-export interface IPCRTemplateRow {
-  kind: IPCRRowKind;
-  // Used by program/function/kra banner rows.
-  text?: string;
-  // Used by data rows.
-  output?: string;
-  indicator?: string;
+export interface IPCRField {
+  cell: string;
+  key: string;
+  label: string;
+  type: IPCRFieldType;
+}
+
+export interface IPCRGridData {
+  data: (string | number)[][];
+  style: Record<string, string>;
+  mergeCells: Record<string, [number, number]>;
+  colWidths: Record<number, number>;
+}
+
+export function emptyGrid(rows = 30, cols = 10): IPCRGridData {
+  return {
+    data: Array.from({ length: rows }, () => Array.from({ length: cols }, () => "")),
+    style: {},
+    mergeCells: {},
+    colWidths: {},
+  };
 }
 
 export interface IPCRTemplate {
   id: number;
   name: string;
-  rows: IPCRTemplateRow[];
+  grid: IPCRGridData;
+  fields_config: IPCRField[];
   created_at: string;
   updated_at: string;
   can_manage: boolean;
@@ -20,39 +35,24 @@ export interface IPCRTemplate {
 
 export interface IPCRTemplateInput {
   name: string;
-  rows: IPCRTemplateRow[];
+  grid: IPCRGridData;
+  fields_config: IPCRField[];
 }
 
-export interface IPCRSubmissionRow extends IPCRTemplateRow {
+export type IPCRFieldValue = string | number | null;
+
+export interface IPCRFieldMetaEntry {
   grouped_task_ids?: number[];
-  actual_accomplishments?: string;
-  rating_q?: number | null;
-  rating_e?: number | null;
-  rating_t?: number | null;
-  rating_a?: number | null;
-  remarks?: string;
 }
 
 export interface IPCRSubmission {
   id: number;
   template: number | null;
-  period_label: string;
-  commitment_date: string | null;
-  employee_name: string;
-  employee_position: string;
-  employee_office: string;
-  reviewed_by_name: string;
-  reviewed_by_title: string;
-  approved_by_name: string;
-  approved_by_title: string;
-  discussed_at: string | null;
-  assessed_at: string | null;
-  final_rating_at: string | null;
-  rows: IPCRSubmissionRow[];
-  areas_of_strength: string[];
-  strength_interventions: string[];
-  areas_for_development: string[];
-  development_interventions: string[];
+  label: string;
+  grid_snapshot: IPCRGridData;
+  fields_snapshot: IPCRField[];
+  field_values: Record<string, IPCRFieldValue>;
+  field_meta: Record<string, IPCRFieldMetaEntry>;
   final_rating: number | null;
   created_at: string;
   updated_at: string;
@@ -61,13 +61,7 @@ export interface IPCRSubmission {
 
 export type IPCRSubmissionInput = Omit<IPCRSubmission, "id" | "final_rating" | "created_at" | "updated_at" | "can_manage">;
 
-export const RATING_SCALE: { value: number; label: string }[] = [
-  { value: 5, label: "Outstanding" },
-  { value: 4, label: "Very Satisfactory" },
-  { value: 3, label: "Satisfactory" },
-  { value: 2, label: "Unsatisfactory" },
-  { value: 1, label: "Poor" },
-];
+export const RATING_SCALE = [1, 2, 3, 4, 5];
 
 export function adjectivalRating(value: number | null): string {
   if (value === null || Number.isNaN(value)) return "";
@@ -77,4 +71,21 @@ export function adjectivalRating(value: number | null): string {
   if (value >= 2) return "Unsatisfactory";
   if (value >= 1) return "Poor";
   return "";
+}
+
+export function fieldToken(key: string): string {
+  return `{{${key}}}`;
+}
+
+const TOKEN_PATTERN = /\{\{([a-z][a-z0-9_]*)\}\}/;
+
+export function tokenKey(cellValue: string | number): string | null {
+  if (typeof cellValue !== "string") return null;
+  const match = cellValue.match(TOKEN_PATTERN);
+  return match ? match[1] : null;
+}
+
+export function slugifyKey(label: string): string {
+  const slug = label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  return /^[a-z]/.test(slug) ? slug : `f_${slug}`;
 }

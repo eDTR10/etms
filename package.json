@@ -23,6 +23,7 @@
     "crypto-js": "^4.2.0",
     "exceljs": "^4.4.0",
     "framer-motion": "^11.0.5",
+    "jspreadsheet-ce": "^5.0.4",
     "jwt-decode": "^4.0.0",
     "lucide-react": "^0.274.0",
     "pdfmake": "^0.3.11",
