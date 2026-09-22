@@ -44,6 +44,11 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+    // Defensive: guard against a second init landing on an already-initialized container
+    // (React 18 StrictMode double-invokes effects in dev; jspreadsheet's own destroy() does
+    // not reliably strip every toolbar/tab node it created) — without this, a second mount
+    // stacks a second toolbar and worksheet tab on top of the first.
+    container.innerHTML = "";
     const rowCount = Math.max(value.data.length, minRows);
     const colCount = Math.max(value.data[0]?.length ?? 0, minCols);
     const data = Array.from({ length: rowCount }, (_, y) =>
@@ -75,7 +80,8 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
     Object.entries(value.colWidths).forEach(([col, width]) => instance.setWidth(Number(col), width));
 
     return () => {
-      jspreadsheet.destroy(container as JspreadsheetInstanceElement);
+      jspreadsheet.destroy(container as JspreadsheetInstanceElement, true);
+      container.innerHTML = "";
       instanceRef.current = null;
     };
     // Intentionally mount-once: see the component-level note above.
