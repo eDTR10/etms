@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Columns, Eye, FileSpreadsheet, ImagePlus, Loader2, MousePointerClick, RefreshCw, Rows, Tag, Trash2 } from "lucide-react";
+import { AlignCenter, AlignLeft, AlignRight, Bold, Columns, Combine, Eye, FileSpreadsheet, Highlighter, ImagePlus, Italic, Loader2, MousePointerClick, Palette, Redo2, RefreshCw, Rows, Tag, Trash2, Underline, Undo2, Ungroup } from "lucide-react";
 import Swal from "sweetalert2";
 import { taskService, taskError } from "../tasks/taskService";
 import type { GroupedTask } from "../tasks/types";
@@ -41,6 +41,8 @@ const FIELD_TYPE_LABEL: Record<IPCRFieldType, string> = {
 export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTemplateFormProps) {
   const gridRef = useRef<IPCRGridHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textColorRef = useRef<HTMLInputElement>(null);
+  const fillColorRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(template?.name ?? "");
   const [fields, setFields] = useState<IPCRField[]>(template?.fields_config ?? []);
   const [images, setImages] = useState<IPCRGridImage[]>(template?.grid.images ?? []);
@@ -170,6 +172,27 @@ export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTem
           <div className="etm-field">
             <label style={{ display: "flex", alignItems: "center", gap: 8 }}><FileSpreadsheet size={16} /> Form layout</label>
             <p className="etm-form-helper">Design the form like a real spreadsheet — type text, resize columns, and use the toolbar or right-click menu to merge cells, color rows, and bold text. Then click a cell and use "Mark as fill-in field" to turn it into a blank users fill in.</p>
+            <div className="etm-ipcr-grid-toolbar etm-ipcr-format-toolbar">
+              <button type="button" className="etm-icon-button" aria-label="Undo" onClick={() => gridRef.current?.undo()}><Undo2 size={15} /></button>
+              <button type="button" className="etm-icon-button" aria-label="Redo" onClick={() => gridRef.current?.redo()}><Redo2 size={15} /></button>
+              <span className="etm-ipcr-toolbar-divider" />
+              <button type="button" className="etm-icon-button" aria-label="Bold" onClick={() => gridRef.current?.toggleStyle("font-weight", "bold")}><Bold size={15} /></button>
+              <button type="button" className="etm-icon-button" aria-label="Italic" onClick={() => gridRef.current?.toggleStyle("font-style", "italic")}><Italic size={15} /></button>
+              <button type="button" className="etm-icon-button" aria-label="Underline" onClick={() => gridRef.current?.toggleStyle("text-decoration", "underline")}><Underline size={15} /></button>
+              <span className="etm-ipcr-toolbar-divider" />
+              <button type="button" className="etm-icon-button" aria-label="Align left" onClick={() => gridRef.current?.alignSelection("left")}><AlignLeft size={15} /></button>
+              <button type="button" className="etm-icon-button" aria-label="Align center" onClick={() => gridRef.current?.alignSelection("center")}><AlignCenter size={15} /></button>
+              <button type="button" className="etm-icon-button" aria-label="Align right" onClick={() => gridRef.current?.alignSelection("right")}><AlignRight size={15} /></button>
+              <span className="etm-ipcr-toolbar-divider" />
+              <button type="button" className="etm-icon-button" aria-label="Text color" onClick={() => textColorRef.current?.click()}><Palette size={15} /></button>
+              <input ref={textColorRef} type="color" hidden onChange={event => gridRef.current?.setSelectionColor("color", event.target.value)} />
+              <button type="button" className="etm-icon-button" aria-label="Fill color" onClick={() => fillColorRef.current?.click()}><Highlighter size={15} /></button>
+              <input ref={fillColorRef} type="color" hidden onChange={event => gridRef.current?.setSelectionColor("background-color", event.target.value)} />
+              <span className="etm-ipcr-toolbar-divider" />
+              <button type="button" className="etm-icon-button" aria-label="Merge selected cells" onClick={() => gridRef.current?.mergeSelection()}><Combine size={15} /></button>
+              <button type="button" className="etm-icon-button" aria-label="Unmerge cell" onClick={() => gridRef.current?.unmergeSelection()}><Ungroup size={15} /></button>
+            </div>
+            <p className="etm-form-helper">Select a range first (click and drag across cells), then use Merge — or right-click the selection for the same options.</p>
             <div className="etm-ipcr-grid-toolbar">
               <button type="button" className="etm-button primary small" onClick={() => void markSelectedCell()}><MousePointerClick size={14} /> Mark selected cell as fill-in field</button>
               <button type="button" className="etm-button ghost small" onClick={() => gridRef.current?.insertColumn()}><Columns size={14} /> Add column</button>

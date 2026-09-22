@@ -16,6 +16,13 @@ export interface IPCRGridHandle {
   markCell: (cell: string, marked: boolean) => void;
   insertColumn: () => void;
   insertRow: () => void;
+  mergeSelection: () => void;
+  unmergeSelection: () => void;
+  toggleStyle: (property: "font-weight" | "font-style" | "text-decoration", onValue: string) => void;
+  setSelectionColor: (property: "color" | "background-color", value: string) => void;
+  alignSelection: (align: "left" | "center" | "right") => void;
+  undo: () => void;
+  redo: () => void;
 }
 
 interface IPCRGridProps {
@@ -42,6 +49,7 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
   const containerRef = useRef<HTMLDivElement>(null);
   const instanceRef = useRef<WorksheetInstance | null>(null);
   const selectedRef = useRef<string | null>(null);
+  const selectionRangeRef = useRef<[number, number, number, number] | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -57,8 +65,13 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
       Array.from({ length: colCount }, (_, x) => value.data[y]?.[x] ?? ""));
 
     const [instance] = jspreadsheet(container, {
-      toolbar: editable,
-      onselection: (_instance, x1, y1) => { selectedRef.current = `${columnName(x1)}${y1 + 1}`; },
+      // The built-in toolbar is intentionally disabled — a custom, explicit toolbar (see
+      // IPCRTemplateForm) replaces it, driving the same setStyle()/setMerge() APIs directly.
+      toolbar: false,
+      onselection: (_instance, x1, y1, x2, y2) => {
+        selectedRef.current = `${columnName(x1)}${y1 + 1}`;
+        selectionRangeRef.current = [x1, y1, x2, y2];
+      },
       worksheets: [{
         data,
         style: value.style,
@@ -115,6 +128,53 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
     },
     insertColumn: () => { instanceRef.current?.insertColumn(); },
     insertRow: () => { instanceRef.current?.insertRow(); },
+    mergeSelection: () => {
+      const instance = instanceRef.current;
+      const range = selectionRangeRef.current;
+      if (!instance || !range) return;
+      const [x1, y1, x2, y2] = range;
+      const colspan = Math.abs(x2 - x1) + 1;
+      const rowspan = Math.abs(y2 - y1) + 1;
+      if (colspan <= 1 && rowspan <= 1) return;
+      instance.setMerge(`${columnName(Math.min(x1, x2))}${Math.min(y1, y2) + 1}`, colspan, rowspan);
+    },
+    unmergeSelection: () => {
+      const cell = selectedRef.current;
+      if (cell) instanceRef.current?.removeMerge(cell);
+    },
+    toggleStyle: (property, onValue) => {
+      const instance = instanceRef.current;
+      const range = selectionRangeRef.current;
+      if (!instance || !range) return;
+      const [x1, y1, x2, y2] = range;
+      const cells: string[] = [];
+      for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) {
+        for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) cells.push(`${columnName(x)}${y + 1}`);
+      }
+      const current = instance.getStyle(cells[0], property);
+      const next = current === onValue ? "" : onValue;
+      cells.forEach(cell => instance.setStyle(cell, property, next, true));
+    },
+    setSelectionColor: (property, value) => {
+      const instance = instanceRef.current;
+      const range = selectionRangeRef.current;
+      if (!instance || !range) return;
+      const [x1, y1, x2, y2] = range;
+      for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) {
+        for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) instance.setStyle(`${columnName(x)}${y + 1}`, property, value, true);
+      }
+    },
+    alignSelection: align => {
+      const instance = instanceRef.current;
+      const range = selectionRangeRef.current;
+      if (!instance || !range) return;
+      const [x1, y1, x2, y2] = range;
+      for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) {
+        for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) instance.setStyle(`${columnName(x)}${y + 1}`, "text-align", align, true);
+      }
+    },
+    undo: () => { instanceRef.current?.undo(); },
+    redo: () => { instanceRef.current?.redo(); },
   }), [value]);
 
   return <div ref={containerRef} className="etm-ipcr-grid-host" />;

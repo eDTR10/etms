@@ -1,5 +1,8 @@
 /* ── Spreadsheet grid host ──────────────────────────────────────────────── */
 .etm-ipcr-grid-toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.etm-ipcr-format-toolbar { align-items: center; gap: 3px; padding: 6px 8px; border: 1px solid var(--etm-border); border-radius: 9px; background: var(--etm-surface-alt); margin-bottom: 6px; }
+.etm-ipcr-format-toolbar input[type="color"] { width: 0; height: 0; padding: 0; border: 0; }
+.etm-ipcr-toolbar-divider { width: 1px; height: 20px; margin: 0 4px; background: var(--etm-border); flex-shrink: 0; }
 .etm-ipcr-grid-host { margin: 10px 0; border: 1px solid var(--etm-border); border-radius: 9px; overflow: auto; background: #fff; }
 .etm-ipcr-grid-host .jexcel_container { font-size: 12.5px; }
 .etm-ipcr-grid-overlay-wrap { position: relative; }
