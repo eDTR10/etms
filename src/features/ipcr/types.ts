@@ -7,11 +7,21 @@ export interface IPCRField {
   type: IPCRFieldType;
 }
 
+export interface IPCRGridImage {
+  id: string;
+  dataUrl: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface IPCRGridData {
   data: (string | number)[][];
   style: Record<string, string>;
   mergeCells: Record<string, [number, number]>;
   colWidths: Record<number, number>;
+  images: IPCRGridImage[];
 }
 
 export function emptyGrid(rows = 30, cols = 10): IPCRGridData {
@@ -20,6 +30,7 @@ export function emptyGrid(rows = 30, cols = 10): IPCRGridData {
     style: {},
     mergeCells: {},
     colWidths: {},
+    images: [],
   };
 }
 

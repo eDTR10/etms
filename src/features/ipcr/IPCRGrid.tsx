@@ -14,6 +14,8 @@ export interface IPCRGridHandle {
   getSelectedCell: () => string | null;
   setCellValue: (cell: string, value: string) => void;
   markCell: (cell: string, marked: boolean) => void;
+  insertColumn: () => void;
+  insertRow: () => void;
 }
 
 interface IPCRGridProps {
@@ -101,13 +103,15 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
         const numeric = Number(width);
         if (!Number.isNaN(numeric)) colWidths[index] = numeric;
       });
-      return { data, style, mergeCells: merge, colWidths };
+      return { data, style, mergeCells: merge, colWidths, images: value.images };
     },
     getSelectedCell: () => selectedRef.current,
     setCellValue: (cell, cellValue) => { instanceRef.current?.setValue(cell, cellValue); },
     markCell: (cell, marked) => {
       instanceRef.current?.setStyle(cell, "border", marked ? "2px dashed #0d8a92" : "", true);
     },
+    insertColumn: () => { instanceRef.current?.insertColumn(); },
+    insertRow: () => { instanceRef.current?.insertRow(); },
   }), [value]);
 
   return <div ref={containerRef} className="etm-ipcr-grid-host" />;

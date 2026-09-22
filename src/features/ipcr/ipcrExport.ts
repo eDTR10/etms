@@ -37,6 +37,22 @@ export async function buildIPCRWorkbook(grid: IPCRGridData, sheetName = "IPCR"):
     sheet.mergeCells(row + 1, col + 1, row + rowspan, col + colspan);
   });
 
+  // Approximate placement only — the overlay's on-screen x/y is in pixels against whatever
+  // column widths/row heights were in effect, which Excel's column-index anchoring can't
+  // reproduce exactly. Close enough for a corner logo.
+  const AVG_COL_WIDTH_PX = 70;
+  const AVG_ROW_HEIGHT_PX = 20;
+  grid.images.forEach(image => {
+    const match = image.dataUrl.match(/^data:image\/(png|jpe?g|gif);base64,/);
+    if (!match) return;
+    const extension = match[1] === "jpg" ? "jpeg" : (match[1] as "png" | "jpeg" | "gif");
+    const imageId = workbook.addImage({ base64: image.dataUrl, extension });
+    sheet.addImage(imageId, {
+      tl: { col: image.x / AVG_COL_WIDTH_PX, row: image.y / AVG_ROW_HEIGHT_PX },
+      ext: { width: image.width, height: image.height },
+    });
+  });
+
   return workbook;
 }
 

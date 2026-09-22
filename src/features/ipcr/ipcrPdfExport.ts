@@ -57,15 +57,22 @@ export function buildIPCRPdfDocDefinition(grid: IPCRGridData) {
     body.push(line);
   }
 
+  const pageMargin = 24;
   return {
     pageSize: "A3" as const,
     pageOrientation: "landscape" as const,
-    pageMargins: [24, 24, 24, 24] as [number, number, number, number],
+    pageMargins: [pageMargin, pageMargin, pageMargin, pageMargin] as [number, number, number, number],
     content: [
       {
         table: { headerRows: 0, widths: Array(colCount).fill("*"), body },
         layout: { defaultBorder: true, hLineColor: () => "#9a9a9a", vLineColor: () => "#9a9a9a", paddingLeft: () => 4, paddingRight: () => 4, paddingTop: () => 3, paddingBottom: () => 3 },
       },
+      ...grid.images.map(image => ({
+        image: image.dataUrl,
+        width: image.width,
+        height: image.height,
+        absolutePosition: { x: pageMargin + image.x, y: pageMargin + image.y },
+      })),
     ],
     defaultStyle: { fontSize: 8 },
   };

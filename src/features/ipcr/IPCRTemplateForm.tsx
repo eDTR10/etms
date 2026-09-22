@@ -1,11 +1,23 @@
 import { useRef, useState } from "react";
-import { FileSpreadsheet, Loader2, MousePointerClick, Tag, Trash2 } from "lucide-react";
+import { Columns, FileSpreadsheet, ImagePlus, Loader2, MousePointerClick, Rows, Tag, Trash2 } from "lucide-react";
 import Swal from "sweetalert2";
 import { taskError } from "../tasks/taskService";
 import IPCRGrid, { type IPCRGridHandle } from "./IPCRGrid";
-import { emptyGrid, fieldToken, slugifyKey, type IPCRField, type IPCRFieldType, type IPCRTemplate, type IPCRTemplateInput } from "./types";
+import IPCRGridImageOverlay from "./IPCRGridImageOverlay";
+import { emptyGrid, fieldToken, slugifyKey, type IPCRField, type IPCRFieldType, type IPCRGridImage, type IPCRTemplate, type IPCRTemplateInput } from "./types";
 import "../tasks/forms.css";
 import "./ipcr.css";
+
+const MAX_IMAGE_BYTES = 1.5 * 1024 * 1024;
+
+function readImageFile(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
 
 interface IPCRTemplateFormProps {
   template?: IPCRTemplate;
@@ -24,10 +36,24 @@ const FIELD_TYPE_LABEL: Record<IPCRFieldType, string> = {
 
 export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTemplateFormProps) {
   const gridRef = useRef<IPCRGridHandle>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(template?.name ?? "");
   const [fields, setFields] = useState<IPCRField[]>(template?.fields_config ?? []);
+  const [images, setImages] = useState<IPCRGridImage[]>(template?.grid.images ?? []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  async function handleImagePick(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (file.size > MAX_IMAGE_BYTES) {
+      void Swal.fire({ title: "Image is too large", text: "Please use an image under 1.5MB (resize it first).", icon: "error" });
+      return;
+    }
+    const dataUrl = await readImageFile(file);
+    setImages(current => [...current, { id: `img-${Date.now()}`, dataUrl, x: 20, y: 20, width: 90, height: 90 }]);
+  }
 
   async function markSelectedCell() {
     const grid = gridRef.current;
@@ -84,8 +110,8 @@ export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTem
     setSaving(true);
     setError("");
     try {
-      const grid = gridRef.current?.getSnapshot() ?? emptyGrid();
-      await onSave({ name: name.trim(), grid, fields_config: fields });
+      const snapshot = gridRef.current?.getSnapshot() ?? emptyGrid();
+      await onSave({ name: name.trim(), grid: { ...snapshot, images }, fields_config: fields });
     } catch (caught) {
       setError(taskError(caught));
     } finally {
@@ -104,11 +130,18 @@ export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTem
 
           <div className="etm-field">
             <label style={{ display: "flex", alignItems: "center", gap: 8 }}><FileSpreadsheet size={16} /> Form layout</label>
-            <p className="etm-form-helper">Design the form like a real spreadsheet — type text, merge cells, color rows, resize columns, drag/drop to reorder. Then click a cell and use "Mark as fill-in field" to turn it into a blank users fill in.</p>
+            <p className="etm-form-helper">Design the form like a real spreadsheet — type text, resize columns, and use the toolbar or right-click menu to merge cells, color rows, and bold text. Then click a cell and use "Mark as fill-in field" to turn it into a blank users fill in.</p>
             <div className="etm-ipcr-grid-toolbar">
               <button type="button" className="etm-button primary small" onClick={() => void markSelectedCell()}><MousePointerClick size={14} /> Mark selected cell as fill-in field</button>
+              <button type="button" className="etm-button ghost small" onClick={() => gridRef.current?.insertColumn()}><Columns size={14} /> Add column</button>
+              <button type="button" className="etm-button ghost small" onClick={() => gridRef.current?.insertRow()}><Rows size={14} /> Add row</button>
+              <button type="button" className="etm-button ghost small" onClick={() => fileInputRef.current?.click()}><ImagePlus size={14} /> Insert image</button>
+              <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={event => void handleImagePick(event)} />
             </div>
-            <IPCRGrid key={template?.id ?? "new"} ref={gridRef} value={template?.grid ?? emptyGrid()} editable />
+            <div className="etm-ipcr-grid-overlay-wrap">
+              <IPCRGrid key={template?.id ?? "new"} ref={gridRef} value={template?.grid ?? emptyGrid()} editable />
+              <IPCRGridImageOverlay images={images} editable onChange={setImages} />
+            </div>
           </div>
 
           <div className="etm-field">

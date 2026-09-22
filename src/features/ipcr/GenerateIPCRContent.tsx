@@ -5,6 +5,7 @@ import { taskService, taskError } from "../tasks/taskService";
 import type { GroupedTask } from "../tasks/types";
 import { ipcrService } from "./ipcrService";
 import IPCRGrid from "./IPCRGrid";
+import IPCRGridImageOverlay from "./IPCRGridImageOverlay";
 import { downloadIPCRWorkbook } from "./ipcrExport";
 import { downloadIPCRPdf } from "./ipcrPdfExport";
 import { computeFinalRating, fillGrid } from "./ipcrGridUtils";
@@ -279,7 +280,10 @@ export default function GenerateIPCRContent() {
             <button type="button" className="etm-button ghost small" onClick={() => void downloadIPCRWorkbook(fillGrid(preview.grid_snapshot, preview.fields_snapshot, preview.field_values), filename(preview))}><Download size={14} /> Download .xlsx</button>
             <button type="button" className="etm-button ghost small" onClick={() => downloadIPCRPdf(fillGrid(preview.grid_snapshot, preview.fields_snapshot, preview.field_values), filename(preview))}><FileText size={14} /> Download PDF</button>
           </div>
-          <IPCRGrid key={`preview-${preview.id}-${preview.updated_at}`} value={fillGrid(preview.grid_snapshot, preview.fields_snapshot, preview.field_values)} editable={false} />
+          <div className="etm-ipcr-grid-overlay-wrap">
+            <IPCRGrid key={`preview-${preview.id}-${preview.updated_at}`} value={fillGrid(preview.grid_snapshot, preview.fields_snapshot, preview.field_values)} editable={false} />
+            <IPCRGridImageOverlay images={preview.grid_snapshot.images ?? []} editable={false} />
+          </div>
         </section>
       )}
     </div>

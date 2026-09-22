@@ -2,6 +2,15 @@
 .etm-ipcr-grid-toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
 .etm-ipcr-grid-host { margin: 10px 0; border: 1px solid var(--etm-border); border-radius: 9px; overflow: auto; background: #fff; }
 .etm-ipcr-grid-host .jexcel_container { font-size: 12.5px; }
+.etm-ipcr-grid-overlay-wrap { position: relative; }
+
+/* ── Logo/image overlay ─────────────────────────────────────────────────── */
+.etm-ipcr-image-overlay { position: absolute; inset: 10px 0 0; pointer-events: none; z-index: 5; }
+.etm-ipcr-image-item { position: absolute; pointer-events: auto; }
+.etm-ipcr-image-item.editable { cursor: move; outline: 1px dashed #0d8a92; }
+.etm-ipcr-image-item img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.etm-ipcr-image-remove { position: absolute; top: -10px; right: -10px; display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; border: 0; border-radius: 50%; background: #c85f5a; color: #fff; cursor: pointer; }
+.etm-ipcr-image-resize-handle { position: absolute; right: -4px; bottom: -4px; width: 10px; height: 10px; border-radius: 2px; background: #0d8a92; cursor: nwse-resize; }
 
 /* ── Admin: fill-in field registry list ─────────────────────────────────── */
 .etm-ipcr-field-list { display: grid; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
