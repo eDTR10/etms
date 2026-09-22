@@ -1,4 +1,13 @@
 import { adjectivalRating, tokenKey, type IPCRField, type IPCRFieldValue, type IPCRGridData } from "./types";
+import type { GroupedTask } from "../tasks/types";
+
+export function composeGroupedTasksHtml(groupIds: number[], groups: GroupedTask[]): string {
+  return groupIds
+    .map(id => groups.find(group => group.id === id))
+    .filter((group): group is GroupedTask => !!group)
+    .map(group => `<div><strong>${group.name}</strong></div><ul>${group.tasks.map(task => `<li>${task.title}</li>`).join("") || "<li>(no tasks tagged yet)</li>"}</ul>`)
+    .join("");
+}
 
 export function columnName(index: number): string {
   let name = "";
@@ -56,6 +65,17 @@ export function hexToArgb(hex: string): string | null {
   return match ? `FF${match[1].toUpperCase()}` : null;
 }
 
+// Cell content in the spreadsheet grid (and its .xlsx/PDF export) is plain text — flatten rich
+// HTML from a textarea/grouped_tasks field down to readable plain text (bullets, line breaks)
+// rather than dropping it, since a grid cell can't render bold/italic/underline runs.
+export function richTextToPlainText(html: string): string {
+  const container = document.createElement("div");
+  container.innerHTML = html;
+  container.querySelectorAll("li").forEach(li => { li.textContent = `• ${li.textContent}`; });
+  container.querySelectorAll("p, div, li, br").forEach(node => { node.after(document.createTextNode("\n")); });
+  return (container.textContent ?? "").replace(/\n{3,}/g, "\n\n").trim();
+}
+
 function formatFieldValue(field: IPCRField, value: IPCRFieldValue): string {
   if (value === null || value === undefined || value === "") return "";
   if (field.type === "date") {
@@ -63,6 +83,7 @@ function formatFieldValue(field: IPCRField, value: IPCRFieldValue): string {
     return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
   }
   if (field.type === "rating") return `${value} — ${adjectivalRating(Number(value))}`;
+  if (field.type === "textarea" || field.type === "grouped_tasks") return richTextToPlainText(String(value));
   return String(value);
 }
 

@@ -1,21 +1,17 @@
 import { useEffect, useState } from "react";
-import { CalendarDays, Download, FileSpreadsheet, FileText, Loader2, Pencil, Plus, Sparkles, Star, Trash2, Type, X } from "lucide-react";
+import { Download, Eye, FileSpreadsheet, FileText, Loader2, Pencil, Plus, Star, Trash2 } from "lucide-react";
 import Swal from "sweetalert2";
 import { taskService, taskError } from "../tasks/taskService";
 import type { GroupedTask } from "../tasks/types";
 import { ipcrService } from "./ipcrService";
-import IPCRGrid from "./IPCRGrid";
-import IPCRGridImageOverlay from "./IPCRGridImageOverlay";
+import IPCRFillForm from "./IPCRFillForm";
+import IPCRLivePreview from "./IPCRLivePreview";
 import { downloadIPCRWorkbook } from "./ipcrExport";
 import { downloadIPCRPdf } from "./ipcrPdfExport";
-import { computeFinalRating, fillGrid } from "./ipcrGridUtils";
+import { composeGroupedTasksHtml, computeFinalRating, fillGrid } from "./ipcrGridUtils";
 import { adjectivalRating, emptyGrid, type IPCRField, type IPCRFieldValue, type IPCRFieldMetaEntry, type IPCRSubmission, type IPCRSubmissionInput, type IPCRTemplate } from "./types";
 import "../tasks/forms.css";
 import "./ipcr.css";
-
-const FIELD_ICON: Record<IPCRField["type"], typeof Type> = {
-  text: Type, textarea: Type, date: CalendarDays, number: Type, rating: Star, grouped_tasks: Sparkles,
-};
 
 function newDraft(template: IPCRTemplate | null): { fields: IPCRField[]; values: Record<string, IPCRFieldValue>; meta: Record<string, IPCRFieldMetaEntry> } {
   const fields = template?.fields_config ?? [];
@@ -41,6 +37,8 @@ export default function GenerateIPCRContent() {
   const [label, setLabel] = useState("");
   const [saving, setSaving] = useState(false);
   const [preview, setPreview] = useState<IPCRSubmission | null>(null);
+  const [testPreview, setTestPreview] = useState(false);
+  const [testRefreshKey, setTestRefreshKey] = useState(0);
 
   useEffect(() => {
     Promise.all([ipcrService.listTemplates(), taskService.listGroupedTasks(), ipcrService.listSubmissions()])
@@ -53,7 +51,7 @@ export default function GenerateIPCRContent() {
     setTemplateId(null);
     const draft = newDraft(null);
     setGrid(emptyGrid()); setFields(draft.fields); setValues(draft.values); setMeta(draft.meta);
-    setLabel(""); setPreview(null); setError("");
+    setLabel(""); setPreview(null); setError(""); setTestPreview(false);
     setEditingId("new");
   }
 
@@ -65,7 +63,7 @@ export default function GenerateIPCRContent() {
     setMeta(submission.field_meta);
     setLabel(submission.label);
     setPreview(submission);
-    setError("");
+    setError(""); setTestPreview(false);
     setEditingId(submission.id);
   }
 
@@ -76,6 +74,7 @@ export default function GenerateIPCRContent() {
     setGrid(template.grid);
     const draft = newDraft(template);
     setFields(draft.fields); setValues(draft.values); setMeta(draft.meta);
+    setTestPreview(false);
   }
 
   function updateValue(key: string, value: IPCRFieldValue) {
@@ -86,12 +85,7 @@ export default function GenerateIPCRContent() {
     const current = meta[field.key]?.grouped_task_ids ?? [];
     const next = current.includes(groupId) ? current.filter(id => id !== groupId) : [...current, groupId];
     setMeta(currentMeta => ({ ...currentMeta, [field.key]: { grouped_task_ids: next } }));
-    const composed = next
-      .map(id => groups.find(group => group.id === id))
-      .filter((group): group is GroupedTask => !!group)
-      .map(group => `${group.name}:\n${group.tasks.map(task => `- ${task.title}`).join("\n") || "(no tasks tagged yet)"}`)
-      .join("\n\n");
-    updateValue(field.key, composed);
+    updateValue(field.key, composeGroupedTasksHtml(next, groups));
   }
 
   async function handleSave() {
@@ -206,62 +200,21 @@ export default function GenerateIPCRContent() {
 
               <div className="etm-field">
                 <label>Fill in the marked portions</label>
-                <div className="etm-ipcr-fill-form">
-                  {fields.map(field => {
-                    const Icon = FIELD_ICON[field.type];
-                    if (field.type === "grouped_tasks") {
-                      const taggedIds = meta[field.key]?.grouped_task_ids ?? [];
-                      const taggedGroups = groups.filter(group => taggedIds.includes(group.id));
-                      return (
-                        <div className="etm-ipcr-fill-field" key={field.key}>
-                          <label><Icon size={14} /> {field.label} <span className="etm-ipcr-field-cell">{field.cell}</span></label>
-                          <div className="etm-ipcr-group-tag-row">
-                            {taggedGroups.map(group => (
-                              <span key={group.id} className="etm-ipcr-group-tag">{group.name}<button type="button" aria-label={`Untag ${group.name}`} onClick={() => toggleGroupTag(field, group.id)}><X size={12} /></button></span>
-                            ))}
-                            <select value="" onChange={event => { if (event.target.value) toggleGroupTag(field, Number(event.target.value)); }}>
-                              <option value="">Tag a Grouped Task…</option>
-                              {groups.filter(group => !taggedIds.includes(group.id)).map(group => <option key={group.id} value={group.id}>{group.name}</option>)}
-                            </select>
-                          </div>
-                          <textarea value={String(values[field.key] ?? "")} onChange={event => updateValue(field.key, event.target.value)} placeholder="Composed automatically from tagged tasks — editable." />
-                        </div>
-                      );
-                    }
-                    if (field.type === "textarea") {
-                      return (
-                        <div className="etm-ipcr-fill-field" key={field.key}>
-                          <label><Icon size={14} /> {field.label} <span className="etm-ipcr-field-cell">{field.cell}</span></label>
-                          <textarea value={String(values[field.key] ?? "")} onChange={event => updateValue(field.key, event.target.value)} />
-                        </div>
-                      );
-                    }
-                    if (field.type === "rating") {
-                      return (
-                        <div className="etm-ipcr-fill-field" key={field.key}>
-                          <label><Icon size={14} /> {field.label} <span className="etm-ipcr-field-cell">{field.cell}</span></label>
-                          <select value={values[field.key] ?? ""} onChange={event => updateValue(field.key, event.target.value ? Number(event.target.value) : null)}>
-                            <option value="">—</option>
-                            {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n} — {adjectivalRating(n)}</option>)}
-                          </select>
-                        </div>
-                      );
-                    }
-                    return (
-                      <div className="etm-ipcr-fill-field" key={field.key}>
-                        <label><Icon size={14} /> {field.label} <span className="etm-ipcr-field-cell">{field.cell}</span></label>
-                        <input type={field.type === "date" ? "date" : field.type === "number" ? "number" : "text"} value={values[field.key] ?? ""} onChange={event => updateValue(field.key, event.target.value)} />
-                      </div>
-                    );
-                  })}
-                </div>
+                <IPCRFillForm fields={fields} values={values} meta={meta} groups={groups} onUpdateValue={updateValue} onToggleGroupTag={toggleGroupTag} />
               </div>
 
               {liveFinalRating !== null && <div className="etm-ipcr-final-rating-banner"><Star size={16} /> Final rating so far: {liveFinalRating} — {adjectivalRating(liveFinalRating)}</div>}
+
+              <div className="etm-field">
+                <div className="etm-ipcr-preview-actions">
+                  <button type="button" className="etm-button ghost small" onClick={() => { setTestPreview(true); setTestRefreshKey(key => key + 1); }}><Eye size={14} /> {testPreview ? "Update test preview" : "Test with these values"}</button>
+                </div>
+                {testPreview && <IPCRLivePreview grid={grid} fields={fields} values={values} refreshKey={testRefreshKey} />}
+              </div>
             </>}
 
             <div className="etm-form-footer">
-              <span>{fields.length === 0 ? "Choose a template above to see the fill-in fields." : "Save to generate the previewable, downloadable IPCR."}</span>
+              <span>{fields.length === 0 ? "Choose a template above to see the fill-in fields." : "Save to generate the downloadable IPCR."}</span>
               <div>
                 <button type="button" className="etm-button ghost" onClick={() => setEditingId(null)}>{editingId === "new" ? "Cancel" : "Back to list"}</button>
                 <button type="button" className="etm-button primary" onClick={() => void handleSave()} disabled={saving || fields.length === 0}>{saving ? <Loader2 size={17} className="etm-form-spinner" /> : <FileSpreadsheet size={17} />}{saving ? "Saving…" : "Save & generate"}</button>
@@ -271,19 +224,16 @@ export default function GenerateIPCRContent() {
         </section>
       )}
 
-      {preview && (
+      {preview && editingId === preview.id && (
         <section className="etm-panel etm-ipcr-preview-wrap" style={{ padding: 18 }}>
           <div className="etm-report-section-title">
-            <div><p className="etm-report-eyebrow">Preview</p><h2>{preview.label || "IPCR"}</h2></div>
+            <div><p className="etm-report-eyebrow">Saved IPCR</p><h2>{preview.label || "IPCR"}</h2></div>
           </div>
           <div className="etm-ipcr-preview-actions">
             <button type="button" className="etm-button ghost small" onClick={() => void downloadIPCRWorkbook(fillGrid(preview.grid_snapshot, preview.fields_snapshot, preview.field_values), filename(preview))}><Download size={14} /> Download .xlsx</button>
             <button type="button" className="etm-button ghost small" onClick={() => downloadIPCRPdf(fillGrid(preview.grid_snapshot, preview.fields_snapshot, preview.field_values), filename(preview))}><FileText size={14} /> Download PDF</button>
           </div>
-          <div className="etm-ipcr-grid-overlay-wrap">
-            <IPCRGrid key={`preview-${preview.id}-${preview.updated_at}`} value={fillGrid(preview.grid_snapshot, preview.fields_snapshot, preview.field_values)} editable={false} />
-            <IPCRGridImageOverlay images={preview.grid_snapshot.images ?? []} editable={false} />
-          </div>
+          <IPCRLivePreview grid={preview.grid_snapshot} fields={preview.fields_snapshot} values={preview.field_values} refreshKey={`${preview.id}-${preview.updated_at}`} />
         </section>
       )}
     </div>

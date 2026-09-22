@@ -82,7 +82,10 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
     Object.entries(value.colWidths).forEach(([col, width]) => instance.setWidth(Number(col), width));
 
     return () => {
-      jspreadsheet.destroy(container as JspreadsheetInstanceElement, true);
+      // jspreadsheet's own destroy() can throw on some instance shapes — if it does, the
+      // unconditional innerHTML reset below must still run, or a remount (React 18 dev
+      // double-invoke, switching templates, etc.) stacks a second toolbar on top.
+      try { jspreadsheet.destroy(container as JspreadsheetInstanceElement, true); } catch { /* ignore */ }
       container.innerHTML = "";
       instanceRef.current = null;
     };

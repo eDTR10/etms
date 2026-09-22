@@ -1,10 +1,14 @@
 import { useRef, useState } from "react";
-import { Columns, FileSpreadsheet, ImagePlus, Loader2, MousePointerClick, Rows, Tag, Trash2 } from "lucide-react";
+import { Columns, Eye, FileSpreadsheet, ImagePlus, Loader2, MousePointerClick, RefreshCw, Rows, Tag, Trash2 } from "lucide-react";
 import Swal from "sweetalert2";
-import { taskError } from "../tasks/taskService";
+import { taskService, taskError } from "../tasks/taskService";
+import type { GroupedTask } from "../tasks/types";
 import IPCRGrid, { type IPCRGridHandle } from "./IPCRGrid";
 import IPCRGridImageOverlay from "./IPCRGridImageOverlay";
-import { emptyGrid, fieldToken, slugifyKey, type IPCRField, type IPCRFieldType, type IPCRGridImage, type IPCRTemplate, type IPCRTemplateInput } from "./types";
+import IPCRFillForm from "./IPCRFillForm";
+import IPCRLivePreview from "./IPCRLivePreview";
+import { composeGroupedTasksHtml } from "./ipcrGridUtils";
+import { emptyGrid, fieldToken, slugifyKey, type IPCRField, type IPCRFieldMetaEntry, type IPCRFieldType, type IPCRFieldValue, type IPCRGridData, type IPCRGridImage, type IPCRTemplate, type IPCRTemplateInput } from "./types";
 import "../tasks/forms.css";
 import "./ipcr.css";
 
@@ -42,6 +46,41 @@ export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTem
   const [images, setImages] = useState<IPCRGridImage[]>(template?.grid.images ?? []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const [testOpen, setTestOpen] = useState(false);
+  const [testGrid, setTestGrid] = useState<IPCRGridData | null>(null);
+  const [testValues, setTestValues] = useState<Record<string, IPCRFieldValue>>({});
+  const [testMeta, setTestMeta] = useState<Record<string, IPCRFieldMetaEntry>>({});
+  const [testGroups, setTestGroups] = useState<GroupedTask[]>([]);
+  const [testRefreshKey, setTestRefreshKey] = useState(0);
+
+  function refreshTest() {
+    const snapshot = gridRef.current?.getSnapshot() ?? emptyGrid();
+    setTestGrid({ ...snapshot, images });
+    setTestRefreshKey(key => key + 1);
+  }
+
+  function openTest() {
+    setTestOpen(true);
+    setTestValues(current => {
+      const next = { ...current };
+      fields.forEach(field => { if (!(field.key in next)) next[field.key] = field.type === "number" || field.type === "rating" ? null : ""; });
+      return next;
+    });
+    if (!testGroups.length) taskService.listGroupedTasks().then(setTestGroups).catch(() => undefined);
+    refreshTest();
+  }
+
+  function updateTestValue(key: string, value: IPCRFieldValue) {
+    setTestValues(current => ({ ...current, [key]: value }));
+  }
+
+  function toggleTestGroupTag(field: IPCRField, groupId: number) {
+    const current = testMeta[field.key]?.grouped_task_ids ?? [];
+    const next = current.includes(groupId) ? current.filter(id => id !== groupId) : [...current, groupId];
+    setTestMeta(currentMeta => ({ ...currentMeta, [field.key]: { grouped_task_ids: next } }));
+    updateTestValue(field.key, composeGroupedTasksHtml(next, testGroups));
+  }
 
   async function handleImagePick(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -159,6 +198,24 @@ export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTem
               </ul>
             ) : <p className="etm-empty-row">No fill-in fields yet. Select a cell in the sheet above and mark it.</p>}
           </div>
+
+          {fields.length > 0 && (
+            <div className="etm-field">
+              <label style={{ display: "flex", alignItems: "center", gap: 8 }}><Eye size={16} /> Test this template</label>
+              <p className="etm-form-helper">Try filling in the fields yourself to see exactly what a user would see, and how it lands in the sheet — without saving anything.</p>
+              {!testOpen ? (
+                <button type="button" className="etm-button ghost small" onClick={openTest}><Eye size={14} /> Open test preview</button>
+              ) : (
+                <>
+                  <IPCRFillForm fields={fields} values={testValues} meta={testMeta} groups={testGroups} onUpdateValue={updateTestValue} onToggleGroupTag={toggleTestGroupTag} />
+                  <div className="etm-ipcr-preview-actions">
+                    <button type="button" className="etm-button primary small" onClick={refreshTest}><RefreshCw size={14} /> Refresh preview with these values</button>
+                  </div>
+                  {testGrid && <IPCRLivePreview grid={testGrid} fields={fields} values={testValues} refreshKey={testRefreshKey} />}
+                </>
+              )}
+            </div>
+          )}
         </div>
       </fieldset>
       {error && <div className="etm-form-error-banner" role="alert">{error}</div>}
