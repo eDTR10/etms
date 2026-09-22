@@ -37,6 +37,7 @@ const UserDocuments  = lazy(() => import("./screens/User/Documents.tsx"));
 const UserProfile    = lazy(() => import("./screens/User/Profile.tsx"));
 const UserTemplates  = lazy(() => import("./screens/User/Templates.tsx"));
 const UserQuickLinks = lazy(() => import("./screens/User/QuickLinks.tsx"));
+const UserGenerateIPCR = lazy(() => import("./screens/User/GenerateIPCR.tsx"));
 
 // ── Admin pages (eTM) ────────────────────────────────────────────────────
 const AdminDashboard   = lazy(() => import("./screens/Admin/Dashboard.tsx"));
@@ -46,6 +47,7 @@ const AdminTaskDetails = lazy(() => import("./screens/Admin/TaskDetailsPage.tsx"
 const AdminTemplates   = lazy(() => import("./screens/Admin/Templates.tsx"));
 const AdminCalendar    = lazy(() => import("./screens/Admin/Calendar.tsx"));
 const AdminQuickLinks  = lazy(() => import("./screens/Admin/QuickLinks.tsx"));
+const AdminIPCRTemplates = lazy(() => import("./screens/Admin/IPCRTemplates.tsx"));
 const AdminProfile     = lazy(() => import("./screens/Admin/Profile.tsx"));
 
 // Sends "/" to the right place: dashboard if logged in, login otherwise.
@@ -113,6 +115,10 @@ const router = createBrowserRouter([
     element: <ProtectedRoute><Suspense fallback={<Loader />}><UserReports /></Suspense></ProtectedRoute>,
   },
   {
+    path: "/etms/ipcr",
+    element: <ProtectedRoute><Suspense fallback={<Loader />}><UserGenerateIPCR /></Suspense></ProtectedRoute>,
+  },
+  {
     path: "/etms/how-to",
     element: <ProtectedRoute><Suspense fallback={<Loader />}><UserHowTo /></Suspense></ProtectedRoute>,
   },
@@ -149,6 +155,10 @@ const router = createBrowserRouter([
   {
     path: "/etms/admin/tasks/:taskId",
     element: <AdminRoute><Suspense fallback={<Loader />}><AdminTaskDetails /></Suspense></AdminRoute>,
+  },
+  {
+    path: "/etms/admin/ipcr-templates",
+    element: <AdminRoute><Suspense fallback={<Loader />}><AdminIPCRTemplates /></Suspense></AdminRoute>,
   },
   {
     path: "/etms/admin/calendar",

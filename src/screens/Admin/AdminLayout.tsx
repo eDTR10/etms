@@ -4,6 +4,7 @@ import {
   ListChecks,
   Bookmark,
   Calendar,
+  FileSpreadsheet,
   Link2,
   LogOut,
   UserCircle,
@@ -24,6 +25,7 @@ const NAV_ITEMS = [
   { label: "Calendar", icon: <Calendar className="w-4 h-4" />, to: "/etms/admin/calendar" },
   { label: "Templates", icon: <Bookmark className="w-4 h-4" />, to: "/etms/admin/templates" },
   { label: "Quick Links", icon: <Link2 className="w-4 h-4" />, to: "/etms/admin/quick-links" },
+  { label: "Generate IPCR Template", icon: <FileSpreadsheet className="w-4 h-4" />, to: "/etms/admin/ipcr-templates" },
 ];
 
 interface AdminLayoutProps {

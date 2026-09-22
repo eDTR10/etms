@@ -10,6 +10,7 @@ import {
   UserCircle,
   Bookmark,
   Link2,
+  FileSpreadsheet,
   ArrowLeftRight,
 } from "lucide-react";
 import { ModeToggle } from "../../components/mode-toggle";
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
   { label: "Templates", icon: <Bookmark className="w-4 h-4" />, to: "/etms/templates" },
   { label: "Quick Links", icon: <Link2 className="w-4 h-4" />, to: "/etms/quick-links" },
   { label: "Reports", icon: <BarChart3 className="w-4 h-4" />, to: "/etms/reports" },
+  { label: "Generate IPCR", icon: <FileSpreadsheet className="w-4 h-4" />, to: "/etms/ipcr" },
   { label: "How To?", icon: <HelpCircle className="w-4 h-4" />, to: "/etms/how-to" },
 ];
 
