@@ -297,7 +297,12 @@ function ReportsContent() {
   };
 
   return (
-    <div className="etm-reports etm-report-split">
+    <div className="etm-reports">
+      <div className="etm-reports-page-heading">
+        <h1>Task Grouping</h1>
+        <p className="etm-reports-page-note"><em>(for IPCR purposes)</em></p>
+      </div>
+      <div className="etm-report-split">
       <div className="etm-report-column">
         <section className="etm-report-heading">
           <div>
@@ -426,6 +431,7 @@ function ReportsContent() {
           )}
         </section>
       </div>
+      </div>
 
       <Modal open={groupDialogOpen} onClose={closeGroupDialog} title={editingGroup ? "Edit Grouped Task" : "Group Activity"}>
         <form className="etm-report-form" onSubmit={submitGroup}>
@@ -462,5 +468,5 @@ function ReportsContent() {
 }
 
 export default function Reports() {
-  return <UserLayout title="Reports" subtitle="Review completed tasks and organize them into grouped activities."><TaskProvider><ReportsContent /></TaskProvider></UserLayout>;
+  return <UserLayout title="Task Grouping" subtitle="Review completed tasks and organize them into grouped activities."><TaskProvider><ReportsContent /></TaskProvider></UserLayout>;
 }

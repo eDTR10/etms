@@ -28,7 +28,7 @@ const NAV_ITEMS = [
   { label: "All Tasks", icon: <ListChecks className="w-4 h-4" />, to: "/etms/tasks" },
   { label: "Templates", icon: <Bookmark className="w-4 h-4" />, to: "/etms/templates" },
   { label: "Quick Links", icon: <Link2 className="w-4 h-4" />, to: "/etms/quick-links" },
-  { label: "Reports", icon: <BarChart3 className="w-4 h-4" />, to: "/etms/reports" },
+  { label: "Task Grouping", icon: <BarChart3 className="w-4 h-4" />, to: "/etms/reports" },
   { label: "Generate IPCR", icon: <FileSpreadsheet className="w-4 h-4" />, to: "/etms/ipcr" },
   { label: "How To?", icon: <HelpCircle className="w-4 h-4" />, to: "/etms/how-to" },
 ];
@@ -205,7 +205,7 @@ const UserLayout = ({ title, subtitle, children }: UserLayoutProps) => {
           className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 text-[10px] font-semibold ${pathname === "/etms/reports" ? "text-[#0d8a92] dark:text-[#17b3ac]" : "text-muted-foreground"}`}
         >
           <BarChart3 className="w-5 h-5" />
-          Reports
+          Task Grouping
         </Link>
       </nav>
 
