@@ -22,7 +22,7 @@ import etmsLogo from "../../assets/eTMS-icon.png";
 
 // ── Nav config ────────────────────────────────────────────────────────────
 // Grouped for the desktop sidebar (a divider renders between groups, none before the first).
-const NAV_GROUPS: { title?: string; items: { label: string; icon: React.ReactNode; to: string }[] }[] = [
+const NAV_GROUPS: { title?: string; items: { label: string; icon: React.ReactNode; to: string; note?: string }[] }[] = [
   {
     items: [
       { label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, to: "/etms/dashboard" },
@@ -34,7 +34,7 @@ const NAV_GROUPS: { title?: string; items: { label: string; icon: React.ReactNod
   },
   {
     items: [
-      { label: "Task Grouping", icon: <BarChart3 className="w-4 h-4" />, to: "/etms/reports" },
+      { label: "Task Grouping", icon: <BarChart3 className="w-4 h-4" />, to: "/etms/reports", note: "for IPCR purposes" },
       { label: "Generate IPCR", icon: <FileSpreadsheet className="w-4 h-4" />, to: "/etms/ipcr" },
     ],
   },
@@ -98,9 +98,12 @@ const UserLayout = ({ title, subtitle, children }: UserLayoutProps) => {
                         }`}
                     >
                       {item.icon}
-                      {item.label}
+                      <span className="flex-1 min-w-0">
+                        {item.label}
+                        {item.note && <span className="block text-[10px] italic font-normal opacity-70 leading-tight">({item.note})</span>}
+                      </span>
                       {item.to === "/etms/tasks" && unseenAssignedCount > 0 && (
-                        <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-[#e0453c] text-white text-[10px] font-bold flex items-center justify-center">
+                        <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#e0453c] text-white text-[10px] font-bold flex items-center justify-center">
                           {unseenAssignedCount > 9 ? "9+" : unseenAssignedCount}
                         </span>
                       )}
