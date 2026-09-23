@@ -355,3 +355,5 @@
 .etm-reports-page-heading { margin-bottom: 16px; }
 .etm-reports-page-heading h1 { margin: 0; color: var(--etm-ink); font-size: 19px; font-weight: 700; }
 .etm-reports-page-note { margin: 2px 0 0; color: var(--etm-muted); font-size: 12.5px; font-style: italic; }
+
+.etm-tab-alert-badge { display: inline-flex; align-items: center; margin-left: 6px; padding: 1px 7px; border-radius: 20px; background: #e0453c; color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .2px; text-transform: uppercase; vertical-align: middle; }

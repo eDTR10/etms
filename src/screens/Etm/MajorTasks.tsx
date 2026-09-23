@@ -14,7 +14,8 @@ import { useDeleteTaskConfirm } from "../../features/tasks/useDeleteTaskConfirm"
 import { useDuplicateTask } from "../../features/tasks/useDuplicateTask";
 import { useBulkTaskActions } from "../../features/tasks/useBulkTaskActions";
 import { useRowSelection } from "../../features/tasks/useRowSelection";
-import { formatDate, memberName, RECURRENCE_LABELS, remarkPreview, STATUSES, statusChipLabel, statusSlug, type Task, type TaskStatus } from "../../features/tasks/types";
+import { formatDate, isUnseenAssignment, memberName, RECURRENCE_LABELS, remarkPreview, STATUSES, statusChipLabel, statusSlug, type Task, type TaskStatus } from "../../features/tasks/types";
+import { useAuth } from "../Auth/AuthContext";
 
 type TaskScope = "assigned" | "personal";
 
@@ -38,6 +39,7 @@ interface MajorTasksProps {
 
 export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps = {}) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   // Computed once via the lazy useState initializer — a Dashboard KPI tap links here with
   // e.g. ?status=Completed or ?unassigned=1 to arrive pre-filtered, and this needs to survive
@@ -85,6 +87,14 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
     assigned: baseTasks.filter(task => !!task.project).length,
     personal: baseTasks.filter(task => !task.project).length,
   }), [baseTasks]);
+  // Surfaces newly-assigned, unopened tasks even when they land in the tab you're not
+  // currently viewing (e.g. a subtask-assignment's auto-created task with no project, hiding
+  // under "Personal Task" while "Assigned Task" is the default) — otherwise the sidebar's
+  // unseen-count badge and an apparently-empty table disagree with no visible explanation.
+  const unseenByScope = useMemo(() => ({
+    assigned: baseTasks.filter(task => !!task.project && isUnseenAssignment(task, user?.id)).length,
+    personal: baseTasks.filter(task => !task.project && isUnseenAssignment(task, user?.id)).length,
+  }), [baseTasks, user?.id]);
 
   const statusCounts = useMemo(() => {
     const counts = { Pending: 0, "In-Progress": 0, Completed: 0, "Blocked/Stuck": 0 } as Record<TaskStatus, number>;
@@ -123,6 +133,7 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
               onClick={() => setScope(tab.key)}
             >
               {tab.label} <span className="etm-tab-count">{scopeCounts[tab.key]}</span>
+              {unseenByScope[tab.key] > 0 && <span className="etm-tab-alert-badge">{unseenByScope[tab.key]} new</span>}
             </button>
           ))}
         </div>
