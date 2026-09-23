@@ -21,16 +21,29 @@ import { useUnseenAssignedCount } from "../../features/tasks/useUnseenAssignedCo
 import etmsLogo from "../../assets/eTMS-icon.png";
 
 // ── Nav config ────────────────────────────────────────────────────────────
-const NAV_ITEMS = [
-  { label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, to: "/etms/dashboard" },
-  { label: "Add Task", icon: <Plus className="w-4 h-4" />, to: "/etms/tasks/new" },
-  { label: "Calendar", icon: <Calendar className="w-4 h-4" />, to: "/etms/calendar" },
-  { label: "All Tasks", icon: <ListChecks className="w-4 h-4" />, to: "/etms/tasks" },
-  { label: "Templates", icon: <Bookmark className="w-4 h-4" />, to: "/etms/templates" },
-  { label: "Quick Links", icon: <Link2 className="w-4 h-4" />, to: "/etms/quick-links" },
-  { label: "Task Grouping", icon: <BarChart3 className="w-4 h-4" />, to: "/etms/reports" },
-  { label: "Generate IPCR", icon: <FileSpreadsheet className="w-4 h-4" />, to: "/etms/ipcr" },
-  { label: "How To?", icon: <HelpCircle className="w-4 h-4" />, to: "/etms/how-to" },
+// Grouped for the desktop sidebar (a divider renders between groups, none before the first).
+const NAV_GROUPS: { title?: string; items: { label: string; icon: React.ReactNode; to: string }[] }[] = [
+  {
+    items: [
+      { label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, to: "/etms/dashboard" },
+      { label: "Add Task", icon: <Plus className="w-4 h-4" />, to: "/etms/tasks/new" },
+      { label: "All Tasks", icon: <ListChecks className="w-4 h-4" />, to: "/etms/tasks" },
+      { label: "Calendar", icon: <Calendar className="w-4 h-4" />, to: "/etms/calendar" },
+      { label: "Templates", icon: <Bookmark className="w-4 h-4" />, to: "/etms/templates" },
+    ],
+  },
+  {
+    items: [
+      { label: "Task Grouping", icon: <BarChart3 className="w-4 h-4" />, to: "/etms/reports" },
+      { label: "Generate IPCR", icon: <FileSpreadsheet className="w-4 h-4" />, to: "/etms/ipcr" },
+    ],
+  },
+  {
+    items: [
+      { label: "Quick Links", icon: <Link2 className="w-4 h-4" />, to: "/etms/quick-links" },
+      { label: "How To?", icon: <HelpCircle className="w-4 h-4" />, to: "/etms/how-to" },
+    ],
+  },
 ];
 
 // ── Props ─────────────────────────────────────────────────────────────────
@@ -66,28 +79,37 @@ const UserLayout = ({ title, subtitle, children }: UserLayoutProps) => {
         </div>
 
         {/* Nav links */}
-        <nav className="flex-1 px-3 py-4 flex flex-col gap-1">
-          {NAV_ITEMS.map((item) => {
-            const isActive = pathname === item.to;
-            return (
-              <Link
-                key={item.label}
-                to={item.to}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive
-                  ? "bg-[#0d8a92] text-white dark:bg-[#17b3ac]"
-                  : "text-muted-foreground hover:bg-[#0d8a92] hover:text-white dark:hover:bg-[#17b3ac]"
-                  }`}
-              >
-                {item.icon}
-                {item.label}
-                {item.to === "/etms/tasks" && unseenAssignedCount > 0 && (
-                  <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-[#e0453c] text-white text-[10px] font-bold flex items-center justify-center">
-                    {unseenAssignedCount > 9 ? "9+" : unseenAssignedCount}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
+        <nav className="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto">
+          {NAV_GROUPS.map((group, groupIndex) => (
+            <div key={group.title ?? `group-${groupIndex}`} className={groupIndex > 0 ? "mt-3 pt-3 border-t border-border" : undefined}>
+              {group.title && (
+                <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">{group.title}</p>
+              )}
+              <div className="flex flex-col gap-1">
+                {group.items.map((item) => {
+                  const isActive = pathname === item.to;
+                  return (
+                    <Link
+                      key={item.label}
+                      to={item.to}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive
+                        ? "bg-[#0d8a92] text-white dark:bg-[#17b3ac]"
+                        : "text-muted-foreground hover:bg-[#0d8a92] hover:text-white dark:hover:bg-[#17b3ac]"
+                        }`}
+                    >
+                      {item.icon}
+                      {item.label}
+                      {item.to === "/etms/tasks" && unseenAssignedCount > 0 && (
+                        <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-[#e0453c] text-white text-[10px] font-bold flex items-center justify-center">
+                          {unseenAssignedCount > 9 ? "9+" : unseenAssignedCount}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
         {/* User info + Logout */}
