@@ -320,7 +320,9 @@ export function isOverdue(task: Task): boolean {
 }
 
 export function isUnseenAssignment(task: Task, userId: number | undefined): boolean {
-  return !task.is_creator && !task.my_last_viewed_at && task.assignments.some(a => a.id === userId);
+  // A fresh assignment always starts the task at Pending — once it's moved on (In-Progress,
+  // Completed, etc.) it's no longer "new", even if this assignee still hasn't opened it.
+  return task.status === "Pending" && !task.is_creator && !task.my_last_viewed_at && task.assignments.some(a => a.id === userId);
 }
 
 export function completionPercent(task: Task): number {
