@@ -63,6 +63,7 @@ function TemplateSubtaskEditorRow({ subtask, index, fieldId, errors, onUpdate, o
   return (
     <div className="etm-subtask-editor-item">
       <div className="etm-subtask-input-row">
+        <span className="etm-subtask-index" aria-hidden="true">{index + 1}</span>
         <input type="text" data-subtask-key={subtask.localKey} value={subtask.title} onChange={event => onUpdate(subtask.localKey, { title: event.target.value })} placeholder={`Subtask ${index + 1}`} aria-label={`Subtask ${index + 1} title`} maxLength={255} aria-invalid={!!errors[subtask.localKey]} />
         <button className="etm-icon-button" type="button" aria-label={`Add a subtask under "${subtask.title || `subtask ${index + 1}`}"`} title="Add subtask" onClick={() => onAddChild(subtask.localKey)}><Plus size={16} /></button>
         <button className="etm-icon-button" type="button" aria-label={`Remove subtask ${index + 1}`} onClick={() => onRemove(subtask.localKey)}><Trash2 size={16} /></button>

@@ -124,14 +124,19 @@
 .etm-subtask-summary { margin-left: auto; white-space: nowrap; color: #8a98a3; font-size: 12px; }
 .etm-subtask-empty { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 16px 8px; color: #8e9ca8; font-size: 13px; line-height: 1.6; }
 .etm-subtask-empty svg { flex-shrink: 0; color: #b4c1ca; }
-.etm-subtask-editor { display: grid; gap: 10px; }
+.etm-subtask-editor { display: grid; gap: 12px; }
 .etm-subtask-editor:empty { display: none; }
+/* A subtask is its own distinct card — a colored left rail plus a surface change from the
+   page background — so it reads as "one subtask" rather than as loose title/description
+   fields that could be mistaken for more fields on the template/task form itself. */
+.etm-subtask-editor-item { border: 1px solid var(--etm-border); border-left: 3px solid var(--etm-primary); border-radius: 10px; background: var(--etm-surface-alt); padding: 4px; }
 .etm-subtask-children { display: grid; gap: 10px; margin: 10px 0 0 17px; padding-left: 16px; border-left: 2px solid var(--etm-border); }
-.etm-subtask-input-row { display: flex; align-items: center; gap: 10px; padding: 5px 8px 5px 13px; border: 1px solid var(--etm-border); border-radius: 8px; }
+.etm-subtask-index { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 20px; height: 20px; border-radius: 50%; background: color-mix(in srgb, var(--etm-primary) 15%, var(--etm-surface-alt)); color: var(--etm-primary); font-size: 11px; font-weight: 700; }
+.etm-subtask-input-row { display: flex; align-items: center; gap: 10px; padding: 9px 8px 9px 10px; border: 0; border-bottom: 1px solid var(--etm-border); border-radius: 0; }
 .etm-subtask-input-row > input[type="text"] { width: 100%; min-width: 0; height: 35px; padding: 4px; background: transparent; border: 1px solid transparent; border-radius: 4px; color: var(--etm-ink); font-family: inherit; font-size: 12.5px; }
 .etm-subtask-input-row > input[type="text"]:focus { outline: 1px solid var(--etm-primary); outline-offset: 1px; }
 .etm-subtask-input-row > input[type="text"]::placeholder { color: #94a0aa; }
-.etm-subtask-input-row.completed { background: #f8fbfa; }
+.etm-subtask-input-row.completed { background: color-mix(in srgb, #3e9276 8%, transparent); }
 .etm-subtask-input-row.completed > input[type="text"] { text-decoration: line-through; color: #8e9f9d; }
 .etm-subtask-input-row > button { flex-shrink: 0; color: #94a0aa; }
 .etm-subtask-input-row > button:hover { color: #bf625f; background: #fff1ef; }
@@ -149,10 +154,10 @@
 .etm-subtask-completion-warning { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 10px 11px; border: 1px solid #e8c17a; border-radius: 7px; background: #fff8e9; color: #89601c; font-size: 13px; line-height: 1.55; }
 .etm-subtask-completion-warning svg { flex: 0 0 auto; margin-top: 1px; }
 .etm-subtask-completion-warning strong { display: block; color: #795016; }
-.etm-subtask-editor-item > .etm-field-error { margin-top: 5px; }
-.etm-subtask-description { width: 100%; min-width: 0; margin-top: 7px; padding: 8px 10px; border: 1px solid var(--etm-border); border-radius: 7px; background: var(--etm-surface-alt); color: #647787; font-family: inherit; font-size: 12.5px; line-height: 1.6; resize: vertical; box-sizing: border-box; }
+.etm-subtask-editor-item > .etm-field-error { margin: 5px 0 0 10px; }
+.etm-subtask-description { display: block; width: 100%; min-width: 0; margin: 0; padding: 8px 10px; border: 0; border-radius: 0 0 8px 8px; background: transparent; color: #647787; font-family: inherit; font-size: 12.5px; line-height: 1.6; resize: vertical; box-sizing: border-box; }
 .etm-subtask-description::placeholder { color: #9aa7b1; }
-.etm-subtask-description:focus { outline: none; border-color: var(--etm-primary); box-shadow: 0 0 0 3px #087e8b12; }
+.etm-subtask-description:focus { outline: none; box-shadow: inset 0 0 0 2px #087e8b12; }
 .etm-form-error-banner { margin: 20px 0 0; padding: 13px 16px; border: 1px solid #f1ceca; border-radius: 8px; background: #fff5f3; color: #b15750; font-size: 14px; line-height: 1.65; }
 .etm-form-footer { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-top: 24px; padding: 21px 0 4px; border-top: 1px solid var(--etm-border); }
 .etm-form-footer > span { color: #93a0ab; font-size: 13px; }

@@ -298,10 +298,6 @@ function ReportsContent() {
 
   return (
     <div className="etm-reports">
-      <div className="etm-reports-page-heading">
-        <h1>Task Grouping</h1>
-        <p className="etm-reports-page-note"><em>(for IPCR purposes)</em></p>
-      </div>
       <div className="etm-report-split">
       <div className="etm-report-column">
         <section className="etm-report-heading">
