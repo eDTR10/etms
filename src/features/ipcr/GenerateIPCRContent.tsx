@@ -9,7 +9,7 @@ import IPCRLivePreview from "./IPCRLivePreview";
 import { downloadIPCRWorkbook } from "./ipcrExport";
 import { downloadIPCRPdf } from "./ipcrPdfExport";
 import { composeGroupedTasksHtml, computeFinalRating, fillGrid } from "./ipcrGridUtils";
-import { adjectivalRating, emptyGrid, type IPCRField, type IPCRFieldValue, type IPCRFieldMetaEntry, type IPCRSubmission, type IPCRSubmissionInput, type IPCRTemplate } from "./types";
+import { adjectivalRating, emptyGrid, normalizeGrid, type IPCRField, type IPCRFieldValue, type IPCRFieldMetaEntry, type IPCROrientation, type IPCRPaperSize, type IPCRSubmission, type IPCRSubmissionInput, type IPCRTemplate } from "./types";
 import "../tasks/forms.css";
 import "./ipcr.css";
 
@@ -31,6 +31,8 @@ export default function GenerateIPCRContent() {
   const [editingId, setEditingId] = useState<number | "new" | null>(null);
   const [templateId, setTemplateId] = useState<number | null>(null);
   const [grid, setGrid] = useState(emptyGrid());
+  const [paperSize, setPaperSize] = useState<IPCRPaperSize>("a3");
+  const [orientation, setOrientation] = useState<IPCROrientation>("landscape");
   const [fields, setFields] = useState<IPCRField[]>([]);
   const [values, setValues] = useState<Record<string, IPCRFieldValue>>({});
   const [meta, setMeta] = useState<Record<string, IPCRFieldMetaEntry>>({});
@@ -50,14 +52,16 @@ export default function GenerateIPCRContent() {
   function startNew() {
     setTemplateId(null);
     const draft = newDraft(null);
-    setGrid(emptyGrid()); setFields(draft.fields); setValues(draft.values); setMeta(draft.meta);
+    setGrid(emptyGrid()); setPaperSize("a3"); setOrientation("landscape"); setFields(draft.fields); setValues(draft.values); setMeta(draft.meta);
     setLabel(""); setPreview(null); setError(""); setTestPreview(false);
     setEditingId("new");
   }
 
   function startEdit(submission: IPCRSubmission) {
     setTemplateId(submission.template);
-    setGrid(submission.grid_snapshot);
+    setGrid(normalizeGrid(submission.grid_snapshot));
+    setPaperSize(submission.paper_size);
+    setOrientation(submission.orientation);
     setFields(submission.fields_snapshot);
     setValues(submission.field_values);
     setMeta(submission.field_meta);
@@ -71,7 +75,9 @@ export default function GenerateIPCRContent() {
     const template = templates.find(item => item.id === id);
     if (!template) return;
     setTemplateId(id);
-    setGrid(template.grid);
+    setGrid(normalizeGrid(template.grid));
+    setPaperSize(template.paper_size);
+    setOrientation(template.orientation);
     const draft = newDraft(template);
     setFields(draft.fields); setValues(draft.values); setMeta(draft.meta);
     setTestPreview(false);
@@ -98,6 +104,8 @@ export default function GenerateIPCRContent() {
       label: label.trim(),
       grid_snapshot: grid,
       fields_snapshot: fields,
+      paper_size: paperSize,
+      orientation: orientation,
       field_values: values,
       field_meta: meta,
     };
@@ -164,8 +172,8 @@ export default function GenerateIPCRContent() {
                   <td>{new Date(submission.updated_at).toLocaleDateString()}</td>
                   <td className="etm-report-group-actions">
                     {submission.can_manage && <button type="button" className="etm-icon-button" aria-label="Edit" onClick={() => startEdit(submission)}><Pencil size={15} /></button>}
-                    <button type="button" className="etm-icon-button" aria-label="Download Excel" onClick={() => void downloadIPCRWorkbook(fillGrid(submission.grid_snapshot, submission.fields_snapshot, submission.field_values), filename(submission))}><Download size={15} /></button>
-                    <button type="button" className="etm-icon-button" aria-label="Download PDF" onClick={() => downloadIPCRPdf(fillGrid(submission.grid_snapshot, submission.fields_snapshot, submission.field_values), filename(submission))}><FileText size={15} /></button>
+                    <button type="button" className="etm-icon-button" aria-label="Download Excel" onClick={() => void downloadIPCRWorkbook(fillGrid(normalizeGrid(submission.grid_snapshot), submission.fields_snapshot, submission.field_values), filename(submission))}><Download size={15} /></button>
+                    <button type="button" className="etm-icon-button" aria-label="Download PDF" onClick={() => downloadIPCRPdf(fillGrid(normalizeGrid(submission.grid_snapshot), submission.fields_snapshot, submission.field_values), filename(submission), submission.paper_size, submission.orientation)}><FileText size={15} /></button>
                     {submission.can_manage && <button type="button" className="etm-icon-button danger" aria-label="Delete" onClick={() => void confirmDelete(submission)}><Trash2 size={15} /></button>}
                   </td>
                 </tr>
@@ -230,10 +238,10 @@ export default function GenerateIPCRContent() {
             <div><p className="etm-report-eyebrow">Saved IPCR</p><h2>{preview.label || "IPCR"}</h2></div>
           </div>
           <div className="etm-ipcr-preview-actions">
-            <button type="button" className="etm-button ghost small" onClick={() => void downloadIPCRWorkbook(fillGrid(preview.grid_snapshot, preview.fields_snapshot, preview.field_values), filename(preview))}><Download size={14} /> Download .xlsx</button>
-            <button type="button" className="etm-button ghost small" onClick={() => downloadIPCRPdf(fillGrid(preview.grid_snapshot, preview.fields_snapshot, preview.field_values), filename(preview))}><FileText size={14} /> Download PDF</button>
+            <button type="button" className="etm-button ghost small" onClick={() => void downloadIPCRWorkbook(fillGrid(normalizeGrid(preview.grid_snapshot), preview.fields_snapshot, preview.field_values), filename(preview))}><Download size={14} /> Download .xlsx</button>
+            <button type="button" className="etm-button ghost small" onClick={() => downloadIPCRPdf(fillGrid(normalizeGrid(preview.grid_snapshot), preview.fields_snapshot, preview.field_values), filename(preview), preview.paper_size, preview.orientation)}><FileText size={14} /> Download PDF</button>
           </div>
-          <IPCRLivePreview grid={preview.grid_snapshot} fields={preview.fields_snapshot} values={preview.field_values} refreshKey={`${preview.id}-${preview.updated_at}`} />
+          <IPCRLivePreview grid={normalizeGrid(preview.grid_snapshot)} fields={preview.fields_snapshot} values={preview.field_values} refreshKey={`${preview.id}-${preview.updated_at}`} />
         </section>
       )}
     </div>

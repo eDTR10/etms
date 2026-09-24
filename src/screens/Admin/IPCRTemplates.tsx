@@ -50,25 +50,16 @@ function IPCRTemplatesContent() {
   if (editing !== null) {
     const editingTemplate = editing === "new" ? undefined : editing;
     return (
-      <div className="etm-reports">
-        <section className="etm-report-heading">
-          <div>
-            <p className="etm-report-eyebrow"><FileSpreadsheet size={15} /> IPCR forms</p>
-            <h2>{editingTemplate ? `Edit "${editingTemplate.name}"` : "New IPCR Template"}</h2>
-            <p>Design the sheet, then mark the cells users should fill in.</p>
-          </div>
-        </section>
-        <IPCRTemplateForm
-          template={editingTemplate}
-          onCancel={() => setEditing(null)}
-          onSave={async input => {
-            const saved = editingTemplate ? await ipcrService.updateTemplate(editingTemplate.id, input) : await ipcrService.createTemplate(input);
-            setTemplates(current => editingTemplate ? current.map(item => item.id === saved.id ? saved : item) : [...current, saved].sort((a, b) => a.name.localeCompare(b.name)));
-            setEditing(null);
-            await Swal.fire({ title: editingTemplate ? "Template updated" : "Template created", icon: "success", timer: 1400, showConfirmButton: false });
-          }}
-        />
-      </div>
+      <IPCRTemplateForm
+        template={editingTemplate}
+        onCancel={() => setEditing(null)}
+        onSave={async input => {
+          const saved = editingTemplate ? await ipcrService.updateTemplate(editingTemplate.id, input) : await ipcrService.createTemplate(input);
+          setTemplates(current => editingTemplate ? current.map(item => item.id === saved.id ? saved : item) : [...current, saved].sort((a, b) => a.name.localeCompare(b.name)));
+          setEditing(null);
+          await Swal.fire({ title: editingTemplate ? "Template updated" : "Template created", icon: "success", timer: 1400, showConfirmButton: false });
+        }}
+      />
     );
   }
 
