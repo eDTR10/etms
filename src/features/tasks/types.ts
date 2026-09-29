@@ -103,6 +103,17 @@ export interface SubTask {
   spawned_task_id?: number | null;
   // Subtasks of this subtask, unlimited depth.
   subtasks: SubTask[];
+  // Tracking number of a DTMS document linked to this subtask (see the dtmsDocument
+  // feature) — empty/absent when nothing is linked. Optional like assignee/can_complete
+  // above, since a freshly-drafted (not yet saved) subtask has none of these yet.
+  // Read-only; set/cleared only via linkSubtaskDocument/unlinkSubtaskDocument, never
+  // through editSubtask.
+  linked_document_tracknumber?: string;
+  // Id of the DTMS document template a document created for this subtask should default
+  // to — carried over from the Task Template's own subtask blueprint (see TemplateSubtask
+  // below) when a task is created from one. Just a hint for pre-selecting a template in
+  // the Create Document dialog, not a live link.
+  default_document_template?: number | null;
 }
 
 // Walks a subtask tree (any depth) into a single flat list — for stats/gates (completion
@@ -205,6 +216,9 @@ export interface TemplateSubtask {
   title: string;
   description: string;
   subtasks: TemplateSubtask[];
+  // Id of the DTMS document template a document created for this subtask should default
+  // to, once a real task/subtask exists — see SubTask.default_document_template.
+  default_document_template?: number | null;
 }
 
 export function flattenTemplateSubtasks(subtasks: TemplateSubtask[]): TemplateSubtask[] {

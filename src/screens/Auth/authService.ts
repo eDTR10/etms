@@ -54,7 +54,7 @@ export const authService = {
   getMe: async (): Promise<UserProfile> => {
     const { data } = await api.get<UserProfile>("users/me/");
     // Shared key with the other DICT front-ends (DMT, KMS) — same secureStorage/AES
-    // scheme, same VITE_PASSWORD secret — so a cached profile is recognized across systems.
+    // scheme, same VITE_STORAGE_KEY secret — so a cached profile is recognized across systems.
     secureStorage.setItem("auth_user_profile", data);
     return data;
   },

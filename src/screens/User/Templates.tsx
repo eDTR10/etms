@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Bookmark, CheckCheck, Pencil, Plus, Trash2 } from "lucide-react";
+import { useRef, useState, type ChangeEvent } from "react";
+import { Bookmark, CheckCheck, Download, Pencil, Plus, Trash2, Upload } from "lucide-react";
 import Swal from "sweetalert2";
 import UserLayout from "./UserLayout";
 import TaskProvider from "../../features/tasks/TaskProvider";
@@ -7,7 +7,8 @@ import TaskFeedback from "../../features/tasks/TaskFeedback";
 import TemplateFormDialog from "../../features/tasks/TemplateFormDialog";
 import { useTasks } from "../../features/tasks/taskContext";
 import { taskError } from "../../features/tasks/taskService";
-import { flattenTemplateSubtasks, type TaskTemplate } from "../../features/tasks/types";
+import { exportTemplate, readTemplateImportFile } from "../../features/tasks/templateShare";
+import { flattenTemplateSubtasks, type TaskTemplate, type TaskTemplateInput } from "../../features/tasks/types";
 import "../../features/tasks/etm-base.css";
 import "../Etm/etm-app.css";
 
@@ -15,10 +16,26 @@ export function TemplatesContent() {
   const { templates, members, projects, loading, error, createTemplate, updateTemplate, deleteTemplate } = useTasks();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<TaskTemplate | undefined>(undefined);
+  const [importDraft, setImportDraft] = useState<TaskTemplateInput | undefined>(undefined);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
-  const openCreate = () => { setEditingTemplate(undefined); setDialogOpen(true); };
-  const openEdit = (template: TaskTemplate) => { setEditingTemplate(template); setDialogOpen(true); };
-  const closeDialog = () => setDialogOpen(false);
+  const openCreate = () => { setEditingTemplate(undefined); setImportDraft(undefined); setDialogOpen(true); };
+  const openEdit = (template: TaskTemplate) => { setEditingTemplate(template); setImportDraft(undefined); setDialogOpen(true); };
+  const closeDialog = () => { setDialogOpen(false); setImportDraft(undefined); };
+
+  const handleImportFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      const draft = await readTemplateImportFile(file);
+      setEditingTemplate(undefined);
+      setImportDraft(draft);
+      setDialogOpen(true);
+    } catch (err) {
+      void Swal.fire({ title: "Couldn't import that file", text: err instanceof Error ? err.message : "Make sure it's a template exported from here.", icon: "error" });
+    }
+  };
 
   const confirmDelete = async (template: TaskTemplate) => {
     const result = await Swal.fire({
@@ -48,7 +65,11 @@ export function TemplatesContent() {
           <h2>Task Templates</h2>
           <p>Save the details you retype every time, then start a new task from a template in one click.</p>
         </div>
-        <button type="button" className="etm-button" onClick={openCreate}><Plus size={16} /> New Template</button>
+        <div className="etm-report-section-title-actions">
+          <input ref={importInputRef} type="file" accept=".json,application/json" hidden onChange={event => void handleImportFile(event)} />
+          <button type="button" className="etm-button ghost" onClick={() => importInputRef.current?.click()}><Upload size={16} /> Import Template</button>
+          <button type="button" className="etm-button" onClick={openCreate}><Plus size={16} /> New Template</button>
+        </div>
       </section>
 
       <TaskFeedback />
@@ -67,6 +88,7 @@ export function TemplatesContent() {
                   <td className={template.priority.toLowerCase()}>{template.priority}</td>
                   <td>{template.subtasks.length ? <span><CheckCheck size={13} style={{ verticalAlign: "-2px", marginRight: 5 }} />{flattenTemplateSubtasks(template.subtasks).length}</span> : <span className="etm-tasks-table-unassigned">None</span>}</td>
                   <td className="etm-report-group-actions">
+                    <button type="button" className="etm-icon-button" aria-label={`Export ${template.name}`} title="Download as JSON" onClick={() => exportTemplate(template)}><Download size={15} /></button>
                     {template.can_manage ? <>
                     <button type="button" className="etm-icon-button" aria-label={`Edit ${template.name}`} onClick={() => openEdit(template)}><Pencil size={15} /></button>
                     <button type="button" className="etm-icon-button danger" aria-label={`Delete ${template.name}`} onClick={() => void confirmDelete(template)}><Trash2 size={15} /></button>
@@ -81,6 +103,7 @@ export function TemplatesContent() {
 
       <TemplateFormDialog
         template={editingTemplate}
+        initialInput={importDraft}
         members={members}
         projects={projects}
         open={dialogOpen}

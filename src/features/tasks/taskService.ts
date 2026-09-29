@@ -74,6 +74,10 @@ export const taskService = {
   completeTask: async (id: number) => (await api.post<Task>(`etm/tasks/${id}/complete/`)).data,
   assignSubtask: async (id: number, subtaskId: number, userId: number | null) =>
     (await api.post<Task>(`etm/tasks/${id}/subtasks/${subtaskId}/assign/`, { user: userId })).data,
+  linkSubtaskDocument: async (id: number, subtaskId: number, tracknumber: string) =>
+    (await api.post<Task>(`etm/tasks/${id}/subtasks/${subtaskId}/document/`, { tracknumber })).data,
+  unlinkSubtaskDocument: async (id: number, subtaskId: number) =>
+    (await api.delete<Task>(`etm/tasks/${id}/subtasks/${subtaskId}/document/`)).data,
   bulkArchive: async (ids: number[]) =>
     (await api.post<BulkActionResult>("etm/tasks/bulk-archive/", { ids })).data,
   bulkDelete: async (ids: number[]) =>

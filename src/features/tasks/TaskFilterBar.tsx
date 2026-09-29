@@ -1,4 +1,5 @@
 import { AlertTriangle, Search, UserX, X } from "lucide-react";
+import ThemedSelect, { type SelectOption } from "../../components/ThemedSelect";
 import { PRIORITIES, type Priority, type Project } from "./types";
 import type { AssignedFilterValue, PriorityFilterValue, ProjectFilterValue, QuickDeadlineFilterValue } from "./useTaskFilters";
 
@@ -7,6 +8,9 @@ const QUICK_DEADLINE_FILTERS: { value: QuickDeadlineFilterValue; label: string }
   { value: "week", label: "This Week" },
   { value: "month", label: "This Month" },
 ];
+
+type ProjectOption = SelectOption<ProjectFilterValue>;
+type PriorityOption = SelectOption<PriorityFilterValue>;
 
 interface TaskFilterBarProps {
   search: string;
@@ -39,29 +43,42 @@ export default function TaskFilterBar({
   overdueOnly, onOverdueOnlyChange,
   hasActiveFilters, onClear,
 }: TaskFilterBarProps) {
+  const priorityOptions: PriorityOption[] = [
+    { value: "all", label: "All Priorities" },
+    ...PRIORITIES.map((item: Priority) => ({ value: item, label: item })),
+  ];
+  const selectedPriorityOption = priorityOptions.find(option => option.value === priority) ?? priorityOptions[0];
+  const projectOptions: ProjectOption[] = [
+    { value: "all", label: "All Projects" },
+    { value: "personal", label: "Personal" },
+    ...projects.map(project => ({ value: project.id, label: project.name })),
+  ];
+  const selectedProjectOption = projectOptions.find(option => option.value === projectFilter) ?? projectOptions[0];
   return (
     <div className="etm-filter-bar">
       <div className="etm-filter-search">
         <Search size={15} />
         <input value={search} onChange={event => onSearchChange(event.target.value)} placeholder="Search by task or assignee…" aria-label="Search tasks by title or assignee" />
       </div>
-      <select className="etm-filter-select" value={priority} onChange={event => onPriorityChange(event.target.value as PriorityFilterValue)} aria-label="Filter by priority">
-        <option value="all">All Priorities</option>
-        {PRIORITIES.map((item: Priority) => <option key={item} value={item}>{item}</option>)}
-      </select>
-      <select
-        className="etm-filter-select"
-        value={String(projectFilter)}
-        onChange={event => {
-          const value = event.target.value;
-          onProjectFilterChange(value === "all" || value === "personal" ? value : Number(value));
-        }}
-        aria-label="Filter by project"
-      >
-        <option value="all">All Projects</option>
-        <option value="personal">Personal</option>
-        {projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}
-      </select>
+      <div style={{ flex: "1 1 160px", minWidth: 140 }}>
+        <ThemedSelect<PriorityOption>
+          aria-label="Filter by priority"
+          classNamePrefix="etm-priority-select"
+          options={priorityOptions}
+          value={selectedPriorityOption}
+          onChange={option => onPriorityChange(option ? option.value : "all")}
+        />
+      </div>
+      <div style={{ flex: "1 1 200px", minWidth: 160 }}>
+        <ThemedSelect<ProjectOption>
+          aria-label="Filter by project"
+          classNamePrefix="etm-project-select"
+          options={projectOptions}
+          value={selectedProjectOption}
+          onChange={option => onProjectFilterChange(option ? option.value : "all")}
+          isSearchable
+        />
+      </div>
       <div className="etm-filter-dates">
         <label className="etm-filter-date-field">
           <span>Deadline date</span>

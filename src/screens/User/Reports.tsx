@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Check, CheckCircle2, ChevronDown, ChevronRight, FolderKanban, GripVertical, Layers, Pencil, Plus, Target, Trash2, X } from "lucide-react";
 import Swal from "sweetalert2";
 import Modal from "../../components/ui/modal";
+import ThemedSelect, { type SelectOption } from "../../components/ThemedSelect";
 import UserLayout from "./UserLayout";
 import TaskProvider from "../../features/tasks/TaskProvider";
 import TaskFeedback from "../../features/tasks/TaskFeedback";
@@ -14,6 +15,11 @@ import "../Etm/etm-app.css";
 const today = () => new Intl.DateTimeFormat("en-PH", {
   month: "short", day: "numeric", year: "numeric",
 }).format(new Date());
+
+const TARGET_UNIT_OPTIONS: SelectOption<"number" | "percent">[] = [
+  { value: "number", label: "Number" },
+  { value: "percent", label: "Percent" },
+];
 
 function suggestedGroupId() {
   const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
@@ -442,7 +448,7 @@ function ReportsContent() {
           <label>Created Date<input value={today()} readOnly aria-label="Created date" /></label>
           <label>Project Name<div className="etm-report-project-picker" ref={projectPickerRef}><input value={form.project_name} onFocus={() => setProjectMenuOpen(true)} onChange={event => { setForm(current => ({ ...current, project_name: event.target.value })); setProjectMenuOpen(true); }} placeholder="Type to search projects…" autoComplete="off" role="combobox" aria-autocomplete="list" aria-expanded={projectMenuOpen} aria-controls="report-project-options" onKeyDown={event => { if (event.key === "Escape") setProjectMenuOpen(false); }} /><button type="button" className="etm-report-project-toggle" aria-label="Show project suggestions" onClick={() => setProjectMenuOpen(open => !open)}><ChevronDown size={17} /></button>{projectMenuOpen && <div className="etm-report-project-menu" id="report-project-options" role="listbox"><button type="button" role="option" aria-selected={!form.project_name} onClick={() => { setForm(current => ({ ...current, project_name: "" })); setProjectMenuOpen(false); }}>Personal / no project</button>{canAddTypedProject && <button type="button" className="etm-report-project-add" role="option" onClick={() => setProjectMenuOpen(false)}>Add “{typedProjectName}”</button>}{matchingProjects.length ? matchingProjects.map(project => <button type="button" role="option" aria-selected={form.project_name === project.name} key={project.id} onClick={() => { setForm(current => ({ ...current, project_name: project.name })); setProjectMenuOpen(false); }}>{project.name}</button>) : !canAddTypedProject && <p>No matching project found.</p>}</div>}</div></label>
           <fieldset><legend>Do you have a target?</legend><div className="etm-report-radio-row"><label><input type="radio" checked={!form.has_target} onChange={() => updateTargetEnabled(false)} /> No</label><label><input type="radio" checked={form.has_target} onChange={() => updateTargetEnabled(true)} /> Yes</label></div></fieldset>
-          {form.has_target && <div className="etm-report-target-row"><label>Target<input type="number" min="1" max={form.target_type === "percent" ? 100 : undefined} value={form.target_value ?? ""} onChange={event => setForm(current => ({ ...current, target_value: event.target.value === "" ? null : Number(event.target.value) }))} readOnly={form.target_type === "percent"} aria-label={form.target_type === "percent" ? "Percentage target is automatically set to 100 percent" : "Target"} required /></label><label>Unit<select value={form.target_type} onChange={event => setForm(current => ({ ...current, target_type: event.target.value as "number" | "percent", target_value: event.target.value === "percent" ? 100 : dialogTaggedTasks.length }))}><option value="number">Number</option><option value="percent">Percent</option></select></label></div>}
+          {form.has_target && <div className="etm-report-target-row"><label>Target<input type="number" min="1" max={form.target_type === "percent" ? 100 : undefined} value={form.target_value ?? ""} onChange={event => setForm(current => ({ ...current, target_value: event.target.value === "" ? null : Number(event.target.value) }))} readOnly={form.target_type === "percent"} aria-label={form.target_type === "percent" ? "Percentage target is automatically set to 100 percent" : "Target"} required /></label><label>Unit<div style={{ width: 130 }}><ThemedSelect<SelectOption<"number" | "percent">> size="small" classNamePrefix="etm-unit-select" aria-label="Target unit" options={TARGET_UNIT_OPTIONS} value={TARGET_UNIT_OPTIONS.find(option => option.value === form.target_type)} onChange={option => { const nextType = option?.value ?? "number"; setForm(current => ({ ...current, target_type: nextType, target_value: nextType === "percent" ? 100 : dialogTaggedTasks.length })); }} /></div></label></div>}
           {dialogTaggedTasks.length > 0 && (
             <div className="etm-report-task-picker">
               <p className="etm-report-task-picker-label">Tasks in this group ({dialogTaggedTasks.length})</p>

@@ -8,6 +8,11 @@
   --etm-surface-alt: #f7f9fa;
   --etm-surface-sunken: #eef2f4;
   --etm-shadow: 0 24px 90px #122a4130;
+  /* Role accent colors reused wherever a signatory's role needs a color (pills, inline
+     react-select styles that can't just apply a CSS class) — kept as variables so both
+     paths pick up the same dark-mode swap automatically. */
+  --etm-role-reviewer: #8d71a5;
+  --etm-role-viewer: #a17527;
 }
 
 :root.dark {
@@ -20,6 +25,8 @@
   --etm-surface-alt: #212b34;
   --etm-surface-sunken: #171f26;
   --etm-shadow: 0 24px 90px rgba(0, 0, 0, 0.55);
+  --etm-role-reviewer: #bda3dd;
+  --etm-role-viewer: #e6c179;
 }
 
 /* SweetAlert confirmations and notices are used by task actions. Keep them

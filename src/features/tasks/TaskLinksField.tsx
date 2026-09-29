@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ExternalLink, Link2, Plus, X } from "lucide-react";
+import ThemedSelect, { type SelectOption } from "../../components/ThemedSelect";
 import { quickLinkService } from "../quicklinks/quickLinkService";
 import type { QuickLink } from "../quicklinks/types";
 import type { TaskLinkInput } from "./types";
@@ -53,8 +54,8 @@ export default function TaskLinksField({ value, onChange, idPrefix }: TaskLinksF
     setError("");
   }
 
-  function tagQuickLink(rawId: string) {
-    const link = quickLinks.find(item => item.id === Number(rawId));
+  function tagQuickLink(id: number) {
+    const link = quickLinks.find(item => item.id === id);
     if (!link) return;
     onChange([...value, { title: link.title, url: link.url, quick_link: link.id }]);
   }
@@ -77,10 +78,16 @@ export default function TaskLinksField({ value, onChange, idPrefix }: TaskLinksF
       {error && <p className="etm-field-error" role="alert">{error}</p>}
       <div className="etm-task-links-quick">
         <label htmlFor={`${idPrefix}-quick-link`}><ExternalLink size={13} /> Or tag an existing quick link</label>
-        <select id={`${idPrefix}-quick-link`} value="" onChange={event => tagQuickLink(event.target.value)} disabled={available.length === 0}>
-          <option value="">{available.length ? "Choose a quick link…" : quickLinks.length ? "All quick links are tagged" : "No quick links available"}</option>
-          {available.map(link => <option key={link.id} value={link.id}>{link.title}</option>)}
-        </select>
+        <ThemedSelect<SelectOption<number>>
+          inputId={`${idPrefix}-quick-link`}
+          classNamePrefix="etm-quicklink-select"
+          isDisabled={available.length === 0}
+          isSearchable
+          placeholder={available.length ? "Choose a quick link…" : quickLinks.length ? "All quick links are tagged" : "No quick links available"}
+          options={available.map(link => ({ value: link.id, label: link.title }))}
+          value={null}
+          onChange={option => { if (option) tagQuickLink(option.value); }}
+        />
       </div>
     </div>
   );

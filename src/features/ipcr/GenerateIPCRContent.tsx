@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Download, Eye, FileSpreadsheet, FileText, Loader2, Pencil, Plus, Star, Trash2 } from "lucide-react";
 import Swal from "sweetalert2";
+import ThemedSelect, { type SelectOption } from "../../components/ThemedSelect";
 import { taskService, taskError } from "../tasks/taskService";
 import type { GroupedTask } from "../tasks/types";
 import { ipcrService } from "./ipcrService";
@@ -194,10 +195,16 @@ export default function GenerateIPCRContent() {
 
             <div className="etm-field">
               <label htmlFor="ipcr-template">Start from a template</label>
-              <select id="ipcr-template" value={templateId ?? ""} onChange={event => applyTemplate(Number(event.target.value))} disabled={templates.length === 0}>
-                <option value="" disabled>{templates.length ? "Choose an IPCR template…" : "No IPCR templates available"}</option>
-                {templates.map(template => <option key={template.id} value={template.id}>{template.name}</option>)}
-              </select>
+              <ThemedSelect<SelectOption<number>>
+                inputId="ipcr-template"
+                classNamePrefix="etm-ipcr-template-select"
+                isDisabled={templates.length === 0}
+                isSearchable
+                placeholder={templates.length ? "Choose an IPCR template…" : "No IPCR templates available"}
+                options={templates.map(template => ({ value: template.id, label: template.name }))}
+                value={templates.filter(template => template.id === templateId).map(template => ({ value: template.id, label: template.name }))[0] ?? null}
+                onChange={option => applyTemplate(option?.value ?? 0)}
+              />
             </div>
 
             {fields.length > 0 && <>

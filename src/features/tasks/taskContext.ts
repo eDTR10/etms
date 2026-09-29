@@ -1,12 +1,17 @@
 import { createContext, useContext } from "react";
 import type { BulkActionResult } from "./taskService";
 import type { Member, Project, Task, TaskInput, TaskStatus, TaskTemplate, TaskTemplateInput } from "./types";
+import type { DtmsDocumentTemplate } from "../dtmsDocument/dtmsDocumentTypes";
 
 export interface TaskContextValue {
   tasks: Task[];
   members: Member[];
   projects: Project[];
   templates: TaskTemplate[];
+  // DTMS document templates — fetched once here so every subtask document picker/tag can
+  // resolve an id to a name without each duplicating the same request. Best-effort: stays
+  // empty (never blocks task loading) if DTMS is slow/unreachable.
+  dtmsDocumentTemplates: DtmsDocumentTemplate[];
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
@@ -41,6 +46,8 @@ export interface TaskContextValue {
   reorderSubtasks: (id: number, parentId: number | null, order: number[]) => Promise<void>;
   completeTask: (id: number) => Promise<void>;
   assignSubtask: (id: number, subtaskId: number, userId: number | null) => Promise<void>;
+  linkSubtaskDocument: (id: number, subtaskId: number, tracknumber: string) => Promise<void>;
+  unlinkSubtaskDocument: (id: number, subtaskId: number) => Promise<void>;
   bulkArchive: (ids: number[]) => Promise<BulkActionResult>;
   bulkDelete: (ids: number[]) => Promise<BulkActionResult>;
   addRemarkAttachment: (id: number, remarkId: number, file: File) => Promise<void>;

@@ -68,8 +68,12 @@ const Login = () => {
             {/* Logo & Title */}
             <div className="flex flex-col items-center gap-3 mb-8">
               <div className="flex items-center gap-2.5">
-                <img src={etmsLogo} alt="eTMS logo" className="w-10 h-10 object-contain" />
-                <h1 className="text-3xl font-bold text-foreground tracking-tight">eTMS</h1>
+
+                <div className="flex  items-end  justify-end">
+                       <img src={etmsLogo} alt="eTMS logo" className=" mb-1 w-6 h-6 object-contain" />
+                <h1 className="text-3xl font-bold text-foreground tracking-tight">TMS</h1>
+                </div>
+           
               </div>
               <p className="text-xs font-medium text-muted-foreground tracking-wide uppercase">Electronic Task Management System</p>
               <p className="text-sm text-muted-foreground">
@@ -150,7 +154,8 @@ const Login = () => {
               {/* Forgot password – below the button */}
               <div className="flex justify-center">
                 <a
-                  href="#"
+                  target="_blank"
+                  href="https://edtr10.github.io/dtms/forgot-password"
                   className="text-xs text-muted-foreground hover:text-primary hover:underline transition-colors"
                 >
                   Forgot your password?

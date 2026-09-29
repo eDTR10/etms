@@ -68,16 +68,17 @@ const UserLayout = ({ title, subtitle, children }: UserLayoutProps) => {
   return (
     <div className="min-h-screen w-full bg-background flex">
 
-      {/* ── Sidebar (desktop only) ─────────────────────────────────────── */}
+    {/* ── Sidebar (desktop only) ─────────────────────────────────────── */}
       <aside className="w-60 h-screen sticky top-0 self-start shrink-0 overflow-hidden bg-card border-r border-border flex flex-col md:hidden">
-        {/* Logo */}
         <div className="flex items-center gap-3 px-5 py-5 border-b border-border">
-          <img src={etmsLogo} alt="eTMS logo" className="w-7 h-7 object-contain" />
-          <span className="text-foreground font-semibold text-sm tracking-wide">
-            eTMS
-          </span>
-        </div>
 
+          <div className="flex  items-end  justify-end">
+             <img src={etmsLogo} alt="TMS logo" className="w-5 h-5 object-contain mb-[6px]" />
+          <span className="text-foreground  font-extrabold text-3xl tracking-wide">TMS</span>
+          </div>
+         
+          
+        </div>
         {/* Nav links */}
         <nav className="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto">
           {NAV_GROUPS.map((group, groupIndex) => (

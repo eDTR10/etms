@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertTriangle, CheckCircle2, ChevronRight, ClipboardList, UserX } from "lucide-react";
+import ThemedSelect, { type SelectOption } from "../../components/ThemedSelect";
 import { useTasks } from "../../features/tasks/taskContext";
 import { useTaskFilters } from "../../features/tasks/useTaskFilters";
 import TaskFilterBar from "../../features/tasks/TaskFilterBar";
@@ -32,6 +33,10 @@ const STATUS_COLORS: Record<TaskStatus, string> = {
 };
 
 const WORKLOAD_PAGE_SIZE = 5;
+const WORKLOAD_SORT_OPTIONS: SelectOption<"most" | "fewest">[] = [
+  { value: "most", label: "Most tasks" },
+  { value: "fewest", label: "Fewest tasks" },
+];
 
 function StatusDonut({ segments, centerPct, centerLabel }: { segments: { color: string; start: number; end: number }[]; centerPct: number; centerLabel: string }) {
   const hasData = segments.some(segment => segment.end > segment.start);
@@ -69,7 +74,7 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks" }
     tasks, members, projects, updateTask,
     addProgress, editProgress, deleteProgress,
     addRemark, editRemark, deleteRemark, reactToRemark, addRemarkReply,
-    addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, reorderSubtasks, assignSubtask, completeTask,
+    addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, reorderSubtasks, assignSubtask, linkSubtaskDocument, unlinkSubtaskDocument, completeTask,
     addRemarkAttachment, deleteRemarkAttachment, addSubtaskRemarkAttachment, deleteSubtaskRemarkAttachment, markCompletionSeen, markViewed,
   } = useTasks();
   const confirmDelete = useDeleteTaskConfirm();
@@ -161,7 +166,7 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks" }
         <div className="etm-section-heading"><div><h2>Insights</h2><p>Team workload and where tasks currently stand.</p></div></div>
         <div className="etm-charts-grid">
           <div className="etm-panel etm-chart-panel">
-            <div className="etm-workload-heading"><h3 className="etm-chart-title">Team workload</h3><label>Sort<select value={workloadSort} onChange={event => { setWorkloadSort(event.target.value as "most" | "fewest"); setWorkloadPage(0); }}><option value="most">Most tasks</option><option value="fewest">Fewest tasks</option></select></label></div>
+            <div className="etm-workload-heading"><h3 className="etm-chart-title">Team workload</h3><label>Sort<div style={{ width: 130 }}><ThemedSelect<SelectOption<"most" | "fewest">> size="small" classNamePrefix="etm-sort-select" aria-label="Sort team workload" options={WORKLOAD_SORT_OPTIONS} value={WORKLOAD_SORT_OPTIONS.find(option => option.value === workloadSort)} onChange={option => { setWorkloadSort(option?.value ?? "most"); setWorkloadPage(0); }} /></div></label></div>
             {memberCounts.length ? <>
               <div className="etm-workload-list">
                 {paginatedMembers.map(({ member, count }) => <button type="button" className="etm-member-row" key={member.id} onClick={() => setSelectedMemberId(member.id)} aria-label={`Open workload for ${memberName(member)}`}>
@@ -296,6 +301,8 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks" }
         onSetSubtaskCompletion={(subtaskId, isCompleted) => setSubtaskCompletion(viewingTask.id, subtaskId, isCompleted)}
         onReorderSubtasks={(parentId, order) => reorderSubtasks(viewingTask.id, parentId, order)}
         onAssignSubtask={(subtaskId, userId) => assignSubtask(viewingTask.id, subtaskId, userId)}
+        onLinkSubtaskDocument={(subtaskId, tracknumber) => linkSubtaskDocument(viewingTask.id, subtaskId, tracknumber)}
+        onUnlinkSubtaskDocument={subtaskId => unlinkSubtaskDocument(viewingTask.id, subtaskId)}
         onComplete={() => completeTask(viewingTask.id)}
         assignableMembers={members}
         onAddRemarkAttachment={(remarkId, file) => addRemarkAttachment(viewingTask.id, remarkId, file)}

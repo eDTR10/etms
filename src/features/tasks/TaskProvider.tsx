@@ -3,12 +3,15 @@ import { TaskContext } from "./taskContext";
 import { withBlockingLoader } from "./blockingLoader";
 import { taskError, taskService } from "./taskService";
 import { flattenSubtasks, type Member, type Project, type Task, type TaskInput, type TaskStatus, type TaskTemplate, type TaskTemplateInput } from "./types";
+import { dtmsDocumentService } from "../dtmsDocument/dtmsDocumentService";
+import type { DtmsDocumentTemplate } from "../dtmsDocument/dtmsDocumentTypes";
 
 export default function TaskProvider({ children }: { children: ReactNode }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [templates, setTemplates] = useState<TaskTemplate[]>([]);
+  const [dtmsDocumentTemplates, setDtmsDocumentTemplates] = useState<DtmsDocumentTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,6 +35,13 @@ export default function TaskProvider({ children }: { children: ReactNode }) {
       setTemplates(await taskService.listTemplates());
     } catch {
       setTemplates([]);
+    }
+    // Same reasoning — DTMS document templates only drive an optional per-subtask picker/tag,
+    // not core task functionality.
+    try {
+      setDtmsDocumentTemplates(await dtmsDocumentService.listTemplates());
+    } catch {
+      setDtmsDocumentTemplates([]);
     }
   }, []);
 
@@ -136,6 +146,12 @@ export default function TaskProvider({ children }: { children: ReactNode }) {
   const assignSubtask = async (id: number, subtaskId: number, userId: number | null) => withBlockingLoader("Assigning subtask…", async () => {
     replace(await taskService.assignSubtask(id, subtaskId, userId));
   });
+  const linkSubtaskDocument = async (id: number, subtaskId: number, tracknumber: string) => withBlockingLoader("Linking document…", async () => {
+    replace(await taskService.linkSubtaskDocument(id, subtaskId, tracknumber));
+  });
+  const unlinkSubtaskDocument = async (id: number, subtaskId: number) => withBlockingLoader("Unlinking document…", async () => {
+    replace(await taskService.unlinkSubtaskDocument(id, subtaskId));
+  });
   const bulkArchive = async (ids: number[]) => {
     const result = await taskService.bulkArchive(ids);
     setTasks(current => current.filter(task => !result.succeeded.includes(task.id)));
@@ -179,5 +195,5 @@ export default function TaskProvider({ children }: { children: ReactNode }) {
     setTemplates(current => current.filter(item => item.id !== id));
   });
 
-  return <TaskContext.Provider value={{ tasks, members, projects, templates, loading, error, refresh, listArchivedTasks, addMember, createTask, createTemplate, updateTemplate, deleteTemplate, updateTask, deleteTask, duplicateTask, toggleOccurrence, addProgress, editProgress, deleteProgress, addRemark, editRemark, deleteRemark, reactToRemark, addRemarkReply, addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, reorderSubtasks, assignSubtask, completeTask, bulkArchive, bulkDelete, addRemarkAttachment, deleteRemarkAttachment, addSubtaskRemarkAttachment, deleteSubtaskRemarkAttachment, markCompletionSeen, markViewed }}>{children}</TaskContext.Provider>;
+  return <TaskContext.Provider value={{ tasks, members, projects, templates, dtmsDocumentTemplates, loading, error, refresh, listArchivedTasks, addMember, createTask, createTemplate, updateTemplate, deleteTemplate, updateTask, deleteTask, duplicateTask, toggleOccurrence, addProgress, editProgress, deleteProgress, addRemark, editRemark, deleteRemark, reactToRemark, addRemarkReply, addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, reorderSubtasks, assignSubtask, linkSubtaskDocument, unlinkSubtaskDocument, completeTask, bulkArchive, bulkDelete, addRemarkAttachment, deleteRemarkAttachment, addSubtaskRemarkAttachment, deleteSubtaskRemarkAttachment, markCompletionSeen, markViewed }}>{children}</TaskContext.Provider>;
 }

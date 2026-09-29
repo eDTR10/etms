@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import { ChevronLeft, ChevronRight, Repeat, Search, User, X } from "lucide-react";
+import ThemedSelect, { type SelectOption } from "../../components/ThemedSelect";
 import { useTasks } from "../../features/tasks/taskContext";
 import { taskError } from "../../features/tasks/taskService";
 import type { PriorityFilterValue, ProjectFilterValue } from "../../features/tasks/useTaskFilters";
@@ -118,6 +119,15 @@ export default function Calendar({ basePath = "/etms/tasks", showOwner = false }
   const selectedDateLabel = selectedDate
     ? new Date(`${selectedDate}T00:00:00`).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" })
     : "";
+  const calendarPriorityOptions: SelectOption<PriorityFilterValue>[] = [
+    { value: "all", label: "All Priorities" },
+    ...PRIORITIES.map((item: Priority) => ({ value: item, label: item })),
+  ];
+  const calendarProjectOptions: SelectOption<ProjectFilterValue>[] = [
+    { value: "all", label: "All Projects" },
+    { value: "personal", label: "Personal" },
+    ...projects.map(project => ({ value: project.id, label: project.name })),
+  ];
 
   return (
     <div>
@@ -126,23 +136,25 @@ export default function Calendar({ basePath = "/etms/tasks", showOwner = false }
           <Search size={15} />
           <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search by task or assignee…" aria-label="Search tasks by title or assignee" />
         </div>
-        <select className="etm-filter-select" value={priority} onChange={event => setPriority(event.target.value as PriorityFilterValue)} aria-label="Filter by priority">
-          <option value="all">All Priorities</option>
-          {PRIORITIES.map((item: Priority) => <option key={item} value={item}>{item}</option>)}
-        </select>
-        <select
-          className="etm-filter-select"
-          value={String(projectFilter)}
-          onChange={event => {
-            const value = event.target.value;
-            setProjectFilter(value === "all" || value === "personal" ? value : Number(value));
-          }}
-          aria-label="Filter by project"
-        >
-          <option value="all">All Projects</option>
-          <option value="personal">Personal</option>
-          {projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}
-        </select>
+        <div style={{ flex: "1 1 160px", minWidth: 140 }}>
+          <ThemedSelect<SelectOption<PriorityFilterValue>>
+            aria-label="Filter by priority"
+            classNamePrefix="etm-priority-select"
+            options={calendarPriorityOptions}
+            value={calendarPriorityOptions.find(option => option.value === priority)}
+            onChange={option => setPriority(option?.value ?? "all")}
+          />
+        </div>
+        <div style={{ flex: "1 1 200px", minWidth: 160 }}>
+          <ThemedSelect<SelectOption<ProjectFilterValue>>
+            aria-label="Filter by project"
+            classNamePrefix="etm-project-select"
+            options={calendarProjectOptions}
+            value={calendarProjectOptions.find(option => option.value === projectFilter)}
+            onChange={option => setProjectFilter(option?.value ?? "all")}
+            isSearchable
+          />
+        </div>
         {hasActiveFilters && <button type="button" className="etm-button ghost small etm-filter-clear" onClick={clearFilters}><X size={13} />Clear</button>}
       </div>
 

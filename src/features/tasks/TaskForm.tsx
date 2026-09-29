@@ -1,7 +1,8 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { isAxiosError } from "axios";
-import { AlertTriangle, Bookmark, CalendarDays, Check, CheckCheck, ChevronDown, ClipboardList, Clock3, Flag, Folder, Link2, Loader2, MapPin, Plus, Repeat, Search, Trash2, User, UserPlus, Users, X } from "lucide-react";
+import { AlertTriangle, Bookmark, CalendarDays, Check, CheckCheck, ChevronDown, ClipboardList, Clock3, FileText, Flag, Folder, Link2, Loader2, MapPin, Plus, Repeat, Search, Trash2, User, UserPlus, Users, X } from "lucide-react";
+import ThemedSelect, { type SelectOption } from "../../components/ThemedSelect";
 import { useTasks } from "./taskContext";
 import { taskError } from "./taskService";
 import { ASSIGNMENT_ROLES, formatDate, memberName, PRIORITIES, RECURRENCE_LABELS, RECURRENCES, STATUSES, type AssignmentInput, type AssignmentRole, type Member, type Priority, type Project, type TaskLinkInput, type Recurrence, type SubTask, type Task, type TaskInput, type TaskStatus, type TaskTemplate, type TemplateSubtask } from "./types";
@@ -9,6 +10,7 @@ import { describeRecurrence, WEEKDAYS } from "./recurrence";
 import TaskLinksField from "./TaskLinksField";
 import { REGION_X_BARANGAYS, REGION_X_CITIES, REGION_X_PROVINCES } from "./regionXLocations";
 import { addChildToSubtaskTree, flattenTree, mapSubtaskTree, removeFromSubtaskTree } from "./subtaskTree";
+import type { DtmsDocumentTemplate } from "../dtmsDocument/dtmsDocumentTypes";
 import "./forms.css";
 
 // Eisenhower-matrix framing shown as a note under each priority option.
@@ -55,12 +57,13 @@ function toEditableSubtasks(subtasks: SubTask[], keyPrefix: string): EditableSub
 }
 
 function serializeSubtasks(subtasks: EditableSubtask[]): SubTask[] {
-  return subtasks.map(({ id, title, description, status, is_completed, subtasks: children }) => ({
+  return subtasks.map(({ id, title, description, status, is_completed, default_document_template, subtasks: children }) => ({
     ...(id !== undefined ? { id } : {}),
     title: title.trim(),
     description: description.trim(),
     status,
     is_completed,
+    default_document_template: default_document_template ?? null,
     subtasks: serializeSubtasks(children),
   }));
 }
@@ -104,12 +107,16 @@ function saveError(error: unknown): string {
   return "Your task couldn’t be saved. Your changes are still here; please try again.";
 }
 
-function SubtaskEditorRow({ subtask, index, depth, fieldId, errors, onUpdate, onRemove, onAddChild }: {
-  subtask: EditableSubtask; index: number; depth: number; fieldId: string; errors: FormErrors;
-  onUpdate: (localKey: string, change: Partial<Pick<SubTask, "title" | "description" | "status" | "is_completed">>) => void;
+function SubtaskEditorRow({ subtask, index, depth, fieldId, errors, docTemplates, onUpdate, onRemove, onAddChild }: {
+  subtask: EditableSubtask; index: number; depth: number; fieldId: string; errors: FormErrors; docTemplates: DtmsDocumentTemplate[];
+  onUpdate: (localKey: string, change: Partial<Pick<SubTask, "title" | "description" | "status" | "is_completed" | "default_document_template">>) => void;
   onRemove: (localKey: string) => void;
   onAddChild: (parentKey: string) => void;
 }) {
+  const docTemplateOptions: SelectOption<number | "">[] = [
+    { value: "", label: "No document" },
+    ...docTemplates.map(docTemplate => ({ value: docTemplate.id, label: docTemplate.name })),
+  ];
   return (
     <div className="etm-subtask-editor-item">
       <div className={`etm-subtask-input-row ${subtask.is_completed ? "completed" : ""}`}>
@@ -121,10 +128,26 @@ function SubtaskEditorRow({ subtask, index, depth, fieldId, errors, onUpdate, on
       </div>
       {errors[subtask.localKey] && <p className="etm-field-error" id={`${fieldId}-${subtask.localKey}-error`}>{errors[subtask.localKey]}</p>}
       <textarea className="etm-subtask-description" value={subtask.description} onChange={event => onUpdate(subtask.localKey, { description: event.target.value })} placeholder="Add a short description for this subtask (optional)…" aria-label={`Subtask ${index + 1} description`} rows={2} maxLength={2000} />
+      {docTemplates.length > 0 && (
+        <div className={`etm-subtask-doc-picker ${subtask.default_document_template ? "has-value" : ""}`}>
+          <span className="etm-subtask-doc-picker-label"><FileText size={13} />Document</span>
+          <div style={{ flex: 1, minWidth: 0, maxWidth: 240 }}>
+            <ThemedSelect<SelectOption<number | "">>
+              size="small"
+              classNamePrefix="etm-subtask-doc-select"
+              isSearchable
+              aria-label={`Document to create for subtask ${index + 1}`}
+              options={docTemplateOptions}
+              value={docTemplateOptions.find(option => option.value === (subtask.default_document_template ?? "")) ?? docTemplateOptions[0]}
+              onChange={option => onUpdate(subtask.localKey, { default_document_template: option && option.value !== "" ? option.value : null })}
+            />
+          </div>
+        </div>
+      )}
       {subtask.subtasks.length > 0 && (
         <div className="etm-subtask-children">
           {subtask.subtasks.map((child, childIndex) => (
-            <SubtaskEditorRow key={child.localKey} subtask={child} index={childIndex} depth={depth + 1} fieldId={fieldId} errors={errors} onUpdate={onUpdate} onRemove={onRemove} onAddChild={onAddChild} />
+            <SubtaskEditorRow key={child.localKey} subtask={child} index={childIndex} depth={depth + 1} fieldId={fieldId} errors={errors} docTemplates={docTemplates} onUpdate={onUpdate} onRemove={onRemove} onAddChild={onAddChild} />
           ))}
         </div>
       )}
@@ -160,7 +183,7 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
   const projectPickerRef = useRef<HTMLDivElement>(null);
   const nextSubtask = useRef(0);
   const nextTemplateSubtask = useRef(0);
-  const { addMember, templates } = useTasks();
+  const { addMember, templates, dtmsDocumentTemplates: docTemplates } = useTasks();
   const [values, setValues] = useState<FormValues>(() => initialValues(task));
   const [errors, setErrors] = useState<FormErrors>({});
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
@@ -247,7 +270,7 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
     }
   }
 
-  function updateSubtask(localKey: string, change: Partial<Pick<SubTask, "title" | "description" | "status" | "is_completed">>) {
+  function updateSubtask(localKey: string, change: Partial<Pick<SubTask, "title" | "description" | "status" | "is_completed" | "default_document_template">>) {
     setValues(current => ({ ...current, subtasks: mapSubtaskTree(current.subtasks, localKey, subtask => ({ ...subtask, ...change })) }));
     if (errors[localKey] || (change.is_completed !== undefined && errors.status)) setErrors(current => ({ ...current, [localKey]: "", ...(change.is_completed !== undefined ? { status: "" } : {}) }));
   }
@@ -268,6 +291,7 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
       description: subtask.description,
       status: "Pending",
       is_completed: false,
+      default_document_template: subtask.default_document_template ?? null,
       localKey: `template-${templateId}-${nextTemplateSubtask.current++}`,
       subtasks: templateToEditableSubtasks(templateId, subtask.subtasks ?? []),
     }));
@@ -426,16 +450,16 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
                 {!task && (
                   <div className="etm-field etm-template-picker">
                     <label htmlFor={`${fieldId}-template`}><Bookmark size={15} /> Start from a template <span className="etm-form-optional">(optional)</span></label>
-                    <select id={`${fieldId}-template`} value={selectedTemplateId} onChange={event => handleTemplateChange(event.target.value)} disabled={templates.length === 0}>
-                      {templates.length > 0 ? (
-                        <>
-                          <option value="">Add task manually — start from scratch</option>
-                          {templates.map(template => <option key={template.id} value={template.id}>{template.name}</option>)}
-                        </>
-                      ) : (
-                        <option value="">No templates saved yet</option>
-                      )}
-                    </select>
+                    <ThemedSelect<SelectOption<string>>
+                      inputId={`${fieldId}-template`}
+                      classNamePrefix="etm-task-template-select"
+                      isSearchable
+                      isDisabled={templates.length === 0}
+                      placeholder={templates.length ? "Add task manually — start from scratch" : "No templates saved yet"}
+                      options={templates.map(template => ({ value: String(template.id), label: template.name }))}
+                      value={templates.map(template => ({ value: String(template.id), label: template.name })).find(option => option.value === selectedTemplateId) ?? null}
+                      onChange={option => handleTemplateChange(option?.value ?? "")}
+                    />
                     <p className="etm-form-helper">Choosing a template fills in the details, subtasks, and assignees below — you can still edit anything before saving. <Link to="/etms/templates">Manage templates</Link></p>
                   </div>
                 )}
@@ -462,10 +486,16 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
                   <p className="etm-form-helper">Choose Region X suggestions, or type a city or barangay that is not listed.</p>
                   <div className="etm-location-grid">
                     <label htmlFor={`${fieldId}-province`}>Province
-                      <select id={`${fieldId}-province`} value={values.location_province} onChange={event => setValues(current => ({ ...current, location_province: event.target.value, location_city: "", location_barangay: "" }))}>
-                        <option value="">Select a Region X province</option>
-                        {REGION_X_PROVINCES.map(province => <option key={province} value={province}>{province}</option>)}
-                      </select>
+                      <ThemedSelect<SelectOption<string>>
+                        inputId={`${fieldId}-province`}
+                        classNamePrefix="etm-province-select"
+                        isSearchable
+                        isClearable
+                        placeholder="Select a Region X province"
+                        options={REGION_X_PROVINCES.map(province => ({ value: province, label: province }))}
+                        value={values.location_province ? { value: values.location_province, label: values.location_province } : null}
+                        onChange={option => setValues(current => ({ ...current, location_province: option?.value ?? "", location_city: "", location_barangay: "" }))}
+                      />
                     </label>
                     <label htmlFor={`${fieldId}-city`}>City / Municipality
                       <input id={`${fieldId}-city`} list={`${fieldId}-city-options`} value={values.location_city} onChange={event => update("location_city", event.target.value)} placeholder={values.location_province ? "Search or type a city" : "Select a province first"} disabled={!values.location_province} maxLength={100} />
@@ -535,7 +565,7 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
               <div className="etm-form-section-body">
                 {allSubtasks.length === 0 && <div className="etm-subtask-empty"><CheckCheck size={23} /><span>No subtasks yet. Add the first step below.</span></div>}
                 <div className="etm-subtask-editor">{values.subtasks.map((subtask, index) => (
-                  <SubtaskEditorRow key={subtask.localKey} subtask={subtask} index={index} depth={0} fieldId={fieldId} errors={errors} onUpdate={updateSubtask} onRemove={removeSubtask} onAddChild={addSubtask} />
+                  <SubtaskEditorRow key={subtask.localKey} subtask={subtask} index={index} depth={0} fieldId={fieldId} errors={errors} docTemplates={docTemplates} onUpdate={updateSubtask} onRemove={removeSubtask} onAddChild={addSubtask} />
                 ))}</div>
                 <button type="button" className="etm-add-subtask" onClick={() => addSubtask(null)}><Plus size={16} /> Add subtask</button>
               </div>
@@ -559,9 +589,14 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
                 </div>
                 <div className="etm-field">
                   <label htmlFor={`${fieldId}-recurrence`}>Repeat</label>
-                  <select data-howto="repeat" id={`${fieldId}-recurrence`} value={values.recurrence} onChange={event => update("recurrence", event.target.value as Recurrence)}>
-                    {RECURRENCES.map(item => <option key={item} value={item}>{RECURRENCE_LABELS[item]}</option>)}
-                  </select>
+                  <ThemedSelect<SelectOption<Recurrence>>
+                    inputId={`${fieldId}-recurrence`}
+                    classNamePrefix="etm-recurrence-select"
+                    isSearchable={false}
+                    options={RECURRENCES.map(item => ({ value: item, label: RECURRENCE_LABELS[item] }))}
+                    value={{ value: values.recurrence, label: RECURRENCE_LABELS[values.recurrence] }}
+                    onChange={option => update("recurrence", option?.value ?? values.recurrence)}
+                  />
                   {values.recurrence === "Weekly" && (
                     <div className="etm-weekday-picker" role="group" aria-label="Repeat on these weekdays">
                       {WEEKDAYS.map(day => {

@@ -1,10 +1,10 @@
 import CryptoJS from "crypto-js";
 
-const SECRET = import.meta.env.VITE_PASSWORD;
+const SECRET = import.meta.env.VITE_STORAGE_KEY;
 
 if (!SECRET) {
   console.warn(
-    "VITE_PASSWORD is not set: data written to localStorage will not be encrypted."
+    "VITE_STORAGE_KEY is not set: data written to localStorage will not be encrypted."
   );
 }
 
@@ -21,13 +21,22 @@ function decrypt(cipherText: string): string | null {
   }
 }
 
-// Wraps localStorage so every value is AES-encrypted at rest with VITE_PASSWORD.
+// Wraps localStorage so every value is AES-encrypted at rest with VITE_STORAGE_KEY.
 // Note: this is obfuscation, not real secrecy — VITE_ vars are baked into the
 // public JS bundle, so anyone with devtools can recover the key. It stops
 // casual/plaintext inspection of localStorage, not a determined attacker.
 export const secureStorage = {
+  // Strings are stored raw, not JSON-quoted. ETMS, DMT-Front-end, and KMS-Front-end
+  // deploy under one origin at different base paths (/etms, /dtms, /kms — see each
+  // vite.config.ts), so they share this same localStorage, and DMT-Front-end's own
+  // secureStorage (services/api.ts) always stores a string value as-is. JSON-quoting
+  // a token here would make DTMS read it back with literal quote characters baked
+  // into the Authorization header. getItem's fallback below already expected this
+  // raw format when reading a token written by "another DICT app" — this makes
+  // writing symmetric with that.
   setItem(key: string, value: unknown): void {
-    localStorage.setItem(key, encrypt(JSON.stringify(value)));
+    const plain = typeof value === "string" ? value : JSON.stringify(value);
+    localStorage.setItem(key, encrypt(plain));
   },
 
   getItem<T = unknown>(key: string): T | null {

@@ -101,15 +101,70 @@
 .etm-member-search input::placeholder { color: #8a98a4; }
 .etm-member-search:focus-within { box-shadow: inset 0 -2px var(--etm-primary); }
 .etm-member-options { max-height: 212px; overflow-y: auto; padding: 5px; }
-.etm-member-option { display: flex; min-height: 46px; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 6px; cursor: pointer; }
+.etm-member-option { display: flex; min-height: 46px; align-items: center; flex-wrap: wrap; gap: 10px; padding: 7px 8px; border-radius: 6px; cursor: pointer; }
 .etm-member-option:hover { background: var(--etm-surface-alt); }
 .etm-member-option.selected { background: var(--etm-surface-sunken); }
 .etm-member-initials { display: flex; align-items: center; justify-content: center; width: 29px; height: 29px; flex: 0 0 29px; border-radius: 50%; background: #eaf0f4; color: #547084; font-size: 11px; font-weight: 600; text-transform: uppercase; }
 .etm-member-option:nth-child(3n + 2) .etm-member-initials { background: #f4eefa; color: #8d71a5; }
 .etm-member-option:nth-child(3n + 3) .etm-member-initials { background: #faf0e7; color: #a08058; }
-.etm-member-option-name { color: #455a6b; font-size: 13px; overflow-wrap: anywhere; }
+.etm-member-option-name { flex: 1 1 auto; min-width: 120px; color: #455a6b; font-size: 13px; overflow-wrap: anywhere; }
 .etm-member-option-name small { display: block; margin-top: 2px; color: #94a0aa; font-size: 11px; }
 .etm-member-empty { padding: 15px 12px; margin: 0; color: var(--etm-muted); font-size: 13px; line-height: 1.7; }
+.etm-sig-quickadd { display: flex; flex-shrink: 0; gap: 4px; margin-left: auto; }
+.etm-sig-quickadd-btn { display: inline-flex; align-items: center; gap: 3px; padding: 4px 8px; border: 0; border-radius: 6px; font-family: inherit; font-size: 11px; font-weight: 700; white-space: nowrap; cursor: pointer; transition: background .15s; }
+.etm-sig-quickadd-btn.signer { background: color-mix(in srgb, var(--etm-primary) 14%, transparent); color: var(--etm-primary); }
+.etm-sig-quickadd-btn.signer:hover { background: color-mix(in srgb, var(--etm-primary) 24%, transparent); }
+.etm-sig-quickadd-btn.reviewer { background: color-mix(in srgb, #8d71a5 16%, transparent); color: #8d71a5; }
+.etm-sig-quickadd-btn.reviewer:hover { background: color-mix(in srgb, #8d71a5 26%, transparent); }
+.etm-sig-quickadd-btn.viewer { background: color-mix(in srgb, #a17527 16%, transparent); color: #a17527; }
+.etm-sig-quickadd-btn.viewer:hover { background: color-mix(in srgb, #a17527 26%, transparent); }
+:root.dark .etm-sig-quickadd-btn.reviewer { color: #bda3dd; background: color-mix(in srgb, #bda3dd 18%, transparent); }
+:root.dark .etm-sig-quickadd-btn.reviewer:hover { background: color-mix(in srgb, #bda3dd 28%, transparent); }
+:root.dark .etm-sig-quickadd-btn.viewer { color: #e6c179; background: color-mix(in srgb, #e6c179 18%, transparent); }
+:root.dark .etm-sig-quickadd-btn.viewer:hover { background: color-mix(in srgb, #e6c179 28%, transparent); }
+.etm-sig-queue { border: 1px solid var(--etm-border); border-radius: 9px; background: var(--etm-surface-alt); overflow: hidden; }
+.etm-sig-queue > li { border-bottom: 1px solid var(--etm-border); }
+.etm-sig-queue > li:last-child { border-bottom: 0; }
+.etm-sig-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; }
+.etm-sig-parallel-toggle-row { display: flex; align-items: center; justify-content: center; padding: 4px 0; }
+.etm-sig-parallel-toggle { display: inline-flex; align-items: center; gap: 4px; border: 0; padding: 2px 9px; border-radius: 20px; background: var(--etm-surface-sunken); color: var(--etm-muted); font-family: inherit; font-size: 10px; font-weight: 600; cursor: pointer; }
+.etm-sig-parallel-toggle:hover { color: var(--etm-ink); }
+.etm-sig-parallel-toggle.parallel { background: color-mix(in srgb, #5484bd 15%, transparent); color: #5484bd; }
+.etm-sig-parallel-toggle.parallel:hover { background: color-mix(in srgb, #5484bd 25%, transparent); }
+:root.dark .etm-sig-parallel-toggle.parallel { color: #8ab6ef; background: color-mix(in srgb, #8ab6ef 18%, transparent); }
+:root.dark .etm-sig-parallel-toggle.parallel:hover { background: color-mix(in srgb, #8ab6ef 28%, transparent); }
+.etm-sig-row-badge { display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; flex: 0 0 20px; border-radius: 50%; background: var(--etm-primary); color: #fff; font-size: 10px; font-weight: 700; }
+.etm-sig-row-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; color: var(--etm-ink); }
+/* Specificity note: `.etm-task-form .etm-field select` (forms.css line 31) already claims
+   width:100%/min-height:43px/border/padding for every select inside a .etm-field, at a
+   specificity these single-class rules alone can't beat. Chaining .etm-task-form + .etm-sig-queue
+   here (3 classes) is what actually wins — without it this renders as that full-width bordered
+   input look and squeezes the name/buttons on the same row down to nothing. */
+.etm-task-form .etm-sig-queue .etm-sig-row-role { width: auto; min-width: 0; min-height: auto; flex-shrink: 0; padding: 3px 8px; border: 0; background: transparent; font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
+.etm-task-form .etm-sig-queue .etm-sig-row-role.signer { background: color-mix(in srgb, var(--etm-primary) 14%, transparent); color: var(--etm-primary); }
+.etm-task-form .etm-sig-queue .etm-sig-row-role.reviewer { background: color-mix(in srgb, #8d71a5 16%, transparent); color: #8d71a5; }
+.etm-task-form .etm-sig-queue .etm-sig-row-role.viewer { background: color-mix(in srgb, #a17527 16%, transparent); color: #a17527; }
+:root.dark .etm-task-form .etm-sig-queue .etm-sig-row-role.reviewer { color: #bda3dd; background: color-mix(in srgb, #bda3dd 18%, transparent); }
+:root.dark .etm-task-form .etm-sig-queue .etm-sig-row-role.viewer { color: #e6c179; background: color-mix(in srgb, #e6c179 18%, transparent); }
+.etm-subtask-doc-chip { cursor: pointer; }
+.etm-subtask-doc-chip:hover { background: color-mix(in srgb, var(--etm-primary) 22%, var(--etm-surface)); }
+.etm-subtask-doc-chip:focus-visible { outline: 2px solid var(--etm-primary); outline-offset: 2px; }
+.etm-role-pill { flex-shrink: 0; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 700; }
+.etm-role-pill.signer { background: color-mix(in srgb, var(--etm-primary) 14%, transparent); color: var(--etm-primary); }
+.etm-role-pill.reviewer { background: color-mix(in srgb, #8d71a5 16%, transparent); color: #8d71a5; }
+.etm-role-pill.viewer { background: color-mix(in srgb, #a17527 16%, transparent); color: #a17527; }
+:root.dark .etm-role-pill.reviewer { color: #bda3dd; background: color-mix(in srgb, #bda3dd 18%, transparent); }
+:root.dark .etm-role-pill.viewer { color: #e6c179; background: color-mix(in srgb, #e6c179 18%, transparent); }
+.etm-doc-detail-header { display: flex; gap: 12px; align-items: flex-start; padding-bottom: 14px; border-bottom: 1px solid var(--etm-border); margin-bottom: 14px; }
+.etm-doc-detail-header strong { display: block; color: var(--etm-ink); font-size: 15px; }
+.etm-doc-detail-icon { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; flex: 0 0 40px; border-radius: 10px; background: color-mix(in srgb, var(--etm-primary) 14%, var(--etm-surface)); color: var(--etm-primary); }
+.etm-doc-detail-meta { margin: 3px 0 0; color: var(--etm-muted); font-size: 12px; }
+.etm-doc-detail-message { margin: 0 0 14px; padding: 10px 12px; border-radius: 8px; background: var(--etm-surface-alt); font-size: 13px; line-height: 1.6; color: var(--etm-ink); }
+.etm-doc-detail-office-label { margin: 14px 0 6px; color: var(--etm-muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; }
+.etm-doc-detail-sig-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--etm-border); border-radius: 8px; margin-bottom: 6px; }
+.etm-doc-detail-sig-name { flex: 1 1 auto; min-width: 0; }
+.etm-doc-detail-sig-name strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--etm-ink); }
+.etm-doc-detail-sig-name small { display: block; color: var(--etm-muted); font-size: 11px; }
 .etm-add-member-trigger { display: flex; align-items: center; gap: 6px; width: 100%; padding: 11px 13px; margin: 0; border-top: 1px solid var(--etm-border); border-radius: 0; font-size: 13px; }
 .etm-add-member-form { display: flex; flex-direction: column; gap: 10px; padding: 12px 13px; border-top: 1px solid var(--etm-border); background: var(--etm-surface-alt); }
 .etm-add-member-form-heading { display: flex; align-items: center; gap: 7px; color: var(--etm-ink); font-size: 13px; font-weight: 600; }
@@ -158,6 +213,13 @@
 .etm-subtask-description { display: block; width: 100%; min-width: 0; margin: 0; padding: 8px 10px; border: 0; border-radius: 0 0 8px 8px; background: transparent; color: #647787; font-family: inherit; font-size: 12.5px; line-height: 1.6; resize: vertical; box-sizing: border-box; }
 .etm-subtask-description::placeholder { color: #9aa7b1; }
 .etm-subtask-description:focus { outline: none; box-shadow: inset 0 0 0 2px #087e8b12; }
+.etm-subtask-doc-picker { display: flex; align-items: center; gap: 8px; padding: 7px 10px 8px; border-top: 1px solid var(--etm-border); border-radius: 0 0 8px 8px; }
+.etm-subtask-doc-picker-label { display: flex; align-items: center; gap: 5px; flex-shrink: 0; color: var(--etm-muted); font-size: 12px; font-weight: 600; }
+.etm-subtask-doc-picker select { flex: 1; min-width: 0; max-width: 240px; min-height: 32px; padding: 5px 26px 5px 8px; border: 1px solid var(--etm-border); border-radius: 7px; background: var(--etm-surface); color: var(--etm-ink); font-family: inherit; font-size: 12px; outline: none; transition: border-color .15s, box-shadow .15s; }
+.etm-subtask-doc-picker select:focus { border-color: var(--etm-primary); box-shadow: 0 0 0 3px #087e8b12; }
+.etm-subtask-doc-picker.has-value { background: color-mix(in srgb, var(--etm-primary) 5%, transparent); }
+.etm-subtask-doc-picker.has-value .etm-subtask-doc-picker-label { color: var(--etm-primary); }
+.etm-subtask-doc-picker.has-value select { border-color: color-mix(in srgb, var(--etm-primary) 45%, var(--etm-border)); color: var(--etm-primary); font-weight: 600; }
 .etm-form-error-banner { margin: 20px 0 0; padding: 13px 16px; border: 1px solid #f1ceca; border-radius: 8px; background: #fff5f3; color: #b15750; font-size: 14px; line-height: 1.65; }
 .etm-form-footer { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-top: 24px; padding: 21px 0 4px; border-top: 1px solid var(--etm-border); }
 .etm-form-footer > span { color: #93a0ab; font-size: 13px; }
@@ -256,7 +318,7 @@
 .etm-details-subtask-toggle { display: inline-flex; align-items: center; justify-content: center; width: 25px; height: 25px; flex: 0 0 25px; margin-top: 1px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #8ca1ac; cursor: pointer; }
 .etm-details-subtask-toggle:hover { background: #e9f3f3; color: var(--etm-primary); }
 .etm-details-subtask-toggle.checked { background: #75b29f; color: #fff; }
-.etm-subtask-panel-open { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; font: inherit; cursor: pointer; }
+.etm-subtask-panel-open { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; flex: 1; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; font: inherit; cursor: pointer; }
 .etm-subtask-panel-open:hover strong { color: var(--etm-primary-dark); }
 .etm-subtask-panel-open > svg { flex: 0 0 auto; color: #91a2ac; transition: transform .15s; }
 .etm-subtask-panel-open > svg.open { transform: rotate(90deg); }
@@ -271,7 +333,7 @@
 .etm-subtask-edit-inline input:focus, .etm-subtask-edit-inline textarea:focus { outline: none; border-color: var(--etm-primary); box-shadow: 0 0 0 3px #087e8b12; }
 .etm-subtask-edit-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .etm-details-subtask-check { display: inline-flex; width: 17px; height: 17px; flex: 0 0 17px; align-items: center; justify-content: center; margin-top: 1px; color: #a4b7c1; }
-.etm-details-subtask-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.etm-details-subtask-text { display: flex; flex-direction: column; gap: 3px; flex: 1 1 auto; min-width: 140px; }
 .etm-details-subtask-text small { color: #93a3ad; font-size: 12px; line-height: 1.6; font-weight: 400; }
 .etm-details-subtasks li.completed .etm-details-subtask-check { border-radius: 50%; background: #75b29f; color: #fff; }
 .etm-activity-log { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }

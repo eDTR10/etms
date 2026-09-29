@@ -1,12 +1,18 @@
 import { useId, useRef, useState, type FormEvent } from "react";
-import { Bookmark, CheckCheck, Loader2, Plus, Trash2 } from "lucide-react";
+import { Bookmark, CheckCheck, FileText, Loader2, Plus, Trash2 } from "lucide-react";
+import ThemedSelect, { type SelectOption } from "../../components/ThemedSelect";
 import { taskError } from "./taskService";
+import { useTasks } from "./taskContext";
+import type { DtmsDocumentTemplate } from "../dtmsDocument/dtmsDocumentTypes";
 import type { Member, Project, TaskTemplate, TaskTemplateInput, TemplateSubtask } from "./types";
 import { addChildToSubtaskTree, flattenTree, mapSubtaskTree, removeFromSubtaskTree } from "./subtaskTree";
 import "./forms.css";
 
 interface TemplateFormProps {
   template?: TaskTemplate;
+  // Prefills the form from an imported file without treating it as an edit of an
+  // existing template — onSave still creates a new one. Ignored when `template` is set.
+  initialInput?: TaskTemplateInput;
   members: Member[];
   projects: Project[];
   onSave: (input: TaskTemplateInput) => Promise<void>;
@@ -30,36 +36,42 @@ function toEditableTemplateSubtasks(subtasks: TemplateSubtask[]): EditableTempla
 }
 
 function serializeTemplateSubtasks(subtasks: EditableTemplateSubtask[]): TemplateSubtask[] {
-  return subtasks.map(({ title, description, subtasks: children }) => ({
+  return subtasks.map(({ title, description, default_document_template, subtasks: children }) => ({
     title: title.trim(),
     description: description.trim(),
+    default_document_template: default_document_template ?? null,
     subtasks: serializeTemplateSubtasks(children),
   }));
 }
 
-function initialValues(template?: TaskTemplate): FormValues {
+function initialValues(template?: TaskTemplate, initialInput?: TaskTemplateInput): FormValues {
+  const source = template ?? initialInput;
   return {
-    name: template?.name ?? "",
-    title: template?.title ?? "",
-    is_personal: template?.is_personal ?? true,
-    project: template?.project ?? "",
-    details: template?.details ?? "",
-    requestor: template?.requestor ?? "",
-    location_province: template?.location_province ?? "",
-    location_city: template?.location_city ?? "",
-    location_barangay: template?.location_barangay ?? "",
-    priority: template?.priority ?? "Medium",
-    subtasks: toEditableTemplateSubtasks(template?.subtasks ?? []),
+    name: source?.name ?? "",
+    title: source?.title ?? "",
+    is_personal: source?.is_personal ?? true,
+    project: source?.project ?? "",
+    details: source?.details ?? "",
+    requestor: source?.requestor ?? "",
+    location_province: source?.location_province ?? "",
+    location_city: source?.location_city ?? "",
+    location_barangay: source?.location_barangay ?? "",
+    priority: source?.priority ?? "Medium",
+    subtasks: toEditableTemplateSubtasks(source?.subtasks ?? []),
     assignments: template?.assignments ?? [],
   };
 }
 
-function TemplateSubtaskEditorRow({ subtask, index, fieldId, errors, onUpdate, onRemove, onAddChild }: {
-  subtask: EditableTemplateSubtask; index: number; fieldId: string; errors: FormErrors;
-  onUpdate: (localKey: string, change: Partial<Pick<TemplateSubtask, "title" | "description">>) => void;
+function TemplateSubtaskEditorRow({ subtask, index, fieldId, errors, docTemplates, onUpdate, onRemove, onAddChild }: {
+  subtask: EditableTemplateSubtask; index: number; fieldId: string; errors: FormErrors; docTemplates: DtmsDocumentTemplate[];
+  onUpdate: (localKey: string, change: Partial<Pick<TemplateSubtask, "title" | "description" | "default_document_template">>) => void;
   onRemove: (localKey: string) => void;
   onAddChild: (parentKey: string) => void;
 }) {
+  const docTemplateOptions: SelectOption<number | "">[] = [
+    { value: "", label: "No document" },
+    ...docTemplates.map(docTemplate => ({ value: docTemplate.id, label: docTemplate.name })),
+  ];
   return (
     <div className="etm-subtask-editor-item">
       <div className="etm-subtask-input-row">
@@ -70,10 +82,26 @@ function TemplateSubtaskEditorRow({ subtask, index, fieldId, errors, onUpdate, o
       </div>
       {errors[subtask.localKey] && <p className="etm-field-error">{errors[subtask.localKey]}</p>}
       <textarea className="etm-subtask-description" value={subtask.description} onChange={event => onUpdate(subtask.localKey, { description: event.target.value })} placeholder="Add a short description for this subtask (optional)…" aria-label={`Subtask ${index + 1} description`} rows={2} maxLength={2000} />
+      {docTemplates.length > 0 && (
+        <div className={`etm-subtask-doc-picker ${subtask.default_document_template ? "has-value" : ""}`}>
+          <span className="etm-subtask-doc-picker-label"><FileText size={13} />Document</span>
+          <div style={{ flex: 1, minWidth: 0, maxWidth: 240 }}>
+            <ThemedSelect<SelectOption<number | "">>
+              size="small"
+              classNamePrefix="etm-subtask-doc-select"
+              isSearchable
+              aria-label={`Default document template for subtask ${index + 1}`}
+              options={docTemplateOptions}
+              value={docTemplateOptions.find(option => option.value === (subtask.default_document_template ?? "")) ?? docTemplateOptions[0]}
+              onChange={option => onUpdate(subtask.localKey, { default_document_template: option && option.value !== "" ? option.value : null })}
+            />
+          </div>
+        </div>
+      )}
       {subtask.subtasks.length > 0 && (
         <div className="etm-subtask-children">
           {subtask.subtasks.map((child, childIndex) => (
-            <TemplateSubtaskEditorRow key={child.localKey} subtask={child} index={childIndex} fieldId={fieldId} errors={errors} onUpdate={onUpdate} onRemove={onRemove} onAddChild={onAddChild} />
+            <TemplateSubtaskEditorRow key={child.localKey} subtask={child} index={childIndex} fieldId={fieldId} errors={errors} docTemplates={docTemplates} onUpdate={onUpdate} onRemove={onRemove} onAddChild={onAddChild} />
           ))}
         </div>
       )}
@@ -81,11 +109,12 @@ function TemplateSubtaskEditorRow({ subtask, index, fieldId, errors, onUpdate, o
   );
 }
 
-export default function TemplateForm({ template, onSave, onCancel }: TemplateFormProps) {
+export default function TemplateForm({ template, initialInput, onSave, onCancel }: TemplateFormProps) {
   const fieldId = useId();
   const formRef = useRef<HTMLFormElement>(null);
   const nextSubtask = useRef(0);
-  const [values, setValues] = useState<FormValues>(() => initialValues(template));
+  const { dtmsDocumentTemplates: docTemplates } = useTasks();
+  const [values, setValues] = useState<FormValues>(() => initialValues(template, initialInput));
   const [errors, setErrors] = useState<FormErrors>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -97,7 +126,7 @@ export default function TemplateForm({ template, onSave, onCancel }: TemplateFor
     if (errors[field as string]) setErrors(current => ({ ...current, [field as string]: "" }));
   }
 
-  function updateSubtask(localKey: string, change: Partial<Pick<TemplateSubtask, "title" | "description">>) {
+  function updateSubtask(localKey: string, change: Partial<Pick<TemplateSubtask, "title" | "description" | "default_document_template">>) {
     setValues(current => ({ ...current, subtasks: mapSubtaskTree(current.subtasks, localKey, subtask => ({ ...subtask, ...change })) }));
     if (errors[localKey]) setErrors(current => ({ ...current, [localKey]: "" }));
   }
@@ -173,7 +202,7 @@ export default function TemplateForm({ template, onSave, onCancel }: TemplateFor
             <label style={{ display: "flex", alignItems: "center", gap: 8 }}><CheckCheck size={16} /> Subtasks <span className="etm-form-optional">(optional)</span></label>
             {allSubtasks.length === 0 && <div className="etm-subtask-empty"><CheckCheck size={23} /><span>No subtasks yet. Add the first step below.</span></div>}
             <div className="etm-subtask-editor">{values.subtasks.map((subtask, index) => (
-              <TemplateSubtaskEditorRow key={subtask.localKey} subtask={subtask} index={index} fieldId={fieldId} errors={errors} onUpdate={updateSubtask} onRemove={removeSubtask} onAddChild={addSubtask} />
+              <TemplateSubtaskEditorRow key={subtask.localKey} subtask={subtask} index={index} fieldId={fieldId} errors={errors} docTemplates={docTemplates} onUpdate={updateSubtask} onRemove={removeSubtask} onAddChild={addSubtask} />
             ))}</div>
             <button type="button" className="etm-add-subtask" onClick={() => addSubtask(null)}><Plus size={16} /> Add subtask</button>
           </div>

@@ -5,6 +5,7 @@ import {
   MousePointerClick, PaintBucket, RefreshCw, Search, Square, Trash2, Type, Underline, Undo2, Redo2, Ungroup, X, ZoomIn, ZoomOut,
 } from "lucide-react";
 import Swal from "sweetalert2";
+import ThemedSelect, { type SelectOption } from "../../components/ThemedSelect";
 import { taskService, taskError } from "../tasks/taskService";
 import type { GroupedTask } from "../tasks/types";
 import IPCRGrid, { type IPCRBorderKind, type IPCRGridHandle } from "./IPCRGrid";
@@ -22,6 +23,22 @@ import pdfMake from "pdfmake/build/pdfmake";
 const MAX_IMAGE_BYTES = 1.5 * 1024 * 1024;
 
 const FONT_OPTIONS = ["Arial", "Helvetica", "Times New Roman", "Georgia", "Courier New", "Verdana"];
+
+const VALIGN_OPTIONS: SelectOption<"top" | "middle" | "bottom">[] = [
+  { value: "top", label: "Top" },
+  { value: "middle", label: "Middle" },
+  { value: "bottom", label: "Bottom" },
+];
+
+const BORDER_OPTIONS: SelectOption<IPCRBorderKind>[] = [
+  { value: "all", label: "All sides" },
+  { value: "outer", label: "Outer box" },
+  { value: "top", label: "Top" },
+  { value: "bottom", label: "Bottom" },
+  { value: "left", label: "Left" },
+  { value: "right", label: "Right" },
+  { value: "none", label: "Clear" },
+];
 
 function readImageFile(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -381,10 +398,16 @@ export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTem
         <button type="button" onClick={() => setZoom(z => Math.min(2, +(z + 0.1).toFixed(2)))} className={tb} title="Zoom in"><ZoomIn className="w-3.5 h-3.5" /></button>
         <div className="w-px h-4 bg-border mx-1 shrink-0" />
 
-        <select value={paperSize} onChange={event => setPaperSize(event.target.value as IPCRPaperSize)}
-          className="text-[11px] border border-border rounded px-1.5 bg-background h-6 shrink-0" title="Paper size — used when generating a PDF">
-          {PAPER_SIZE_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-        </select>
+        <div className="shrink-0" style={{ width: 92 }} title="Paper size — used when generating a PDF">
+          <ThemedSelect<SelectOption<IPCRPaperSize>>
+            size="mini"
+            classNamePrefix="etm-papersize-select"
+            isSearchable={false}
+            options={PAPER_SIZE_OPTIONS.map(option => ({ value: option.value, label: option.label }))}
+            value={PAPER_SIZE_OPTIONS.map(option => ({ value: option.value, label: option.label })).find(option => option.value === paperSize)}
+            onChange={option => setPaperSize(option?.value ?? paperSize)}
+          />
+        </div>
         <div className="flex rounded border border-border overflow-hidden h-6 shrink-0">
           <button type="button" onClick={() => setOrientation("portrait")} title="Portrait"
             className={`px-1.5 text-[10px] ${orientation === "portrait" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground"}`}>P</button>
@@ -393,12 +416,17 @@ export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTem
         </div>
         <div className="w-px h-4 bg-border mx-1 shrink-0" />
 
-        <select value={currentStyle.fontFamily ?? FONT_OPTIONS[0]} disabled={!sel}
-          onChange={event => runStyleAction(() => gridRef.current?.setFontFamily(event.target.value))}
-          title="Font family — applies on screen and in the .xlsx export; PDF export uses a fixed font"
-          className="text-[11px] border border-border rounded px-1.5 bg-background h-6 shrink-0 disabled:opacity-40">
-          {FONT_OPTIONS.map(font => <option key={font} value={font}>{font}</option>)}
-        </select>
+        <div className="shrink-0" style={{ width: 120, opacity: sel ? 1 : 0.4 }} title="Font family — applies on screen and in the .xlsx export; PDF export uses a fixed font">
+          <ThemedSelect<SelectOption<string>>
+            size="mini"
+            classNamePrefix="etm-fontfamily-select"
+            isSearchable={false}
+            isDisabled={!sel}
+            options={FONT_OPTIONS.map(font => ({ value: font, label: font }))}
+            value={{ value: currentStyle.fontFamily ?? FONT_OPTIONS[0], label: currentStyle.fontFamily ?? FONT_OPTIONS[0] }}
+            onChange={option => { if (option) runStyleAction(() => gridRef.current?.setFontFamily(option.value)); }}
+          />
+        </div>
         <input type="number" min={5} max={72} disabled={!sel} value={currentStyle.fontSize ?? 12}
           onChange={event => runStyleAction(() => gridRef.current?.setFontSize(Math.max(5, Math.min(72, Number(event.target.value) || 12))))}
           className="w-12 text-[11px] border border-border rounded px-1.5 bg-background h-6 shrink-0 disabled:opacity-40" title="Font size (px)" />
@@ -428,29 +456,33 @@ export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTem
         <button type="button" disabled={!sel} onClick={() => runStyleAction(() => gridRef.current?.alignSelection("left"))} className={tbActive(!currentStyle.align || currentStyle.align === "left")} title="Align left"><AlignLeft className="w-3.5 h-3.5" /></button>
         <button type="button" disabled={!sel} onClick={() => runStyleAction(() => gridRef.current?.alignSelection("center"))} className={tbActive(currentStyle.align === "center")} title="Align center"><AlignCenter className="w-3.5 h-3.5" /></button>
         <button type="button" disabled={!sel} onClick={() => runStyleAction(() => gridRef.current?.alignSelection("right"))} className={tbActive(currentStyle.align === "right")} title="Align right"><AlignRight className="w-3.5 h-3.5" /></button>
-        <select value={currentStyle.valign ?? "top"} disabled={!sel}
-          onChange={event => runStyleAction(() => gridRef.current?.setVerticalAlign(event.target.value as "top" | "middle" | "bottom"))}
-          className="text-[10px] border border-border rounded px-1 bg-background h-6 shrink-0 disabled:opacity-40" title="Vertical alignment">
-          <option value="top">Top</option>
-          <option value="middle">Middle</option>
-          <option value="bottom">Bottom</option>
-        </select>
+        <div className="shrink-0" style={{ width: 74, opacity: sel ? 1 : 0.4 }} title="Vertical alignment">
+          <ThemedSelect<SelectOption<"top" | "middle" | "bottom">>
+            size="mini"
+            classNamePrefix="etm-valign-select"
+            isSearchable={false}
+            isDisabled={!sel}
+            options={VALIGN_OPTIONS}
+            value={VALIGN_OPTIONS.find(option => option.value === (currentStyle.valign ?? "top"))}
+            onChange={option => { if (option) runStyleAction(() => gridRef.current?.setVerticalAlign(option.value)); }}
+          />
+        </div>
         <div className="w-px h-4 bg-border mx-1 shrink-0" />
 
         <button type="button" onClick={() => gridRef.current?.mergeSelection()} className={`${tb} text-[10px] font-medium px-1.5 shrink-0`} title="Merge selected cells"><Combine className="w-3.5 h-3.5" /></button>
         <button type="button" onClick={() => gridRef.current?.unmergeSelection()} className={`${tb} text-[10px] font-medium px-1.5 shrink-0`} title="Unmerge cell"><Ungroup className="w-3.5 h-3.5" /></button>
-        <select value="" disabled={!sel}
-          onChange={event => { if (event.target.value) gridRef.current?.applyBorder(event.target.value as IPCRBorderKind, borderColor); event.target.value = ""; }}
-          className="text-[10px] border border-border rounded px-1 bg-background h-6 shrink-0 disabled:opacity-40" title="Apply borders to the selection">
-          <option value="" hidden>Borders…</option>
-          <option value="all">All sides</option>
-          <option value="outer">Outer box</option>
-          <option value="top">Top</option>
-          <option value="bottom">Bottom</option>
-          <option value="left">Left</option>
-          <option value="right">Right</option>
-          <option value="none">Clear</option>
-        </select>
+        <div className="shrink-0" style={{ width: 96, opacity: sel ? 1 : 0.4 }} title="Apply borders to the selection">
+          <ThemedSelect<SelectOption<IPCRBorderKind>>
+            size="mini"
+            classNamePrefix="etm-border-select"
+            isSearchable={false}
+            isDisabled={!sel}
+            placeholder="Borders…"
+            options={BORDER_OPTIONS}
+            value={null}
+            onChange={option => { if (option) gridRef.current?.applyBorder(option.value, borderColor); }}
+          />
+        </div>
         <label className={`${tb} relative cursor-pointer ${!sel ? "opacity-30 pointer-events-none" : ""}`} title="Border color">
           <Square className="w-3.5 h-3.5" />
           <span className="absolute bottom-0.5 left-1 right-1 h-[3px] rounded-sm" style={{ backgroundColor: borderColor }} />
