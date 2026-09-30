@@ -14,6 +14,15 @@ import GuestRoute from './screens/Auth/GuestRoute.tsx';
 import { getHomePath } from './screens/Auth/roles.ts';
 import { ThemeProvider } from './components/theme-provider.tsx';
 
+// A long press on touch also fires "contextmenu" (the browser's right-click menu), which would pop
+// up over the row being dragged. Suppress it for touch input on touch-draggable elements only, so mouse
+// right-click keeps working.
+let lastPointerType = '';
+window.addEventListener('pointerdown', event => { lastPointerType = event.pointerType; }, true);
+window.addEventListener('contextmenu', event => {
+  if (lastPointerType === 'touch' && (event.target as Element | null)?.closest?.('[data-touch-drag]')) event.preventDefault();
+}, true);
+
 const Page1 = lazy(() =>
   wait(1300).then(() => import("./screens/page1.tsx"))
 );

@@ -597,3 +597,21 @@ a.etm-task-links-text:hover strong { color: var(--etm-primary); text-decoration:
 .etm-task-links-quick { display: grid; gap: 6px; }
 .etm-task-links-quick label { display: flex; align-items: center; gap: 6px; color: var(--etm-muted); font-size: 12px; font-weight: 600; }
 @media (max-width: 720px) { .etm-task-links-add { grid-template-columns: 1fr; } }
+
+/* Turn over: an assignee hands the task to someone else */
+.etm-details-turnover { margin-top: 10px; }
+.etm-turnover-panel { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; padding: 14px; border: 1px solid var(--etm-border); border-radius: 12px; background: var(--etm-surface-alt); }
+.etm-turnover-panel p { margin: 0; color: var(--etm-muted); font-size: 13px; }
+.etm-turnover-panel label { display: flex; flex-direction: column; gap: 4px; color: var(--etm-muted); font-size: 12px; font-weight: 600; }
+.etm-turnover-panel textarea { padding: 8px 10px; border: 1px solid var(--etm-border); border-radius: 8px; background: var(--etm-surface); color: var(--etm-ink); font: inherit; font-size: 14px; resize: vertical; }
+.etm-turnover-error { color: #c0392b !important; font-weight: 600; }
+.etm-turnover-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+.etm-report-row-clickable { cursor: pointer; }
+.etm-report-row-clickable:hover { background: var(--etm-surface-sunken); }
+
+/* Sortable table headers */
+.etm-sort-button { display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; text-align: left; cursor: pointer; }
+.etm-sort-button svg { flex-shrink: 0; opacity: .45; transition: opacity .15s; }
+.etm-sort-button:hover svg, .etm-sort-button.active svg { opacity: 1; }
+.etm-sort-button.active { color: var(--etm-primary); }

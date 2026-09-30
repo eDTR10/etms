@@ -4,7 +4,7 @@ import { isAxiosError } from "axios";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
-import { AlertTriangle, Bold, CalendarDays, Check, CheckCheck, ChevronRight, Circle, ClipboardList, Clock3, Copy, Download, Edit3, ExternalLink, Link2, FileText, Flag, Folder, GripVertical, History, Italic, List, Loader2, MessageSquare, Paperclip, Pencil, Plus, Repeat, Reply, Search, Send, SmilePlus, Trash2, Underline, User, UserPlus, Users, X } from "lucide-react";
+import { AlertTriangle, ArrowRightLeft, Bold, CalendarDays, Check, CheckCheck, ChevronRight, Circle, ClipboardList, Clock3, Copy, Download, Edit3, ExternalLink, Link2, FileText, Flag, Folder, GripVertical, History, Italic, List, Loader2, MessageSquare, Paperclip, Pencil, Plus, Repeat, Reply, Search, Send, SmilePlus, Trash2, Underline, User, UserPlus, Users, X } from "lucide-react";
 import MentionField from "./MentionField";
 import ThemedSelect, { type SelectOption } from "../../components/ThemedSelect";
 import { useAuth } from "../../screens/Auth/AuthContext";
@@ -46,6 +46,8 @@ interface TaskDetailsProps {
   onLinkSubtaskDocument: (subtaskId: number, tracknumber: string) => Promise<void>;
   onUnlinkSubtaskDocument: (subtaskId: number) => Promise<void>;
   onComplete?: () => Promise<void>;
+  // Hand this task over to someone else. Only offered to a person the task is assigned to.
+  onTurnover?: (userId: number, note: string) => Promise<void>;
   assignableMembers?: Member[];
   onAddRemarkAttachment: (remarkId: number, file: File) => Promise<void>;
   onDeleteRemarkAttachment: (remarkId: number, attachmentId: number) => Promise<void>;
@@ -125,6 +127,7 @@ function useSubtaskDragReorder(items: SubTask[], enabled: boolean, onReorder: (o
 // read as an assignment, not just "mentions the word subtask").
 const ACTIVITY_CATEGORIES: { test: (message: string) => boolean; label: string; color: string }[] = [
   { test: m => m === "Created this task" || m.startsWith("Created from subtask"), label: "Created", color: "#3e9276" },
+  { test: m => m.startsWith("Turned over"), label: "Turn over", color: "#7a6ad8" },
   { test: m => m.startsWith("Assigned") || m.startsWith("Unassigned") || m.includes("role to") || m.includes("from the task"), label: "Assignment", color: "#5484bd" },
   { test: m => m === "Archived this task", label: "Archived", color: "#c0605a" },
   { test: m => m.startsWith("Duplicated from"), label: "Duplicated", color: "#8b7fd6" },
@@ -1104,7 +1107,7 @@ function useHighlightFlash<T extends HTMLElement>(active: boolean) {
   return ref;
 }
 
-function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = false, onProgress, onEditProgress, onDeleteProgress, onAddRemark, onEditRemark, onDeleteRemark, onReactRemark, onAddRemarkReply, onAddSubtaskRemark, onEditSubtaskRemark, onDeleteSubtaskRemark, onReactSubtaskRemark, onAddSubtaskRemarkReply, onSetSubtaskStatus, onAddSubtask, onEditSubtask, onDeleteSubtask, onSetSubtaskCompletion, onReorderSubtasks, onAssignSubtask, onLinkSubtaskDocument, onUnlinkSubtaskDocument, onComplete, assignableMembers, onAddRemarkAttachment, onDeleteRemarkAttachment, onAddSubtaskRemarkAttachment, onDeleteSubtaskRemarkAttachment, onMarkCompletionSeen, onMarkViewed, initialSubtaskId, highlightHeader = false, highlightRemarks = false, page = false }: Omit<TaskDetailsProps, "open">) {
+function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = false, onProgress, onEditProgress, onDeleteProgress, onAddRemark, onEditRemark, onDeleteRemark, onReactRemark, onAddRemarkReply, onAddSubtaskRemark, onEditSubtaskRemark, onDeleteSubtaskRemark, onReactSubtaskRemark, onAddSubtaskRemarkReply, onSetSubtaskStatus, onAddSubtask, onEditSubtask, onDeleteSubtask, onSetSubtaskCompletion, onReorderSubtasks, onAssignSubtask, onLinkSubtaskDocument, onUnlinkSubtaskDocument, onComplete, onTurnover, assignableMembers, onAddRemarkAttachment, onDeleteRemarkAttachment, onAddSubtaskRemarkAttachment, onDeleteSubtaskRemarkAttachment, onMarkCompletionSeen, onMarkViewed, initialSubtaskId, highlightHeader = false, highlightRemarks = false, page = false }: Omit<TaskDetailsProps, "open">) {
   const fieldId = useId();
   const [taskInfoOpen, setTaskInfoOpen] = useState(false);
   const [activityLogOpen, setActivityLogOpen] = useState(false);
@@ -1138,6 +1141,32 @@ function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = 
   const activityLogs = [...task.activity_logs].sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime() || right.id - left.id);
   const canComment = task.can_edit || task.my_role === "Commentor";
   const canAddSubtasks = task.can_edit;
+  const { user: currentUser } = useAuth();
+  const [turnoverOpen, setTurnoverOpen] = useState(false);
+  const [turnoverUserId, setTurnoverUserId] = useState("");
+  const [turnoverNote, setTurnoverNote] = useState("");
+  const [turningOver, setTurningOver] = useState(false);
+  const [turnoverError, setTurnoverError] = useState("");
+  const canTurnover = !!onTurnover && task.my_role === "Editor" && !task.is_creator && !task.is_completed;
+  const turnoverCandidates = (assignableMembers ?? []).filter(member => member.id !== currentUser?.id);
+  async function submitTurnover(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!onTurnover || turningOver) return;
+    if (!turnoverUserId) { setTurnoverError("Choose who you're turning this task over to."); return; }
+    setTurningOver(true);
+    setTurnoverError("");
+    try {
+      await onTurnover(Number(turnoverUserId), turnoverNote.trim());
+      setTurnoverOpen(false);
+      setTurnoverUserId("");
+      setTurnoverNote("");
+    } catch (caught) {
+      setTurnoverError(progressError(caught));
+    } finally {
+      setTurningOver(false);
+    }
+  }
+
   const [completing, setCompleting] = useState(false);
   async function markComplete() {
     if (!onComplete || completing) return;
@@ -1229,6 +1258,27 @@ function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = 
       {page ? <p className="etm-details-description">{task.details || "No description provided."}</p> : <Dialog.Description className="etm-details-description">{task.details || "No description provided."}</Dialog.Description>}
       <div className="etm-details-badges"><span className={`etm-badge ${statusSlug(task.status)}`}><span className="etm-details-status-dot" />{task.status}</span><span className={`etm-details-priority ${task.priority.toLowerCase()}`}><Flag size={13} />{task.priority} priority</span>{task.recurrence !== "None" && <span className="etm-badge"><Repeat size={13} />{describeRecurrence(task)}</span>}</div>
       {task.can_edit && onComplete && !task.is_completed && <button type="button" className={`etm-button primary small etm-details-complete ${page ? "page" : ""}`} onClick={() => void markComplete()} disabled={completing}>{completing ? <Loader2 size={14} className="etm-form-spinner" /> : <CheckCheck size={14} />}Mark as complete</button>}
+      {canTurnover && !turnoverOpen && <button type="button" className="etm-button ghost small etm-details-turnover" onClick={() => setTurnoverOpen(true)}><ArrowRightLeft size={14} />Turn over</button>}
+      {canTurnover && turnoverOpen && (
+        <form className="etm-turnover-panel" onSubmit={event => void submitTurnover(event)}>
+          <strong>Turn this task over</strong>
+          <p>You'll hand it to someone else and stay on it as a viewer. This is recorded in the activity log.</p>
+          <label>Turn over to
+            <select className="etm-filter-select" value={turnoverUserId} onChange={event => setTurnoverUserId(event.target.value)} disabled={turningOver}>
+              <option value="">Select a person…</option>
+              {turnoverCandidates.map(member => <option key={member.id} value={member.id}>{memberName(member)}</option>)}
+            </select>
+          </label>
+          <label>Note (optional)
+            <textarea value={turnoverNote} onChange={event => setTurnoverNote(event.target.value)} maxLength={300} rows={2} placeholder="e.g. I'm on leave until the 15th" disabled={turningOver} />
+          </label>
+          {turnoverError && <p className="etm-turnover-error" role="alert">{turnoverError}</p>}
+          <div className="etm-turnover-actions">
+            <button type="button" className="etm-button ghost small" onClick={() => { setTurnoverOpen(false); setTurnoverError(""); }} disabled={turningOver}>Cancel</button>
+            <button type="submit" className="etm-button primary small" disabled={turningOver}>{turningOver ? <Loader2 size={14} className="etm-form-spinner" /> : <ArrowRightLeft size={14} />}Turn over</button>
+          </div>
+        </form>
+      )}
       {!page && <button type="button" className="etm-icon-button etm-details-close" onClick={onClose} aria-label="Close task details"><X size={21} /></button>}
     </div>
     <div className="etm-details-body">
@@ -1342,8 +1392,8 @@ function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = 
   </>;
 }
 
-export default function TaskDetails({ task, open, onClose, onEdit, onDuplicate, duplicating, onProgress, onEditProgress, onDeleteProgress, onAddRemark, onEditRemark, onDeleteRemark, onReactRemark, onAddRemarkReply, onAddSubtaskRemark, onEditSubtaskRemark, onDeleteSubtaskRemark, onReactSubtaskRemark, onAddSubtaskRemarkReply, onSetSubtaskStatus, onAddSubtask, onEditSubtask, onDeleteSubtask, onSetSubtaskCompletion, onReorderSubtasks, onAssignSubtask, onLinkSubtaskDocument, onUnlinkSubtaskDocument, onComplete, assignableMembers, onAddRemarkAttachment, onDeleteRemarkAttachment, onAddSubtaskRemarkAttachment, onDeleteSubtaskRemarkAttachment, onMarkCompletionSeen, onMarkViewed, initialSubtaskId, highlightHeader, highlightRemarks, page = false }: TaskDetailsProps) {
-  if (page) return <div className="etm-task-details-page"><TaskDetailsContent task={task} onClose={onClose} onEdit={onEdit} onDuplicate={onDuplicate} duplicating={duplicating} onProgress={onProgress} onEditProgress={onEditProgress} onDeleteProgress={onDeleteProgress} onAddRemark={onAddRemark} onEditRemark={onEditRemark} onDeleteRemark={onDeleteRemark} onReactRemark={onReactRemark} onAddRemarkReply={onAddRemarkReply} onAddSubtaskRemark={onAddSubtaskRemark} onEditSubtaskRemark={onEditSubtaskRemark} onDeleteSubtaskRemark={onDeleteSubtaskRemark} onReactSubtaskRemark={onReactSubtaskRemark} onAddSubtaskRemarkReply={onAddSubtaskRemarkReply} onSetSubtaskStatus={onSetSubtaskStatus} onAddSubtask={onAddSubtask} onEditSubtask={onEditSubtask} onDeleteSubtask={onDeleteSubtask} onSetSubtaskCompletion={onSetSubtaskCompletion} onReorderSubtasks={onReorderSubtasks} onAssignSubtask={onAssignSubtask} onLinkSubtaskDocument={onLinkSubtaskDocument} onUnlinkSubtaskDocument={onUnlinkSubtaskDocument} onComplete={onComplete} assignableMembers={assignableMembers} onAddRemarkAttachment={onAddRemarkAttachment} onDeleteRemarkAttachment={onDeleteRemarkAttachment} onAddSubtaskRemarkAttachment={onAddSubtaskRemarkAttachment} onDeleteSubtaskRemarkAttachment={onDeleteSubtaskRemarkAttachment} onMarkCompletionSeen={onMarkCompletionSeen} onMarkViewed={onMarkViewed} initialSubtaskId={initialSubtaskId} highlightHeader={highlightHeader} highlightRemarks={highlightRemarks} page /></div>;
+export default function TaskDetails({ task, open, onClose, onEdit, onDuplicate, duplicating, onProgress, onEditProgress, onDeleteProgress, onAddRemark, onEditRemark, onDeleteRemark, onReactRemark, onAddRemarkReply, onAddSubtaskRemark, onEditSubtaskRemark, onDeleteSubtaskRemark, onReactSubtaskRemark, onAddSubtaskRemarkReply, onSetSubtaskStatus, onAddSubtask, onEditSubtask, onDeleteSubtask, onSetSubtaskCompletion, onReorderSubtasks, onAssignSubtask, onLinkSubtaskDocument, onUnlinkSubtaskDocument, onComplete, onTurnover, assignableMembers, onAddRemarkAttachment, onDeleteRemarkAttachment, onAddSubtaskRemarkAttachment, onDeleteSubtaskRemarkAttachment, onMarkCompletionSeen, onMarkViewed, initialSubtaskId, highlightHeader, highlightRemarks, page = false }: TaskDetailsProps) {
+  if (page) return <div className="etm-task-details-page"><TaskDetailsContent task={task} onClose={onClose} onEdit={onEdit} onDuplicate={onDuplicate} duplicating={duplicating} onProgress={onProgress} onEditProgress={onEditProgress} onDeleteProgress={onDeleteProgress} onAddRemark={onAddRemark} onEditRemark={onEditRemark} onDeleteRemark={onDeleteRemark} onReactRemark={onReactRemark} onAddRemarkReply={onAddRemarkReply} onAddSubtaskRemark={onAddSubtaskRemark} onEditSubtaskRemark={onEditSubtaskRemark} onDeleteSubtaskRemark={onDeleteSubtaskRemark} onReactSubtaskRemark={onReactSubtaskRemark} onAddSubtaskRemarkReply={onAddSubtaskRemarkReply} onSetSubtaskStatus={onSetSubtaskStatus} onAddSubtask={onAddSubtask} onEditSubtask={onEditSubtask} onDeleteSubtask={onDeleteSubtask} onSetSubtaskCompletion={onSetSubtaskCompletion} onReorderSubtasks={onReorderSubtasks} onAssignSubtask={onAssignSubtask} onLinkSubtaskDocument={onLinkSubtaskDocument} onUnlinkSubtaskDocument={onUnlinkSubtaskDocument} onComplete={onComplete} onTurnover={onTurnover} assignableMembers={assignableMembers} onAddRemarkAttachment={onAddRemarkAttachment} onDeleteRemarkAttachment={onDeleteRemarkAttachment} onAddSubtaskRemarkAttachment={onAddSubtaskRemarkAttachment} onDeleteSubtaskRemarkAttachment={onDeleteSubtaskRemarkAttachment} onMarkCompletionSeen={onMarkCompletionSeen} onMarkViewed={onMarkViewed} initialSubtaskId={initialSubtaskId} highlightHeader={highlightHeader} highlightRemarks={highlightRemarks} page /></div>;
   function ignoreWhileSwalOpen(event: { preventDefault: () => void }) {
     // A SweetAlert popup renders outside this Dialog.Content in the DOM, so Radix sees
     // clicks/Escape on it as "outside" and would otherwise close this dialog underneath it.
@@ -1357,6 +1407,6 @@ export default function TaskDetails({ task, open, onClose, onEdit, onDuplicate, 
       onPointerDownOutside={ignoreWhileSwalOpen}
       onInteractOutside={ignoreWhileSwalOpen}
       onEscapeKeyDown={ignoreWhileSwalOpen}
-    ><TaskDetailsContent key={`${task.id}-${initialSubtaskId ?? "task"}`} task={task} onClose={onClose} onEdit={onEdit} onDuplicate={onDuplicate} duplicating={duplicating} onProgress={onProgress} onEditProgress={onEditProgress} onDeleteProgress={onDeleteProgress} onAddRemark={onAddRemark} onEditRemark={onEditRemark} onDeleteRemark={onDeleteRemark} onReactRemark={onReactRemark} onAddRemarkReply={onAddRemarkReply} onAddSubtaskRemark={onAddSubtaskRemark} onEditSubtaskRemark={onEditSubtaskRemark} onDeleteSubtaskRemark={onDeleteSubtaskRemark} onReactSubtaskRemark={onReactSubtaskRemark} onAddSubtaskRemarkReply={onAddSubtaskRemarkReply} onSetSubtaskStatus={onSetSubtaskStatus} onAddSubtask={onAddSubtask} onEditSubtask={onEditSubtask} onDeleteSubtask={onDeleteSubtask} onSetSubtaskCompletion={onSetSubtaskCompletion} onReorderSubtasks={onReorderSubtasks} onAssignSubtask={onAssignSubtask} onLinkSubtaskDocument={onLinkSubtaskDocument} onUnlinkSubtaskDocument={onUnlinkSubtaskDocument} onComplete={onComplete} assignableMembers={assignableMembers} onAddRemarkAttachment={onAddRemarkAttachment} onDeleteRemarkAttachment={onDeleteRemarkAttachment} onAddSubtaskRemarkAttachment={onAddSubtaskRemarkAttachment} onDeleteSubtaskRemarkAttachment={onDeleteSubtaskRemarkAttachment} onMarkCompletionSeen={onMarkCompletionSeen} onMarkViewed={onMarkViewed} initialSubtaskId={initialSubtaskId} highlightHeader={highlightHeader} highlightRemarks={highlightRemarks} /></Dialog.Content></Dialog.Portal>
+    ><TaskDetailsContent key={`${task.id}-${initialSubtaskId ?? "task"}`} task={task} onClose={onClose} onEdit={onEdit} onDuplicate={onDuplicate} duplicating={duplicating} onProgress={onProgress} onEditProgress={onEditProgress} onDeleteProgress={onDeleteProgress} onAddRemark={onAddRemark} onEditRemark={onEditRemark} onDeleteRemark={onDeleteRemark} onReactRemark={onReactRemark} onAddRemarkReply={onAddRemarkReply} onAddSubtaskRemark={onAddSubtaskRemark} onEditSubtaskRemark={onEditSubtaskRemark} onDeleteSubtaskRemark={onDeleteSubtaskRemark} onReactSubtaskRemark={onReactSubtaskRemark} onAddSubtaskRemarkReply={onAddSubtaskRemarkReply} onSetSubtaskStatus={onSetSubtaskStatus} onAddSubtask={onAddSubtask} onEditSubtask={onEditSubtask} onDeleteSubtask={onDeleteSubtask} onSetSubtaskCompletion={onSetSubtaskCompletion} onReorderSubtasks={onReorderSubtasks} onAssignSubtask={onAssignSubtask} onLinkSubtaskDocument={onLinkSubtaskDocument} onUnlinkSubtaskDocument={onUnlinkSubtaskDocument} onComplete={onComplete} onTurnover={onTurnover} assignableMembers={assignableMembers} onAddRemarkAttachment={onAddRemarkAttachment} onDeleteRemarkAttachment={onDeleteRemarkAttachment} onAddSubtaskRemarkAttachment={onAddSubtaskRemarkAttachment} onDeleteSubtaskRemarkAttachment={onDeleteSubtaskRemarkAttachment} onMarkCompletionSeen={onMarkCompletionSeen} onMarkViewed={onMarkViewed} initialSubtaskId={initialSubtaskId} highlightHeader={highlightHeader} highlightRemarks={highlightRemarks} /></Dialog.Content></Dialog.Portal>
   </Dialog.Root>;
 }

@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertTriangle, CheckCircle2, ChevronRight, ClipboardList, UserX } from "lucide-react";
+import { AlertTriangle, Ban, CheckCircle2, ChevronRight, ClipboardList, Clock, Hourglass, UserX } from "lucide-react";
 import ThemedSelect, { type SelectOption } from "../../components/ThemedSelect";
 import { useTasks } from "../../features/tasks/taskContext";
 import { useTaskFilters } from "../../features/tasks/useTaskFilters";
@@ -15,7 +15,8 @@ import { useDeleteTaskConfirm } from "../../features/tasks/useDeleteTaskConfirm"
 import { useDuplicateTask } from "../../features/tasks/useDuplicateTask";
 import { useBulkTaskActions } from "../../features/tasks/useBulkTaskActions";
 import { useRowSelection } from "../../features/tasks/useRowSelection";
-import { formatDate, isOverdue, memberName, remarkPreview, statusChipLabel, statusSlug, STATUSES, type TaskStatus } from "../../features/tasks/types";
+import { SortTh, useTableSort } from "../../features/tasks/useTableSort";
+import { dueSoonLabel, formatDate, isDueSoon, isOverdue, memberName, remarkPreview, statusChipLabel, statusSlug, STATUSES, type TaskStatus } from "../../features/tasks/types";
 import Modal from "../../components/ui/modal";
 
 interface DashboardOverviewProps {
@@ -74,7 +75,7 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks" }
     tasks, members, projects, updateTask,
     addProgress, editProgress, deleteProgress,
     addRemark, editRemark, deleteRemark, reactToRemark, addRemarkReply,
-    addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, reorderSubtasks, assignSubtask, linkSubtaskDocument, unlinkSubtaskDocument, completeTask,
+    addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, reorderSubtasks, assignSubtask, linkSubtaskDocument, unlinkSubtaskDocument, completeTask, turnoverTask,
     addRemarkAttachment, deleteRemarkAttachment, addSubtaskRemarkAttachment, deleteSubtaskRemarkAttachment, markCompletionSeen, markViewed,
   } = useTasks();
   const confirmDelete = useDeleteTaskConfirm();
@@ -84,7 +85,7 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks" }
     filtered, search, setSearch, deadlineDate, setDeadlineDate, quickFilter, setQuickFilter,
     status, setStatus, priority, setPriority, projectFilter, setProjectFilter,
     assignedFilter, setAssignedFilter, overdueOnly, setOverdueOnly,
-    hasActiveFilters, clearFilters,
+    dueSoonOnly, setDueSoonOnly, hasActiveFilters, clearFilters,
   } = useTaskFilters(tasks, { initialStatus: "Pending" });
   const [viewingId, setViewingId] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -92,15 +93,35 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks" }
   const [workloadPage, setWorkloadPage] = useState(0);
   const [workloadSort, setWorkloadSort] = useState<"most" | "fewest">("most");
   const navigate = useNavigate();
+  const recentSectionRef = useRef<HTMLDivElement>(null);
+
+  // Card taps filter the "Recently added tasks" table and smoothly scroll down to it.
+  const filterRecent = (kind: "unassigned" | "completed" | "overdue" | "pending" | "dueSoon" | "blocked") => {
+    clearFilters();
+    if (kind === "unassigned") setAssignedFilter("unassigned");
+    else if (kind === "completed") setStatus("Completed");
+    else if (kind === "pending") setStatus("Pending");
+    else if (kind === "blocked") setStatus("Blocked/Stuck");
+    else if (kind === "dueSoon") setDueSoonOnly(true);
+    else setOverdueOnly(true);
+    recentSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  const activeKpi = dueSoonOnly ? "dueSoon" : overdueOnly ? "overdue" : assignedFilter === "unassigned" ? "unassigned" : status === "Completed" ? "completed" : status === "Pending" ? "pending" : status === "Blocked/Stuck" ? "blocked" : null;
 
   const totalTasks = tasks.length;
   const totalUnassigned = useMemo(() => tasks.filter(task => task.assignments.length === 0).length, [tasks]);
   const totalCompleted = useMemo(() => tasks.filter(task => task.status === "Completed").length, [tasks]);
+  const totalPending = useMemo(() => tasks.filter(task => task.status === "Pending").length, [tasks]);
+  const totalBlocked = useMemo(() => tasks.filter(task => task.status === "Blocked/Stuck").length, [tasks]);
+  const totalDueSoon = useMemo(() => tasks.filter(isDueSoon).length, [tasks]);
   const totalPastDue = useMemo(() => tasks.filter(isOverdue).length, [tasks]);
   const unseenCompleted = useMemo(() => tasks.filter(task => task.is_creator && task.status === "Completed" && !task.completion_seen).length, [tasks]);
 
   const memberCounts = useMemo(() => members
-    .map(member => ({ member, count: tasks.filter(task => task.assignments.some(a => a.id === member.id)).length }))
+    .map(member => {
+      const assigned = tasks.filter(task => task.assignments.some(a => a.id === member.id));
+      return { member, count: assigned.length, dueSoon: assigned.filter(isDueSoon).length };
+    })
     .filter(({ count }) => count > 0)
     .sort((a, b) => b.count - a.count), [members, tasks]);
 
@@ -124,6 +145,12 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks" }
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   ).slice(0, 6), [filtered]);
 
+  const { sorted: sortedRecent, sort, toggle: toggleSort } = useTableSort(recentTasks, {
+    title: task => task.title,
+    date: task => new Date(task.created_at).getTime(),
+    priority: task => ({ Low: 1, Medium: 2, High: 3 })[task.priority],
+    progress: task => task.status,
+  });
   const recentIds = useMemo(() => recentTasks.map(task => task.id), [recentTasks]);
   const selection = useRowSelection(recentIds);
 
@@ -143,22 +170,34 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks" }
 
   return (
     <div>
-      <div className="etm-kpi-grid">
+      <div className="etm-kpi-grid etm-kpi-grid-six">
         <button type="button" className="etm-panel etm-kpi-card etm-kpi-card-button" onClick={() => navigate(basePath)}>
           <div className="etm-kpi-card-top"><span className="etm-kpi-label">Total Tasks</span><span className="etm-kpi-icon"><ClipboardList size={17} /></span></div>
           <span className="etm-kpi-value">{totalTasks}</span>
         </button>
-        <button type="button" className="etm-panel etm-kpi-card etm-kpi-card-button warn" onClick={() => navigate(`${basePath}?unassigned=1`)}>
+        <button type="button" className={`etm-panel etm-kpi-card etm-kpi-card-button warn${activeKpi === "pending" ? " selected" : ""}`} onClick={() => filterRecent("pending")}>
+          <div className="etm-kpi-card-top"><span className="etm-kpi-label">Pending Tasks</span><span className="etm-kpi-icon"><Hourglass size={17} /></span></div>
+          <span className="etm-kpi-value">{totalPending}</span>
+        </button>
+        <button type="button" className={`etm-panel etm-kpi-card etm-kpi-card-button danger${activeKpi === "dueSoon" ? " selected" : ""}${totalDueSoon > 0 ? " due-soon" : ""}`} onClick={() => filterRecent("dueSoon")}>
+          <div className="etm-kpi-card-top"><span className="etm-kpi-label">Almost Due Date</span><span className="etm-kpi-icon"><Clock size={17} /></span></div>
+          <span className="etm-kpi-value">{totalDueSoon}</span>
+        </button>
+        <button type="button" className={`etm-panel etm-kpi-card etm-kpi-card-button warn${activeKpi === "unassigned" ? " selected" : ""}`} onClick={() => filterRecent("unassigned")}>
           <div className="etm-kpi-card-top"><span className="etm-kpi-label">Unassigned Tasks</span><span className="etm-kpi-icon"><UserX size={17} /></span></div>
           <span className="etm-kpi-value">{totalUnassigned}</span>
         </button>
-        <button type="button" className="etm-panel etm-kpi-card etm-kpi-card-button success" onClick={() => navigate(`${basePath}?status=Completed`)}>
+        <button type="button" className={`etm-panel etm-kpi-card etm-kpi-card-button success${activeKpi === "completed" ? " selected" : ""}`} onClick={() => filterRecent("completed")}>
           <div className="etm-kpi-card-top"><span className="etm-kpi-label">Completed Tasks</span><span className="etm-kpi-icon"><CheckCircle2 size={17} /></span></div>
           <span className="etm-kpi-value">{totalCompleted}</span>
         </button>
-        <button type="button" className="etm-panel etm-kpi-card etm-kpi-card-button danger" onClick={() => navigate(`${basePath}?overdue=1`)}>
+        <button type="button" className={`etm-panel etm-kpi-card etm-kpi-card-button danger${activeKpi === "overdue" ? " selected" : ""}`} onClick={() => filterRecent("overdue")}>
           <div className="etm-kpi-card-top"><span className="etm-kpi-label">Past Due Tasks</span><span className="etm-kpi-icon"><AlertTriangle size={17} /></span></div>
           <span className="etm-kpi-value">{totalPastDue}</span>
+        </button>
+        <button type="button" className={`etm-panel etm-kpi-card etm-kpi-card-button danger${activeKpi === "blocked" ? " selected" : ""}`} onClick={() => filterRecent("blocked")}>
+          <div className="etm-kpi-card-top"><span className="etm-kpi-label">Blocked Tasks</span><span className="etm-kpi-icon"><Ban size={17} /></span></div>
+          <span className="etm-kpi-value">{totalBlocked}</span>
         </button>
       </div>
 
@@ -169,8 +208,8 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks" }
             <div className="etm-workload-heading"><h3 className="etm-chart-title">Team workload</h3><label>Sort<div style={{ width: 130 }}><ThemedSelect<SelectOption<"most" | "fewest">> size="small" classNamePrefix="etm-sort-select" aria-label="Sort team workload" options={WORKLOAD_SORT_OPTIONS} value={WORKLOAD_SORT_OPTIONS.find(option => option.value === workloadSort)} onChange={option => { setWorkloadSort(option?.value ?? "most"); setWorkloadPage(0); }} /></div></label></div>
             {memberCounts.length ? <>
               <div className="etm-workload-list">
-                {paginatedMembers.map(({ member, count }) => <button type="button" className="etm-member-row" key={member.id} onClick={() => setSelectedMemberId(member.id)} aria-label={`Open workload for ${memberName(member)}`}>
-                  <span className="etm-member-row-avatar" aria-hidden="true">{member.first_name?.charAt(0)}{member.last_name?.charAt(0)}</span><span className="etm-member-row-name">{memberName(member)}{member.position && <small>{member.position}</small>}</span><span className="etm-member-row-count">{count} {count === 1 ? "task" : "tasks"}</span><ChevronRight className="etm-member-workload-chevron" size={16} />
+                {paginatedMembers.map(({ member, count, dueSoon }) => <button type="button" className="etm-member-row" key={member.id} onClick={() => setSelectedMemberId(member.id)} aria-label={`Open workload for ${memberName(member)}`}>
+                  <span className="etm-member-row-avatar" aria-hidden="true">{member.first_name?.charAt(0)}{member.last_name?.charAt(0)}</span><span className="etm-member-row-name">{memberName(member)}{member.position && <small>{member.position}</small>}</span>{dueSoon > 0 && <span className="etm-due-soon-badge">{dueSoon} due soon</span>}<span className="etm-member-row-count">{count} {count === 1 ? "task" : "tasks"}</span><ChevronRight className="etm-member-workload-chevron" size={16} />
                 </button>)}
               </div>
               <div className="etm-workload-pagination"><button type="button" className="etm-button ghost small" onClick={() => setWorkloadPage(page => Math.max(0, page - 1))} disabled={currentWorkloadPage === 0}>Previous</button><span>Page {currentWorkloadPage + 1} of {workloadPageCount}</span><button type="button" className="etm-button ghost small" onClick={() => setWorkloadPage(page => Math.min(workloadPageCount - 1, page + 1))} disabled={currentWorkloadPage === workloadPageCount - 1}>Next</button></div>
@@ -188,7 +227,7 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks" }
         </div>
       </div>
 
-      <div className="etm-section">
+      <div className="etm-section" ref={recentSectionRef} style={{ scrollMarginTop: 16 }}>
         <div className="etm-section-heading"><div><h2>Recently added tasks</h2><p>The latest tasks created.</p></div><button type="button" className="etm-button ghost small" onClick={onViewMajorTasks}>View all</button></div>
         <TaskFilterBar
           search={search}
@@ -221,26 +260,23 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks" }
             <table className="etm-tasks-table etm-tasks-table-dashboard">
               <thead>
                 <tr>
-                  <th scope="col" className="etm-tasks-table-title-col">
-                    <div className="etm-task-title-heading">
-                      <input
-                        type="checkbox"
-                        aria-label="Select all tasks"
-                        checked={selection.isAllSelected}
-                        ref={el => { if (el) el.indeterminate = selection.isSomeSelected; }}
-                        onChange={selection.toggleAll}
-                      />
-                      Task Title
-                    </div>
-                  </th>
-                  <th scope="col">Date</th>
-                  <th scope="col">Priority</th>
-                  <th scope="col">Progress Log</th>
+                  <SortTh sortKey="title" sort={sort} onSort={toggleSort} className="etm-tasks-table-title-col" leading={
+                    <input
+                      type="checkbox"
+                      aria-label="Select all tasks"
+                      checked={selection.isAllSelected}
+                      ref={el => { if (el) el.indeterminate = selection.isSomeSelected; }}
+                      onChange={selection.toggleAll}
+                    />
+                  }>Task Title</SortTh>
+                  <SortTh sortKey="date" sort={sort} onSort={toggleSort}>Date</SortTh>
+                  <SortTh sortKey="priority" sort={sort} onSort={toggleSort}>Priority</SortTh>
+                  <SortTh sortKey="progress" sort={sort} onSort={toggleSort}>Progress Log</SortTh>
                   <th scope="col" className="etm-tasks-table-actions-col">Action Buttons</th>
                 </tr>
               </thead>
               <tbody>
-                {recentTasks.map(task => {
+                {sortedRecent.map(task => {
                   const lastRemark = task.remarks[0];
                   return (
                     <tr key={task.id} className="etm-tasks-table-row-clickable" onClick={() => setViewingId(task.id)}>
@@ -304,6 +340,7 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks" }
         onLinkSubtaskDocument={(subtaskId, tracknumber) => linkSubtaskDocument(viewingTask.id, subtaskId, tracknumber)}
         onUnlinkSubtaskDocument={subtaskId => unlinkSubtaskDocument(viewingTask.id, subtaskId)}
         onComplete={() => completeTask(viewingTask.id)}
+        onTurnover={(userId, note) => turnoverTask(viewingTask.id, userId, note)}
         assignableMembers={members}
         onAddRemarkAttachment={(remarkId, file) => addRemarkAttachment(viewingTask.id, remarkId, file)}
         onDeleteRemarkAttachment={(remarkId, attachmentId) => deleteRemarkAttachment(viewingTask.id, remarkId, attachmentId)}
@@ -317,7 +354,7 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks" }
         {selectedMemberWorkload && <div className="etm-workload-dialog">
           <p>{selectedMemberTasks.length} assigned {selectedMemberTasks.length === 1 ? "task" : "tasks"}{selectedMemberWorkload.member.position ? ` · ${selectedMemberWorkload.member.position}` : ""}</p>
           <div className="etm-workload-dialog-tasks">
-            {selectedMemberTasks.map(task => <button type="button" key={task.id} onClick={() => { setSelectedMemberId(null); navigate(`${basePath}/${task.id}`); }}><ClipboardList size={15} /><span>{task.title}<small>{task.status} · {task.project?.name ?? "Personal"}</small></span><ChevronRight size={15} /></button>)}
+            {selectedMemberTasks.map(task => <button type="button" key={task.id} onClick={() => { setSelectedMemberId(null); navigate(`${basePath}/${task.id}`); }}><ClipboardList size={15} /><span>{task.title}<small>{task.status} · {task.project?.name ?? "Personal"}{isDueSoon(task) && <> · <b className="etm-due-soon-text">{dueSoonLabel(task)}</b></>}</small></span><ChevronRight size={15} /></button>)}
           </div>
         </div>}
       </Modal>

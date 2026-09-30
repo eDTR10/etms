@@ -136,7 +136,7 @@ export default function Calendar({ basePath = "/etms/tasks", showOwner = false }
           <Search size={15} />
           <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search by task or assignee…" aria-label="Search tasks by title or assignee" />
         </div>
-        <div style={{ flex: "1 1 160px", minWidth: 140 }}>
+        <div className="etm-filter-field" style={{ flexBasis: 160, minWidth: 140 }}>
           <ThemedSelect<SelectOption<PriorityFilterValue>>
             aria-label="Filter by priority"
             classNamePrefix="etm-priority-select"
@@ -145,7 +145,7 @@ export default function Calendar({ basePath = "/etms/tasks", showOwner = false }
             onChange={option => setPriority(option?.value ?? "all")}
           />
         </div>
-        <div style={{ flex: "1 1 200px", minWidth: 160 }}>
+        <div className="etm-filter-field" style={{ flexBasis: 200, minWidth: 160 }}>
           <ThemedSelect<SelectOption<ProjectFilterValue>>
             aria-label="Filter by project"
             classNamePrefix="etm-project-select"

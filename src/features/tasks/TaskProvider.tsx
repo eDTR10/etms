@@ -143,6 +143,9 @@ export default function TaskProvider({ children }: { children: ReactNode }) {
   const completeTask = async (id: number) => withBlockingLoader("Completing task…", async () => {
     replace(await taskService.completeTask(id));
   });
+  const turnoverTask = async (id: number, userId: number, note: string) => withBlockingLoader("Turning over task…", async () => {
+    replace(await taskService.turnoverTask(id, userId, note));
+  });
   const assignSubtask = async (id: number, subtaskId: number, userId: number | null) => withBlockingLoader("Assigning subtask…", async () => {
     replace(await taskService.assignSubtask(id, subtaskId, userId));
   });
@@ -195,5 +198,5 @@ export default function TaskProvider({ children }: { children: ReactNode }) {
     setTemplates(current => current.filter(item => item.id !== id));
   });
 
-  return <TaskContext.Provider value={{ tasks, members, projects, templates, dtmsDocumentTemplates, loading, error, refresh, listArchivedTasks, addMember, createTask, createTemplate, updateTemplate, deleteTemplate, updateTask, deleteTask, duplicateTask, toggleOccurrence, addProgress, editProgress, deleteProgress, addRemark, editRemark, deleteRemark, reactToRemark, addRemarkReply, addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, reorderSubtasks, assignSubtask, linkSubtaskDocument, unlinkSubtaskDocument, completeTask, bulkArchive, bulkDelete, addRemarkAttachment, deleteRemarkAttachment, addSubtaskRemarkAttachment, deleteSubtaskRemarkAttachment, markCompletionSeen, markViewed }}>{children}</TaskContext.Provider>;
+  return <TaskContext.Provider value={{ tasks, members, projects, templates, dtmsDocumentTemplates, loading, error, refresh, listArchivedTasks, addMember, createTask, createTemplate, updateTemplate, deleteTemplate, updateTask, deleteTask, duplicateTask, toggleOccurrence, addProgress, editProgress, deleteProgress, addRemark, editRemark, deleteRemark, reactToRemark, addRemarkReply, addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, reorderSubtasks, assignSubtask, linkSubtaskDocument, unlinkSubtaskDocument, completeTask, turnoverTask, bulkArchive, bulkDelete, addRemarkAttachment, deleteRemarkAttachment, addSubtaskRemarkAttachment, deleteSubtaskRemarkAttachment, markCompletionSeen, markViewed }}>{children}</TaskContext.Provider>;
 }

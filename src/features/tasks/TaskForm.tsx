@@ -107,7 +107,9 @@ function saveError(error: unknown): string {
   return "Your task couldn’t be saved. Your changes are still here; please try again.";
 }
 
-function SubtaskEditorRow({ subtask, index, depth, fieldId, errors, docTemplates, onUpdate, onRemove, onAddChild }: {
+function SubtaskEditorRow({ subtask, index, depth, fieldId, errors, docTemplates, canComplete, onUpdate, onRemove, onAddChild }: {
+  // Completion only makes sense on a task that already exists; a brand-new one has nothing done yet.
+  canComplete: boolean;
   subtask: EditableSubtask; index: number; depth: number; fieldId: string; errors: FormErrors; docTemplates: DtmsDocumentTemplate[];
   onUpdate: (localKey: string, change: Partial<Pick<SubTask, "title" | "description" | "status" | "is_completed" | "default_document_template">>) => void;
   onRemove: (localKey: string) => void;
@@ -119,9 +121,9 @@ function SubtaskEditorRow({ subtask, index, depth, fieldId, errors, docTemplates
   ];
   return (
     <div className="etm-subtask-editor-item">
-      <div className={`etm-subtask-input-row ${subtask.is_completed ? "completed" : ""}`}>
+      <div className={`etm-subtask-input-row ${canComplete && subtask.is_completed ? "completed" : ""}`}>
         <span className="etm-subtask-index" aria-hidden="true">{index + 1}</span>
-        <input type="checkbox" checked={subtask.is_completed} onChange={event => onUpdate(subtask.localKey, { is_completed: event.target.checked })} aria-label={`Mark subtask ${index + 1} complete`} />
+        {canComplete && <input type="checkbox" checked={subtask.is_completed} onChange={event => onUpdate(subtask.localKey, { is_completed: event.target.checked })} aria-label={`Mark subtask ${index + 1} complete`} />}
         <input type="text" data-subtask-key={subtask.localKey} value={subtask.title} onChange={event => onUpdate(subtask.localKey, { title: event.target.value })} placeholder={`Subtask ${index + 1}`} aria-label={`Subtask ${index + 1} title`} maxLength={255} aria-invalid={!!errors[subtask.localKey]} aria-describedby={errors[subtask.localKey] ? `${fieldId}-${subtask.localKey}-error` : undefined} />
         <button className="etm-icon-button" type="button" aria-label={`Add a subtask under "${subtask.title || `subtask ${index + 1}`}"`} title="Add subtask" onClick={() => onAddChild(subtask.localKey)}><Plus size={16} /></button>
         <button className="etm-icon-button" type="button" aria-label={`Remove subtask ${index + 1}`} onClick={() => onRemove(subtask.localKey)}><Trash2 size={16} /></button>
@@ -147,7 +149,7 @@ function SubtaskEditorRow({ subtask, index, depth, fieldId, errors, docTemplates
       {subtask.subtasks.length > 0 && (
         <div className="etm-subtask-children">
           {subtask.subtasks.map((child, childIndex) => (
-            <SubtaskEditorRow key={child.localKey} subtask={child} index={childIndex} depth={depth + 1} fieldId={fieldId} errors={errors} docTemplates={docTemplates} onUpdate={onUpdate} onRemove={onRemove} onAddChild={onAddChild} />
+            <SubtaskEditorRow key={child.localKey} subtask={child} index={childIndex} depth={depth + 1} fieldId={fieldId} errors={errors} docTemplates={docTemplates} canComplete={canComplete} onUpdate={onUpdate} onRemove={onRemove} onAddChild={onAddChild} />
           ))}
         </div>
       )}
@@ -438,10 +440,76 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
                       {errors.project && <p className="etm-field-error" id={`${fieldId}-project-error`}>{errors.project}</p>}
                     </div>
                   )}
-                  <div className="etm-field">
-                    <label htmlFor={`${fieldId}-date`}>Date created</label>
-                    <div className="etm-form-static-field" id={`${fieldId}-date`}><CalendarDays size={16} /><span>{formatDate(task?.created_at ?? new Date().toISOString(), true)}</span><span className="etm-form-auto-label">Automatic</span></div>
-                  </div>
+                <div className="etm-field">
+                  <label htmlFor={`${fieldId}-deadline`}>Deadline <span aria-hidden="true">*</span></label>
+                  <input data-howto="deadline" type="date" id={`${fieldId}-deadline`} value={values.deadline ?? ""} onChange={event => update("deadline", event.target.value)} required aria-invalid={!!errors.deadline} aria-describedby={errors.deadline ? `${fieldId}-deadline-error` : undefined} />
+                  {errors.deadline && <p className="etm-field-error" id={`${fieldId}-deadline-error`}>{errors.deadline}</p>}
+                </div>
+                </div>
+                <div className="etm-field">
+                  <label className={`etm-completion-control ${values.recurrence !== "None" ? "checked" : ""}`}>
+                    <input type="checkbox" checked={values.recurrence !== "None"} onChange={event => update("recurrence", event.target.checked ? "Daily" : "None")} />
+                    <span><strong>Will this task be repeated?</strong><small>Tick this if it comes back on a schedule.</small></span>
+                  </label>
+                  {values.recurrence !== "None" && <>
+                  <ThemedSelect<SelectOption<Recurrence>>
+                    inputId={`${fieldId}-recurrence`}
+                    classNamePrefix="etm-recurrence-select"
+                    isSearchable={false}
+                    aria-label="How often it repeats"
+                    options={RECURRENCES.filter(item => item !== "None").map(item => ({ value: item, label: RECURRENCE_LABELS[item] }))}
+                    value={{ value: values.recurrence, label: RECURRENCE_LABELS[values.recurrence] }}
+                    onChange={option => update("recurrence", option?.value ?? values.recurrence)}
+                  />
+                  {values.recurrence === "Weekly" && (
+                    <div className="etm-weekday-picker" role="group" aria-label="Repeat on these weekdays">
+                      {WEEKDAYS.map(day => {
+                        const codes = values.recurrence_weekdays.split(",").filter(Boolean);
+                        const selected = codes.includes(day.code);
+                        return (
+                          <button
+                            type="button"
+                            key={day.code}
+                            className={`etm-weekday-chip ${selected ? "selected" : ""}`}
+                            aria-pressed={selected}
+                            onClick={() => {
+                              const next = selected ? codes.filter(code => code !== day.code) : [...codes, day.code];
+                              update("recurrence_weekdays", WEEKDAYS.filter(item => next.includes(item.code)).map(item => item.code).join(","));
+                            }}
+                          >
+                            {day.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {values.recurrence === "Weekly" && errors.recurrence_weekdays && <p className="etm-field-error">{errors.recurrence_weekdays}</p>}
+                  {values.recurrence === "Specific" && (
+                    <div className="etm-specific-dates-picker">
+                      <input
+                        type="date"
+                        aria-label="Add a specific date"
+                        value=""
+                        onChange={event => {
+                          const value = event.target.value;
+                          if (value && !values.recurrence_dates.includes(value)) update("recurrence_dates", [...values.recurrence_dates, value].sort());
+                        }}
+                      />
+                      {values.recurrence_dates.length > 0 && (
+                        <div className="etm-specific-dates-list">
+                          {values.recurrence_dates.map(dateStr => (
+                            <span className="etm-specific-date-chip" key={dateStr}>
+                              {formatDate(dateStr)}
+                              <button type="button" aria-label={`Remove ${formatDate(dateStr)}`} onClick={() => update("recurrence_dates", values.recurrence_dates.filter(item => item !== dateStr))}><X size={12} /></button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {errors.recurrence_dates && <p className="etm-field-error">{errors.recurrence_dates}</p>}
+                    </div>
+                  )}
+                  <p className="etm-form-helper">{RECURRENCE_HELPER[values.recurrence]}</p>
+                  </>}
                 </div>
                 <div className="etm-field">
                   <label htmlFor={`${fieldId}-details`}>Details</label>
@@ -561,11 +629,11 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
             </section>
 
             <section className="etm-panel etm-form-section" aria-labelledby={`${fieldId}-subtasks-heading`}>
-              <div className="etm-form-section-heading"><span className="etm-form-section-icon"><CheckCheck size={19} /></span><div><h2 id={`${fieldId}-subtasks-heading`}>Subtasks <span className="etm-form-optional">(optional)</span> <span className="etm-form-count">{allSubtasks.length}</span></h2><p>Add them now, or let the creator or assignees add them later. Subtasks can have their own subtasks too.</p></div>{allSubtasks.length > 0 && <span className="etm-subtask-summary">{completedSubtasks}/{allSubtasks.length} done</span>}</div>
+              <div className="etm-form-section-heading"><span className="etm-form-section-icon"><CheckCheck size={19} /></span><div><h2 id={`${fieldId}-subtasks-heading`}>Subtasks <span className="etm-form-optional">(optional)</span> <span className="etm-form-count">{allSubtasks.length}</span></h2><p>Add them now, or let the creator or assignees add them later. Subtasks can have their own subtasks too.</p></div>{task && allSubtasks.length > 0 && <span className="etm-subtask-summary">{completedSubtasks}/{allSubtasks.length} done</span>}</div>
               <div className="etm-form-section-body">
                 {allSubtasks.length === 0 && <div className="etm-subtask-empty"><CheckCheck size={23} /><span>No subtasks yet. Add the first step below.</span></div>}
                 <div className="etm-subtask-editor">{values.subtasks.map((subtask, index) => (
-                  <SubtaskEditorRow key={subtask.localKey} subtask={subtask} index={index} depth={0} fieldId={fieldId} errors={errors} docTemplates={docTemplates} onUpdate={updateSubtask} onRemove={removeSubtask} onAddChild={addSubtask} />
+                  <SubtaskEditorRow key={subtask.localKey} subtask={subtask} index={index} depth={0} fieldId={fieldId} errors={errors} docTemplates={docTemplates} canComplete={!!task} onUpdate={updateSubtask} onRemove={removeSubtask} onAddChild={addSubtask} />
                 ))}</div>
                 <button type="button" className="etm-add-subtask" onClick={() => addSubtask(null)}><Plus size={16} /> Add subtask</button>
               </div>
@@ -580,72 +648,8 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
 
           <aside className="etm-form-aside">
             <section className="etm-panel etm-form-section mt-2" aria-labelledby={`${fieldId}-planning-heading`}>
-              <div className="etm-form-section-heading"><span className="etm-form-section-icon"><CalendarDays size={19} /></span><div><h2 id={`${fieldId}-planning-heading`}>Schedule & status</h2><p>Keep the work on track.</p></div></div>
+              <div className="etm-form-section-heading"><span className="etm-form-section-icon"><CalendarDays size={19} /></span><div><h2 id={`${fieldId}-planning-heading`}>Status</h2><p>Keep the work on track.</p></div></div>
               <div className="etm-form-section-body">
-                <div className="etm-field">
-                  <label htmlFor={`${fieldId}-deadline`}>Deadline <span aria-hidden="true">*</span></label>
-                  <input data-howto="deadline" type="date" id={`${fieldId}-deadline`} value={values.deadline ?? ""} onChange={event => update("deadline", event.target.value)} required aria-invalid={!!errors.deadline} aria-describedby={errors.deadline ? `${fieldId}-deadline-error` : undefined} />
-                  {errors.deadline && <p className="etm-field-error" id={`${fieldId}-deadline-error`}>{errors.deadline}</p>}
-                </div>
-                <div className="etm-field">
-                  <label htmlFor={`${fieldId}-recurrence`}>Repeat</label>
-                  <ThemedSelect<SelectOption<Recurrence>>
-                    inputId={`${fieldId}-recurrence`}
-                    classNamePrefix="etm-recurrence-select"
-                    isSearchable={false}
-                    options={RECURRENCES.map(item => ({ value: item, label: RECURRENCE_LABELS[item] }))}
-                    value={{ value: values.recurrence, label: RECURRENCE_LABELS[values.recurrence] }}
-                    onChange={option => update("recurrence", option?.value ?? values.recurrence)}
-                  />
-                  {values.recurrence === "Weekly" && (
-                    <div className="etm-weekday-picker" role="group" aria-label="Repeat on these weekdays">
-                      {WEEKDAYS.map(day => {
-                        const codes = values.recurrence_weekdays.split(",").filter(Boolean);
-                        const selected = codes.includes(day.code);
-                        return (
-                          <button
-                            type="button"
-                            key={day.code}
-                            className={`etm-weekday-chip ${selected ? "selected" : ""}`}
-                            aria-pressed={selected}
-                            onClick={() => {
-                              const next = selected ? codes.filter(code => code !== day.code) : [...codes, day.code];
-                              update("recurrence_weekdays", WEEKDAYS.filter(item => next.includes(item.code)).map(item => item.code).join(","));
-                            }}
-                          >
-                            {day.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {values.recurrence === "Weekly" && errors.recurrence_weekdays && <p className="etm-field-error">{errors.recurrence_weekdays}</p>}
-                  {values.recurrence === "Specific" && (
-                    <div className="etm-specific-dates-picker">
-                      <input
-                        type="date"
-                        aria-label="Add a specific date"
-                        value=""
-                        onChange={event => {
-                          const value = event.target.value;
-                          if (value && !values.recurrence_dates.includes(value)) update("recurrence_dates", [...values.recurrence_dates, value].sort());
-                        }}
-                      />
-                      {values.recurrence_dates.length > 0 && (
-                        <div className="etm-specific-dates-list">
-                          {values.recurrence_dates.map(dateStr => (
-                            <span className="etm-specific-date-chip" key={dateStr}>
-                              {formatDate(dateStr)}
-                              <button type="button" aria-label={`Remove ${formatDate(dateStr)}`} onClick={() => update("recurrence_dates", values.recurrence_dates.filter(item => item !== dateStr))}><X size={12} /></button>
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      {errors.recurrence_dates && <p className="etm-field-error">{errors.recurrence_dates}</p>}
-                    </div>
-                  )}
-                  <p className="etm-form-helper">{RECURRENCE_HELPER[values.recurrence]}</p>
-                </div>
                 {task ? (
                   <>
                     <div className="etm-field">

@@ -45,6 +45,7 @@ export interface TaskContextValue {
   setSubtaskCompletion: (id: number, subtaskId: number, isCompleted: boolean) => Promise<void>;
   reorderSubtasks: (id: number, parentId: number | null, order: number[]) => Promise<void>;
   completeTask: (id: number) => Promise<void>;
+  turnoverTask: (id: number, userId: number, note: string) => Promise<void>;
   assignSubtask: (id: number, subtaskId: number, userId: number | null) => Promise<void>;
   linkSubtaskDocument: (id: number, subtaskId: number, tracknumber: string) => Promise<void>;
   unlinkSubtaskDocument: (id: number, subtaskId: number) => Promise<void>;

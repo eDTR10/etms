@@ -82,3 +82,7 @@
     --ring: 224.3 76.3% 48%;
   }
 }
+/* Touch press-and-hold on a draggable row should start a drag, not select text or show the callout menu. */
+@media (pointer: coarse) {
+  [data-touch-drag] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+}

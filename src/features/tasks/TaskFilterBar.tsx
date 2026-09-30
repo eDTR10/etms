@@ -60,7 +60,7 @@ export default function TaskFilterBar({
         <Search size={15} />
         <input value={search} onChange={event => onSearchChange(event.target.value)} placeholder="Search by task or assignee…" aria-label="Search tasks by title or assignee" />
       </div>
-      <div style={{ flex: "1 1 160px", minWidth: 140 }}>
+      <div className="etm-filter-field" style={{ flexBasis: 160, minWidth: 140 }}>
         <ThemedSelect<PriorityOption>
           aria-label="Filter by priority"
           classNamePrefix="etm-priority-select"
@@ -69,7 +69,7 @@ export default function TaskFilterBar({
           onChange={option => onPriorityChange(option ? option.value : "all")}
         />
       </div>
-      <div style={{ flex: "1 1 200px", minWidth: 160 }}>
+      <div className="etm-filter-field" style={{ flexBasis: 200, minWidth: 160 }}>
         <ThemedSelect<ProjectOption>
           aria-label="Filter by project"
           classNamePrefix="etm-project-select"

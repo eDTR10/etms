@@ -14,6 +14,7 @@ import { useDeleteTaskConfirm } from "../../features/tasks/useDeleteTaskConfirm"
 import { useDuplicateTask } from "../../features/tasks/useDuplicateTask";
 import { useBulkTaskActions } from "../../features/tasks/useBulkTaskActions";
 import { useRowSelection } from "../../features/tasks/useRowSelection";
+import { SortTh, useTableSort } from "../../features/tasks/useTableSort";
 import { formatDate, isUnseenAssignment, memberName, RECURRENCE_LABELS, remarkPreview, STATUSES, statusChipLabel, statusSlug, type Task, type TaskStatus } from "../../features/tasks/types";
 import { useAuth } from "../Auth/AuthContext";
 
@@ -60,7 +61,7 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
     tasks, members, projects, updateTask, listArchivedTasks,
     addProgress, editProgress, deleteProgress,
     addRemark, editRemark, deleteRemark, reactToRemark, addRemarkReply,
-    addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, reorderSubtasks, assignSubtask, linkSubtaskDocument, unlinkSubtaskDocument, completeTask,
+    addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, reorderSubtasks, assignSubtask, linkSubtaskDocument, unlinkSubtaskDocument, completeTask, turnoverTask,
     addRemarkAttachment, deleteRemarkAttachment, addSubtaskRemarkAttachment, deleteSubtaskRemarkAttachment, markCompletionSeen, markViewed,
   } = useTasks();
   const confirmDelete = useDeleteTaskConfirm();
@@ -113,6 +114,17 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
   const [viewingSubtaskId, setViewingSubtaskId] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
 
+  const { sorted: sortedTasks, sort, toggle: toggleSort } = useTableSort(filtered, {
+    title: task => task.title,
+    project: task => task.project ? task.project.name : "Personal",
+    priority: task => ({ Low: 1, Medium: 2, High: 3 })[task.priority],
+    repeat: task => task.recurrence !== "None" ? RECURRENCE_LABELS[task.recurrence] : null,
+    requestor: task => task.requestor,
+    details: task => task.details,
+    date: task => new Date(task.created_at).getTime(),
+    assigned: task => task.assignments.map(person => memberName(person)).sort().join(", "),
+    progress: task => task.status,
+  });
   const filteredIds = useMemo(() => filtered.map(task => task.id), [filtered]);
   const selection = useRowSelection(filteredIds);
 
@@ -195,8 +207,7 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
         <table className="etm-tasks-table">
           <thead>
             <tr>
-              <th scope="col" className="etm-tasks-table-title-col">
-                <div className="etm-task-title-heading">
+              <SortTh sortKey="title" sort={sort} onSort={toggleSort} className="etm-tasks-table-title-col" leading={
                 <input
                   type="checkbox"
                   aria-label="Select all tasks"
@@ -204,22 +215,20 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
                   ref={el => { if (el) el.indeterminate = selection.isSomeSelected; }}
                   onChange={selection.toggleAll}
                 />
-                Task Title
-                </div>
-              </th>
-              <th scope="col">Project</th>
-              <th scope="col">Priority</th>
-              <th scope="col">Repeat</th>
-              <th scope="col">Requestor</th>
-              <th scope="col">Details</th>
-              <th scope="col">Date</th>
-              <th scope="col">Assigned To</th>
-              <th scope="col">Progress Log</th>
+              }>Task Title</SortTh>
+              <SortTh sortKey="project" sort={sort} onSort={toggleSort}>Project</SortTh>
+              <SortTh sortKey="priority" sort={sort} onSort={toggleSort}>Priority</SortTh>
+              <SortTh sortKey="repeat" sort={sort} onSort={toggleSort}>Repeat</SortTh>
+              <SortTh sortKey="requestor" sort={sort} onSort={toggleSort}>Requestor</SortTh>
+              <SortTh sortKey="details" sort={sort} onSort={toggleSort}>Details</SortTh>
+              <SortTh sortKey="date" sort={sort} onSort={toggleSort}>Date</SortTh>
+              <SortTh sortKey="assigned" sort={sort} onSort={toggleSort}>Assigned To</SortTh>
+              <SortTh sortKey="progress" sort={sort} onSort={toggleSort}>Progress Log</SortTh>
               <th scope="col" className="etm-tasks-table-actions-col">Action Buttons</th>
             </tr>
           </thead>
           <tbody>
-            {filtered.length ? filtered.map(task => {
+            {sortedTasks.length ? sortedTasks.map(task => {
               const expanded = expandedId === task.id;
               const hasSubtasks = task.subtasks.length > 0;
               const lastRemark = task.remarks[0];
@@ -338,6 +347,7 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
         onLinkSubtaskDocument={(subtaskId, tracknumber) => linkSubtaskDocument(viewingTask.id, subtaskId, tracknumber)}
         onUnlinkSubtaskDocument={subtaskId => unlinkSubtaskDocument(viewingTask.id, subtaskId)}
         onComplete={() => completeTask(viewingTask.id)}
+        onTurnover={(userId, note) => turnoverTask(viewingTask.id, userId, note)}
         assignableMembers={members}
         onAddRemarkAttachment={(remarkId, file) => addRemarkAttachment(viewingTask.id, remarkId, file)}
         onDeleteRemarkAttachment={(remarkId, attachmentId) => deleteRemarkAttachment(viewingTask.id, remarkId, attachmentId)}

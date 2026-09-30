@@ -1,3 +1,4 @@
+import { SortTh, useTableSort } from "../../features/tasks/useTableSort";
 import { useRef, useState, type ChangeEvent } from "react";
 import { Bookmark, CheckCheck, Download, Pencil, Plus, Trash2, Upload } from "lucide-react";
 import Swal from "sweetalert2";
@@ -57,6 +58,14 @@ export function TemplatesContent() {
     }
   };
 
+  const { sorted: sortedTemplates, sort, toggle: toggleSort } = useTableSort(templates, {
+    name: template => template.name,
+    title: template => template.title,
+    project: template => template.is_personal ? "Personal" : template.project,
+    priority: template => ({ Low: 1, Medium: 2, High: 3 } as Record<string, number>)[template.priority],
+    subtasks: template => flattenTemplateSubtasks(template.subtasks).length,
+  });
+
   return (
     <div className="etm-reports">
       <section className="etm-report-heading">
@@ -77,10 +86,10 @@ export function TemplatesContent() {
         <section className="etm-panel etm-table-wrap">
           <table className="etm-tasks-table etm-report-table">
             <thead><tr>
-              <th>Template Name</th><th>Default Title</th><th>Project</th><th>Priority</th><th>Subtasks</th><th className="etm-tasks-table-actions-col">Action Buttons</th>
+              <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Template Name</SortTh><SortTh sortKey="title" sort={sort} onSort={toggleSort}>Default Title</SortTh><SortTh sortKey="project" sort={sort} onSort={toggleSort}>Project</SortTh><SortTh sortKey="priority" sort={sort} onSort={toggleSort}>Priority</SortTh><SortTh sortKey="subtasks" sort={sort} onSort={toggleSort}>Subtasks</SortTh><th className="etm-tasks-table-actions-col">Action Buttons</th>
             </tr></thead>
             <tbody>
-              {templates.length ? templates.map(template => (
+              {sortedTemplates.length ? sortedTemplates.map(template => (
                 <tr key={template.id}>
                   <td className="etm-tasks-table-details-col">{template.name}</td>
                   <td>{template.title || <span className="etm-tasks-table-unassigned">Not set</span>}</td>

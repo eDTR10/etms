@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { isOverdue, memberName, type Priority, type Task, type TaskStatus } from "./types";
+import { isDueSoon, isOverdue, memberName, type Priority, type Task, type TaskStatus } from "./types";
 
 export type StatusFilterValue = "all" | TaskStatus;
 export type PriorityFilterValue = "all" | Priority;
@@ -51,6 +51,7 @@ export function useTaskFilters(tasks: Task[], options?: TaskFilterOptions) {
   const [projectFilter, setProjectFilter] = useState<ProjectFilterValue>("all");
   const [assignedFilter, setAssignedFilter] = useState<AssignedFilterValue>(options?.initialAssignedFilter ?? "all");
   const [overdueOnly, setOverdueOnly] = useState(options?.initialOverdueOnly ?? false);
+  const [dueSoonOnly, setDueSoonOnly] = useState(false);
 
   const setDeadlineDate = (value: string) => {
     setDeadlineDateState(value);
@@ -88,13 +89,14 @@ export function useTaskFilters(tasks: Task[], options?: TaskFilterOptions) {
       }
       if (assignedFilter === "unassigned" && task.assignments.length > 0) return false;
       if (overdueOnly && !isOverdue(task)) return false;
+      if (dueSoonOnly && !isDueSoon(task)) return false;
       return true;
     });
-  }, [tasks, search, deadlineRange, status, priority, projectFilter, assignedFilter, overdueOnly, options?.showCompletedInAll]);
+  }, [tasks, search, deadlineRange, status, priority, projectFilter, assignedFilter, overdueOnly, dueSoonOnly, options?.showCompletedInAll]);
 
-  const hasActiveFilters = !!search.trim() || !!deadlineDate || !!quickFilter || status !== "all" || priority !== "all" || projectFilter !== "all" || assignedFilter !== "all" || overdueOnly;
+  const hasActiveFilters = !!search.trim() || !!deadlineDate || !!quickFilter || status !== "all" || priority !== "all" || projectFilter !== "all" || assignedFilter !== "all" || overdueOnly || dueSoonOnly;
   const clearFilters = () => {
-    setSearch(""); setDeadlineDateState(""); setQuickFilterState(""); setStatus("all"); setPriority("all"); setProjectFilter("all"); setAssignedFilter("all"); setOverdueOnly(false);
+    setSearch(""); setDeadlineDateState(""); setQuickFilterState(""); setStatus("all"); setPriority("all"); setProjectFilter("all"); setAssignedFilter("all"); setOverdueOnly(false); setDueSoonOnly(false);
   };
 
   return {
@@ -107,6 +109,7 @@ export function useTaskFilters(tasks: Task[], options?: TaskFilterOptions) {
     projectFilter, setProjectFilter,
     assignedFilter, setAssignedFilter,
     overdueOnly, setOverdueOnly,
+    dueSoonOnly, setDueSoonOnly,
     hasActiveFilters, clearFilters,
   };
 }

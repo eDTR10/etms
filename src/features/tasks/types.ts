@@ -333,6 +333,30 @@ export function isOverdue(task: Task): boolean {
   return !task.is_completed && !!task.deadline && new Date(`${task.deadline}T23:59:59`) < new Date();
 }
 
+// Tasks due within this many days (today included) count as "almost due".
+export const DUE_SOON_DAYS = 2;
+
+// Whole calendar days from today to the deadline (0 = today, negative = past). Null when
+// there's nothing to count down to.
+export function daysUntilDue(task: Task): number | null {
+  if (task.is_completed || !task.deadline) return null;
+  const [year, month, day] = task.deadline.split("-").map(Number);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((new Date(year, month - 1, day).getTime() - today.getTime()) / 86_400_000);
+}
+
+export function isDueSoon(task: Task): boolean {
+  const days = daysUntilDue(task);
+  return days !== null && days >= 0 && days <= DUE_SOON_DAYS;
+}
+
+export function dueSoonLabel(task: Task): string {
+  const days = daysUntilDue(task);
+  if (days === 0) return "Due today";
+  return `${days} ${days === 1 ? "day" : "days"} left`;
+}
+
 export function isUnseenAssignment(task: Task, userId: number | undefined): boolean {
   // A fresh assignment always starts the task at Pending — once it's moved on (In-Progress,
   // Completed, etc.) it's no longer "new", even if this assignee still hasn't opened it.

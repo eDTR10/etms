@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { FileSpreadsheet, Pencil, Plus, Trash2 } from "lucide-react";
 import Swal from "sweetalert2";
 import AdminLayout from "./AdminLayout";
+import IPCRComingSoon, { IPCR_COMING_SOON } from "../../features/ipcr/IPCRComingSoon";
 import IPCRTemplateForm from "../../features/ipcr/IPCRTemplateForm";
 import { ipcrService } from "../../features/ipcr/ipcrService";
 import { taskError } from "../../features/tasks/taskService";
@@ -102,7 +103,7 @@ function IPCRTemplatesContent() {
 export default function AdminIPCRTemplates() {
   return (
     <AdminLayout title="IPCR Templates" subtitle="Every saved IPCR template.">
-      <IPCRTemplatesContent />
+      {IPCR_COMING_SOON ? <IPCRComingSoon /> : <IPCRTemplatesContent />}
     </AdminLayout>
   );
 }
