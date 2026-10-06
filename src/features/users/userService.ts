@@ -10,6 +10,16 @@ export const USER_ROLES = [
   { value: "provincial_officer", label: "Provincial Officer" },
 ] as const;
 
+export const ETMS_ROLES = [
+  { value: "regular_employee", label: "Regular Employee" },
+  { value: "provincial_officer", label: "Provincial Officer" },
+  { value: "focal_officer", label: "Focal Officer" },
+] as const;
+
+export function etmsRoleLabel(role: string | undefined): string {
+  return ETMS_ROLES.find(item => item.value === role)?.label ?? "Regular Employee";
+}
+
 export function roleLabel(role: string): string {
   return USER_ROLES.find(item => item.value === role)?.label ?? role;
 }
@@ -27,6 +37,7 @@ export interface ManagedUser {
   is_active: boolean;
   is_staff: boolean;
   role: string;
+  etms_role?: string;
 }
 
 export interface ManagedUserInput {
@@ -36,9 +47,11 @@ export interface ManagedUserInput {
   position: string;
   office: number | null;
   projects: number[];
-  acc_lvl: number;
+  // Not edited here any more: eTMS uses the eTMS role, office and projects instead.
+  acc_lvl?: number;
   is_active: boolean;
   role: string;
+  etms_role: string;
   // Required when creating; when editing, leave out to keep the current password.
   password?: string;
 }

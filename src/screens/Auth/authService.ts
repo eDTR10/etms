@@ -34,6 +34,7 @@ export interface UserProfile {
   is_active: boolean;
   is_staff: boolean;
   role: string;
+  etms_role?: "regular_employee" | "provincial_officer" | "focal_officer";
 }
 
 // Matches the DRF-token scheme the backend actually exposes (djoser.urls.authtoken):

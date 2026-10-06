@@ -128,7 +128,12 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks", 
   const unseenCompleted = useMemo(() => tasks.filter(task => task.is_creator && task.status === "Completed" && !task.completion_seen).length, [tasks]);
 
   // Access-level-2: the workload covers everyone in the user's office and all of their tasks, not just the ones shared with them.
-  const workloadMembers = officeScope.enabled ? officeScope.members : members;
+  // A Regular Employee only ever sees their own tasks in the workload; officers see their office / project.
+  const isRegularEmployee = !officeScope.enabled && (user?.etms_role ?? "regular_employee") === "regular_employee" && !user?.is_staff && user?.role !== "admin";
+  // Who handed the signed-in user work: shown on their own workload row so they know where it came from.
+  const assignedToMeByOthers = useMemo(() => tasks.filter(task => !task.is_creator && task.assignments.some(person => person.id === user?.id)), [tasks, user?.id]);
+  const assignersToMe = useMemo(() => [...new Set(assignedToMeByOthers.map(task => task.created_by_name).filter((name): name is string => !!name))], [assignedToMeByOthers]);
+  const workloadMembers = officeScope.enabled ? officeScope.members : isRegularEmployee ? members.filter(member => member.id === user?.id) : members;
   const workloadTasks = useMemo(() => officeScope.enabled
     ? [...new Map([...tasks, ...officeScope.tasks].map(task => [task.id, task])).values()]
     : tasks, [tasks, officeScope]);
@@ -238,7 +243,7 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks", 
             {memberCounts.length ? <>
               <div className="etm-workload-list">
                 {paginatedMembers.map(({ member, count, dueSoon }) => <button type="button" className="etm-member-row" key={member.id} onClick={() => setSelectedMemberId(member.id)} aria-label={`Open workload for ${memberName(member)}`}>
-                  <span className="etm-member-row-avatar" aria-hidden="true">{member.first_name?.charAt(0)}{member.last_name?.charAt(0)}</span><span className="etm-member-row-name">{memberName(member)}{member.position && <small>{member.position}</small>}</span>{dueSoon > 0 && <span className="etm-due-soon-badge">{dueSoon} due soon</span>}<span className="etm-member-row-count">{count} {count === 1 ? "task" : "tasks"}</span><ChevronRight className="etm-member-workload-chevron" size={16} />
+                  <span className="etm-member-row-avatar" aria-hidden="true">{member.first_name?.charAt(0)}{member.last_name?.charAt(0)}</span><span className="etm-member-row-name">{memberName(member)}{member.position && <small>{member.position}</small>}{member.id === user?.id && assignersToMe.length > 0 && <small className="etm-assigned-by-note">{assignersToMe.join(", ")} assigned task{assignedToMeByOthers.length === 1 ? "" : "s"} to you</small>}</span>{dueSoon > 0 && <span className="etm-due-soon-badge">{dueSoon} due soon</span>}<span className="etm-member-row-count">{count} {count === 1 ? "task" : "tasks"}</span><ChevronRight className="etm-member-workload-chevron" size={16} />
                 </button>)}
               </div>
               <div className="etm-workload-pagination"><button type="button" className="etm-button ghost small" onClick={() => setWorkloadPage(page => Math.max(0, page - 1))} disabled={currentWorkloadPage === 0}>Previous</button><span>Page {currentWorkloadPage + 1} of {workloadPageCount}</span><button type="button" className="etm-button ghost small" onClick={() => setWorkloadPage(page => Math.min(workloadPageCount - 1, page + 1))} disabled={currentWorkloadPage === workloadPageCount - 1}>Next</button></div>
@@ -383,7 +388,7 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks", 
         {selectedMemberWorkload && <div className="etm-workload-dialog">
           <p>{selectedMemberTasks.length} {selectedMemberTasks.length === 1 ? "task" : "tasks"} owned by or assigned to {memberName(selectedMemberWorkload.member)}{selectedMemberWorkload.member.position ? ` · ${selectedMemberWorkload.member.position}` : ""}</p>
           <div className="etm-workload-dialog-tasks">
-            {pagedMemberTasks.map(task => <button type="button" key={task.id} onClick={() => { setSelectedMemberId(null); setMemberTaskPage(0); navigate(`${basePath}/${task.id}`); }}><ClipboardList size={15} /><span>{task.title}<small>{task.created_by === selectedMemberWorkload.member.id ? "Owner" : "Assigned"} · {task.status} · {task.project?.name ?? "Personal"}{isDueSoon(task) && <> · <b className="etm-due-soon-text">{dueSoonLabel(task)}</b></>}</small></span><ChevronRight size={15} /></button>)}
+            {pagedMemberTasks.map(task => <button type="button" key={task.id} onClick={() => { setSelectedMemberId(null); setMemberTaskPage(0); navigate(`${basePath}/${task.id}`); }}><ClipboardList size={15} /><span>{task.title}<small>{task.created_by === selectedMemberWorkload.member.id ? "Owner" : task.created_by_name ? `Assigned by ${task.created_by_name}` : "Assigned"} · {task.status} · {task.project?.name ?? "Personal"}{isDueSoon(task) && <> · <b className="etm-due-soon-text">{dueSoonLabel(task)}</b></>}</small></span><ChevronRight size={15} /></button>)}
           </div>
           {memberTaskPages > 1 && <div className="etm-workload-dialog-pager">
             <button type="button" disabled={currentMemberPage === 0} onClick={() => setMemberTaskPage(currentMemberPage - 1)}>Previous</button>

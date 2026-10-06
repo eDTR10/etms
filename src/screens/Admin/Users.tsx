@@ -6,7 +6,7 @@ import Modal from "../../components/ui/modal";
 import { useAuth } from "../Auth/AuthContext";
 import { taskService } from "../../features/tasks/taskService";
 import { SortTh, useTableSort } from "../../features/tasks/useTableSort";
-import { roleLabel, USER_ROLES, userError, userService, type ManagedUser, type ManagedUserInput } from "../../features/users/userService";
+import { roleLabel, USER_ROLES, userError, userService, type ManagedUser, type ManagedUserInput, ETMS_ROLES, etmsRoleLabel } from "../../features/users/userService";
 import type { Project } from "../../features/tasks/types";
 import "../../features/tasks/etm-base.css";
 import "../../features/tasks/forms.css";
@@ -22,18 +22,18 @@ interface FormState {
   position: string;
   office: string;
   projects: number[];
-  acc_lvl: string;
   role: string;
+  etms_role: string;
   is_active: boolean;
   password: string;
 }
 
-const EMPTY_FORM: FormState = { email: "", first_name: "", last_name: "", position: "", office: "", projects: [], acc_lvl: "3", role: "user", is_active: true, password: "" };
+const EMPTY_FORM: FormState = { email: "", first_name: "", last_name: "", position: "", office: "", projects: [], role: "user", etms_role: "regular_employee", is_active: true, password: "" };
 
 function toForm(user: ManagedUser): FormState {
   return {
     email: user.email, first_name: user.first_name, last_name: user.last_name, position: user.position ?? "",
-    office: user.office ? String(user.office) : "", projects: user.projects ?? [], acc_lvl: String(user.acc_lvl ?? 3), role: user.role, is_active: user.is_active, password: "",
+    office: user.office ? String(user.office) : "", projects: user.projects ?? [], role: user.role, etms_role: user.etms_role ?? "regular_employee", is_active: user.is_active, password: "",
   };
 }
 
@@ -56,7 +56,7 @@ function UserFormModal({ user, offices, isSelf, onClose, onSaved }: { user: Mana
     setError("");
     const input: ManagedUserInput = {
       email: form.email.trim(), first_name: form.first_name.trim(), last_name: form.last_name.trim(), position: form.position.trim(),
-      office: form.office ? Number(form.office) : null, projects: form.projects, acc_lvl: Number(form.acc_lvl) || 3, role: form.role, is_active: form.is_active,
+      office: form.office ? Number(form.office) : null, projects: form.projects, role: form.role, etms_role: form.etms_role, is_active: form.is_active,
     };
     if (form.password) input.password = form.password;
     try {
@@ -102,12 +102,15 @@ function UserFormModal({ user, offices, isSelf, onClose, onSaved }: { user: Mana
             )) : <p className="px-1.5 py-1 text-xs text-muted-foreground">No projects match.</p>}
           </div>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-1 gap-3">
+        <label className={labelClass}>eTMS role
+          <select className={fieldClass} value={form.etms_role} onChange={event => set("etms_role", event.target.value)} disabled={saving}>
+            {ETMS_ROLES.map(role => <option key={role.value} value={role.value}>{role.label}</option>)}
+          </select>
+          <span className="text-xs font-normal text-muted-foreground">Regular Employees only see tasks assigned to them. Provincial Officers also see their whole office's tasks; Focal Officers, their project's.</span>
+        </label>
+        <div className="grid grid-cols-1 gap-3">
           <label className={labelClass}>{creating ? "Password *" : "New password"}
             <input type="password" className={fieldClass} value={form.password} onChange={event => set("password", event.target.value)} disabled={saving} autoComplete="new-password" placeholder={creating ? "" : "Leave blank to keep the current one"} />
-          </label>
-          <label className={labelClass}>Access level
-            <input type="number" min={1} className={fieldClass} value={form.acc_lvl} onChange={event => set("acc_lvl", event.target.value)} disabled={saving} />
           </label>
         </div>
         <label className="flex items-center gap-2 text-sm text-foreground">
@@ -155,6 +158,7 @@ function UsersContent() {
     position: user => user.position,
     office: user => user.office ? officeName.get(user.office) : null,
     projects: user => projectNames(user),
+    etmsRole: user => etmsRoleLabel(user.etms_role),
     role: user => roleLabel(user.role),
     status: user => user.is_active ? 1 : 0,
   });
@@ -215,6 +219,7 @@ function UsersContent() {
                 <SortTh sortKey="office" sort={sort} onSort={toggle}>Office</SortTh>
                 <SortTh sortKey="projects" sort={sort} onSort={toggle}>Projects</SortTh>
                 <SortTh sortKey="role" sort={sort} onSort={toggle}>Role</SortTh>
+                <SortTh sortKey="etmsRole" sort={sort} onSort={toggle}>eTMS Role</SortTh>
                 <SortTh sortKey="status" sort={sort} onSort={toggle}>Status</SortTh>
                 <th scope="col" className="etm-tasks-table-actions-col">Action Buttons</th>
               </tr></thead>
@@ -229,6 +234,7 @@ function UsersContent() {
                       <td>{user.office ? officeName.get(user.office) ?? `#${user.office}` : <span className="etm-tasks-table-unassigned">None</span>}</td>
                       <td className="etm-tasks-table-details-col">{user.projects?.length ? <span title={projectNames(user)}>{projectNames(user)}</span> : <span className="etm-tasks-table-unassigned">None</span>}</td>
                       <td>{roleLabel(user.role)}</td>
+                      <td>{etmsRoleLabel(user.etms_role)}</td>
                       <td><span className={`etm-badge ${user.is_active ? "completed" : "blocked-stuck"}`}>{user.is_active ? "Active" : "Inactive"}</span></td>
                       <td className="etm-report-group-actions">
                         <button type="button" className="etm-icon-button" aria-label={`Edit ${user.email}`} onClick={() => setEditing(user)}><Pencil size={15} /></button>
@@ -236,7 +242,7 @@ function UsersContent() {
                       </td>
                     </tr>
                   );
-                }) : <tr><td colSpan={8} className="etm-empty-row">{users.length ? "No users match your search." : "No users yet."}</td></tr>}
+                }) : <tr><td colSpan={9} className="etm-empty-row">{users.length ? "No users match your search." : "No users yet."}</td></tr>}
               </tbody>
             </table>
           </section>
