@@ -21,6 +21,8 @@ export interface ManagedUser {
   last_name: string;
   position: string;
   office: number | null;
+  // Ids of the projects (office directory entries) this user is part of.
+  projects?: number[];
   acc_lvl: number;
   is_active: boolean;
   is_staff: boolean;
@@ -33,6 +35,7 @@ export interface ManagedUserInput {
   last_name: string;
   position: string;
   office: number | null;
+  projects: number[];
   acc_lvl: number;
   is_active: boolean;
   role: string;

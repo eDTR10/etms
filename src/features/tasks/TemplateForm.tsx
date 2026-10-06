@@ -1,4 +1,6 @@
 import { useId, useRef, useState, type FormEvent } from "react";
+import IPCRRichTextField from "../ipcr/IPCRRichTextField";
+import { cleanDetails, detailsToHtml } from "./richDetails";
 import { Bookmark, CheckCheck, FileText, Loader2, Plus, Trash2 } from "lucide-react";
 import ThemedSelect, { type SelectOption } from "../../components/ThemedSelect";
 import { taskError } from "./taskService";
@@ -51,7 +53,7 @@ function initialValues(template?: TaskTemplate, initialInput?: TaskTemplateInput
     title: source?.title ?? "",
     is_personal: source?.is_personal ?? true,
     project: source?.project ?? "",
-    details: source?.details ?? "",
+    details: detailsToHtml(source?.details),
     requestor: source?.requestor ?? "",
     location_province: source?.location_province ?? "",
     location_city: source?.location_city ?? "",
@@ -163,7 +165,7 @@ export default function TemplateForm({ template, initialInput, onSave, onCancel 
         name: values.name.trim(),
         title: values.title.trim(),
         project: values.is_personal ? "" : project.trim(),
-        details: values.details.trim(),
+        details: cleanDetails(values.details),
         requestor: values.requestor.trim(),
         location_province: values.location_province.trim(),
         location_city: values.location_city.trim(),
@@ -195,7 +197,7 @@ export default function TemplateForm({ template, initialInput, onSave, onCancel 
 
           <div className="etm-field">
             <label htmlFor={`${fieldId}-details`}>Details</label>
-            <textarea id={`${fieldId}-details`} value={values.details} onChange={event => update("details", event.target.value)} placeholder="Add context, deliverables, or anything the team should know…" rows={4} maxLength={10000} />
+            <IPCRRichTextField value={values.details} onChange={html => update("details", html)} placeholder="Add context, deliverables, or anything the team should know…" />
           </div>
 
           <div className="etm-field">

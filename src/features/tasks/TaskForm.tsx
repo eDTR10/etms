@@ -1,11 +1,14 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { useAuth } from "../../screens/Auth/AuthContext";
+import IPCRRichTextField from "../ipcr/IPCRRichTextField";
+import { cleanDetails, detailsToHtml, detailsToText, RichDetails } from "./richDetails";
 import { Link } from "react-router-dom";
 import { isAxiosError } from "axios";
 import { AlertTriangle, Bookmark, CalendarDays, Check, CheckCheck, ChevronDown, ClipboardList, Clock3, FileText, Flag, Folder, Link2, Loader2, MapPin, Plus, Repeat, Search, Trash2, User, UserPlus, Users, X } from "lucide-react";
 import ThemedSelect, { type SelectOption } from "../../components/ThemedSelect";
 import { useTasks } from "./taskContext";
 import { taskError } from "./taskService";
-import { ASSIGNMENT_ROLES, formatDate, memberName, PRIORITIES, RECURRENCE_LABELS, RECURRENCES, STATUSES, type AssignmentInput, type AssignmentRole, type Member, type Priority, type Project, type TaskLinkInput, type Recurrence, type SubTask, type Task, type TaskInput, type TaskStatus, type TaskTemplate, type TemplateSubtask } from "./types";
+import { ASSIGNMENT_ROLES, EODB_COMPLIANCE, type EodbCompliance, formatDate, memberName, PRIORITIES, RECURRENCE_LABELS, RECURRENCES, STATUSES, type AssignmentInput, type AssignmentRole, type Member, type Priority, type Project, type TaskLinkInput, type Recurrence, type SubTask, type Task, type TaskInput, type TaskStatus, type TaskTemplate, type TemplateSubtask } from "./types";
 import { describeRecurrence, WEEKDAYS } from "./recurrence";
 import TaskLinksField from "./TaskLinksField";
 import { REGION_X_BARANGAYS, REGION_X_CITIES, REGION_X_PROVINCES } from "./regionXLocations";
@@ -73,13 +76,14 @@ function initialValues(task?: Task): FormValues {
     title: task?.title ?? "",
     isPersonal: task ? !task.project : false,
     project: task?.project?.name ?? "",
-    details: task?.details ?? "",
+    details: detailsToHtml(task?.details),
     requestor: task?.requestor ?? "",
     location_province: task?.location_province ?? "",
     location_city: task?.location_city ?? "",
     location_barangay: task?.location_barangay ?? "",
     priority: task?.priority ?? "Medium",
     deadline: task?.deadline?.slice(0, 10) ?? "",
+    eodb_compliance: task?.eodb_compliance ?? "",
     recurrence: task?.recurrence ?? "None",
     recurrence_weekdays: task?.recurrence_weekdays ?? "",
     recurrence_dates: task?.recurrence_dates ?? [],
@@ -167,7 +171,7 @@ function TaskLivePreview({ values, members }: { values: FormValues; members: Mem
 
   return <section className="etm-panel etm-task-preview" aria-live="polite" aria-label="Task preview">
     <div className="etm-task-preview-heading"><span className="etm-form-section-icon"><ClipboardList size={19} /></span><div><span>LIVE PREVIEW</span><h2>{values.title.trim() || "New task"}</h2></div></div>
-    <p className={`etm-task-preview-details ${values.details.trim() ? "" : "empty"}`}>{values.details.trim() || "Your task details will appear here."}</p>
+    {detailsToText(values.details) ? <RichDetails className="etm-task-preview-details" value={values.details} /> : <p className="etm-task-preview-details empty">Your task details will appear here.</p>}
     <dl className="etm-task-preview-meta">
       <div><dt><Folder size={14} />Project / Office</dt><dd>{values.isPersonal ? "Personal task" : values.project.trim() || "Not selected"}</dd></div>
       <div><dt><CalendarDays size={14} />Deadline</dt><dd>{formatDate(values.deadline)}</dd></div>
@@ -182,6 +186,7 @@ function TaskLivePreview({ values, members }: { values: FormValues; members: Mem
 }
 
 function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskFormProps) {
+  const { user: currentUser } = useAuth();
   const fieldId = useId();
   const formRef = useRef<HTMLFormElement>(null);
   const projectPickerRef = useRef<HTMLDivElement>(null);
@@ -234,6 +239,14 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
         ? current.assignments.filter(assignment => assignment.user !== id)
         : [...current.assignments, { user: id, role: "Viewer" as AssignmentRole }],
     }));
+  }
+
+  // Puts the signed-in user on the task's assignees (as an editor, so it counts toward their own workload).
+  function assignToMyself() {
+    if (!currentUser) return;
+    setValues(current => current.assignments.some(assignment => assignment.user === currentUser.id)
+      ? current
+      : { ...current, assignments: [...current.assignments, { user: currentUser.id, role: "Editor" as AssignmentRole }] });
   }
 
   function updateAssignmentRole(id: number, role: AssignmentRole) {
@@ -307,7 +320,7 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
       title: template.title || current.title,
       isPersonal: template.is_personal,
       project: template.is_personal ? "" : template.project,
-      details: template.details,
+      details: detailsToHtml(template.details),
       requestor: template.requestor,
       location_province: template.location_province,
       location_city: template.location_city,
@@ -379,7 +392,7 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
         ...rest,
         title: values.title.trim(),
         project: isPersonal ? null : project.trim(),
-        details: values.details.trim(),
+        details: cleanDetails(values.details),
         requestor: values.requestor.trim(),
         location_province: values.location_province.trim(),
         location_city: values.location_city.trim(),
@@ -446,6 +459,29 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
                   <label htmlFor={`${fieldId}-deadline`}>Deadline <span aria-hidden="true">*</span></label>
                   <input data-howto="deadline" type="date" id={`${fieldId}-deadline`} value={values.deadline ?? ""} onChange={event => update("deadline", event.target.value)} required aria-invalid={!!errors.deadline} aria-describedby={errors.deadline ? `${fieldId}-deadline-error` : undefined} />
                   {errors.deadline && <p className="etm-field-error" id={`${fieldId}-deadline-error`}>{errors.deadline}</p>}
+                </div>
+                <div className="etm-field">
+                  <label htmlFor={`${fieldId}-eodb`}>EODB Compliance</label>
+                  <ThemedSelect<SelectOption<EodbCompliance>>
+                    inputId={`${fieldId}-eodb`}
+                    classNamePrefix="etm-eodb-select"
+                    isSearchable={false}
+                    isClearable
+                    placeholder="Select a compliance class…"
+                    aria-label="EODB compliance"
+                    options={EODB_COMPLIANCE.map(item => ({ value: item.value, label: `${item.value} — ${item.days} days` }))}
+                    value={EODB_COMPLIANCE.filter(item => item.value === values.eodb_compliance).map(item => ({ value: item.value, label: `${item.value} — ${item.days} days` }))[0] ?? null}
+                    onChange={option => {
+                      update("eodb_compliance", option?.value ?? "");
+                      const days = EODB_COMPLIANCE.find(item => item.value === option?.value)?.days;
+                      if (days) {
+                        const due = new Date();
+                        due.setDate(due.getDate() + days);
+                        update("deadline", `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, "0")}-${String(due.getDate()).padStart(2, "0")}`);
+                      }
+                    }}
+                  />
+                  <p className="etm-form-helper">Simple: 3 days · Complex: 7 days · Highly Technical: 30 days. Choosing one sets the deadline counted from today; you can still change the date.</p>
                 </div>
                 </div>
                 <div className="etm-field">
@@ -515,7 +551,7 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
                 </div>
                 <div className="etm-field">
                   <label htmlFor={`${fieldId}-details`}>Details</label>
-                  <textarea id={`${fieldId}-details`} value={values.details} onChange={event => update("details", event.target.value)} placeholder="Add context, deliverables, or anything the team should know…" rows={4} maxLength={10000} />
+                  <IPCRRichTextField value={values.details} onChange={html => update("details", html)} placeholder="Add context, deliverables, or anything the team should know…" />
                 </div>
                 {!task && (
                   <div className="etm-field etm-template-picker">
@@ -599,6 +635,9 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
                         {canManageAssignments && <button type="button" onClick={() => toggleAssignment(assignment.user)} aria-label={`Remove ${name}`}><X size={13} /></button>}
                       </div>;
                     })}</div>}
+                    {canManageAssignments && currentUser && !values.assignments.some(assignment => assignment.user === currentUser.id) && (
+                      <button type="button" className="etm-button ghost small etm-assign-myself" onClick={assignToMyself}><User size={14} />Assign to myself</button>
+                    )}
                     {canManageAssignments && <div className="etm-member-picker">
                       <div className="etm-member-search"><Search size={16} /><input aria-label="Search members to assign" placeholder="Search team members…" value={memberSearch} onChange={event => setMemberSearch(event.target.value)} aria-describedby={`${fieldId}-people-help`} /></div>
                       <div className="etm-member-options">

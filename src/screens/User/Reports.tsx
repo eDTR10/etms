@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { detailsToText } from "../../features/tasks/richDetails";
 import { useNavigate } from "react-router-dom";
 import { Check, CheckCircle2, ChevronDown, ChevronRight, FolderKanban, GripVertical, Layers, Pencil, Plus, Target, Trash2, X } from "lucide-react";
 import Swal from "sweetalert2";
@@ -422,7 +423,7 @@ export function ReportsContent({ taskBasePath = "/etms/tasks", ownTasksOnly = fa
     title: task => task.title,
     finished: task => new Date(task.updated_at).getTime(),
     owner: task => task.created_by_name,
-    details: task => task.details,
+    details: task => detailsToText(task.details),
   });
   const { sorted: sortedGroups, sort: groupSort, toggle: toggleGroupSort } = useTableSort(groups, {
     name: group => group.name,
@@ -482,7 +483,7 @@ export function ReportsContent({ taskBasePath = "/etms/tasks", ownTasksOnly = fa
                     <td className="etm-report-check"><input type="checkbox" aria-label={`Select ${task.title}`} checked={selectedIds.has(task.id)} onChange={() => toggleTask(task.id)} /></td>
                     <td className="etm-report-task-title"><GripVertical size={13} className="etm-report-drag-handle" aria-hidden="true" />{task.title}</td>
                     <td>{formatDate(task.updated_at, true)}</td>
-                    <td className="etm-tasks-table-details-col">{task.details ? <span title={task.details}>{task.details}</span> : <span className="etm-tasks-table-unassigned">No details</span>}</td>
+                    <td className="etm-tasks-table-details-col">{detailsToText(task.details) ? <span title={detailsToText(task.details)}>{detailsToText(task.details)}</span> : <span className="etm-tasks-table-unassigned">No details</span>}</td>
                     {showOwner && <td>{task.created_by_name || <span className="etm-tasks-table-unassigned">Unknown</span>}</td>}
                   </tr>
                 )) : <tr><td colSpan={showOwner ? 5 : 4} className="etm-empty-row">No completed tasks are available yet.</td></tr>}

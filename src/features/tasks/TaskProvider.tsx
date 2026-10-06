@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { TaskContext } from "./taskContext";
+import { TaskContext, type OfficeScope } from "./taskContext";
 import { withBlockingLoader } from "./blockingLoader";
 import { taskError, taskService } from "./taskService";
 import { flattenSubtasks, type Member, type Project, type Task, type TaskInput, type TaskStatus, type TaskTemplate, type TaskTemplateInput } from "./types";
@@ -8,6 +8,7 @@ import type { DtmsDocumentTemplate } from "../dtmsDocument/dtmsDocumentTypes";
 
 export default function TaskProvider({ children }: { children: ReactNode }) {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [officeScope, setOfficeScope] = useState<OfficeScope>({ enabled: false, office_name: null, members: [], tasks: [] });
   const [members, setMembers] = useState<Member[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [templates, setTemplates] = useState<TaskTemplate[]>([]);
@@ -27,6 +28,12 @@ export default function TaskProvider({ children }: { children: ReactNode }) {
       setError(taskError(err));
     } finally {
       setLoading(false);
+    }
+    // Office-wide view for access-level-2 users; best-effort like the lists below.
+    try {
+      setOfficeScope(await taskService.officeScope());
+    } catch {
+      setOfficeScope({ enabled: false, office_name: null, members: [], tasks: [] });
     }
     // Kept out of the Promise.all above and failing silently: templates are an enhancement
     // on top of task creation, not something the rest of the app (dashboard, task list, add
@@ -146,6 +153,9 @@ export default function TaskProvider({ children }: { children: ReactNode }) {
   const turnoverTask = async (id: number, userId: number, note: string) => withBlockingLoader("Turning over task…", async () => {
     replace(await taskService.turnoverTask(id, userId, note));
   });
+  const revertTurnover = async (id: number) => withBlockingLoader("Returning task…", async () => {
+    replace(await taskService.revertTurnover(id));
+  });
   const assignSubtask = async (id: number, subtaskId: number, userId: number | null) => withBlockingLoader("Assigning subtask…", async () => {
     replace(await taskService.assignSubtask(id, subtaskId, userId));
   });
@@ -198,5 +208,5 @@ export default function TaskProvider({ children }: { children: ReactNode }) {
     setTemplates(current => current.filter(item => item.id !== id));
   });
 
-  return <TaskContext.Provider value={{ tasks, members, projects, templates, dtmsDocumentTemplates, loading, error, refresh, listArchivedTasks, addMember, createTask, createTemplate, updateTemplate, deleteTemplate, updateTask, deleteTask, duplicateTask, toggleOccurrence, addProgress, editProgress, deleteProgress, addRemark, editRemark, deleteRemark, reactToRemark, addRemarkReply, addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, reorderSubtasks, assignSubtask, linkSubtaskDocument, unlinkSubtaskDocument, completeTask, turnoverTask, bulkArchive, bulkDelete, addRemarkAttachment, deleteRemarkAttachment, addSubtaskRemarkAttachment, deleteSubtaskRemarkAttachment, markCompletionSeen, markViewed }}>{children}</TaskContext.Provider>;
+  return <TaskContext.Provider value={{ tasks, officeScope, members, projects, templates, dtmsDocumentTemplates, loading, error, refresh, listArchivedTasks, addMember, createTask, createTemplate, updateTemplate, deleteTemplate, updateTask, deleteTask, duplicateTask, toggleOccurrence, addProgress, editProgress, deleteProgress, addRemark, editRemark, deleteRemark, reactToRemark, addRemarkReply, addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, reorderSubtasks, assignSubtask, linkSubtaskDocument, unlinkSubtaskDocument, completeTask, turnoverTask, revertTurnover, bulkArchive, bulkDelete, addRemarkAttachment, deleteRemarkAttachment, addSubtaskRemarkAttachment, deleteSubtaskRemarkAttachment, markCompletionSeen, markViewed }}>{children}</TaskContext.Provider>;
 }

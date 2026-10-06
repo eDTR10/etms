@@ -76,7 +76,7 @@ function StatusRow({ label, count, total, color }: { label: string; count: numbe
 export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks", userView = false }: DashboardOverviewProps) {
   const { user } = useAuth();
   const {
-    tasks, members, projects, updateTask,
+    tasks, officeScope, members, projects, updateTask,
     addProgress, editProgress, deleteProgress,
     addRemark, editRemark, deleteRemark, reactToRemark, addRemarkReply,
     addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, reorderSubtasks, assignSubtask, linkSubtaskDocument, unlinkSubtaskDocument, completeTask, turnoverTask,
@@ -95,6 +95,7 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks", 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null);
   const [workloadPage, setWorkloadPage] = useState(0);
+  const [memberTaskPage, setMemberTaskPage] = useState(0);
   const [workloadSort, setWorkloadSort] = useState<"most" | "fewest">("most");
   const navigate = useNavigate();
   const recentSectionRef = useRef<HTMLDivElement>(null);
@@ -119,19 +120,25 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks", 
   const totalCompleted = useMemo(() => tasks.filter(task => task.status === "Completed").length, [tasks]);
   const totalPending = useMemo(() => tasks.filter(task => task.status === "Pending").length, [tasks]);
   const totalMine = useMemo(() => tasks.filter(task => task.is_creator).length, [tasks]);
-  const totalAssignedToMe = useMemo(() => tasks.filter(task => !task.is_creator && task.assignments.some(person => person.id === user?.id)).length, [tasks, user?.id]);
+  // Includes tasks you assigned to yourself.
+  const totalAssignedToMe = useMemo(() => tasks.filter(task => task.assignments.some(person => person.id === user?.id)).length, [tasks, user?.id]);
   const totalBlocked = useMemo(() => tasks.filter(task => task.status === "Blocked/Stuck").length, [tasks]);
   const totalDueSoon = useMemo(() => tasks.filter(isDueSoon).length, [tasks]);
   const totalPastDue = useMemo(() => tasks.filter(isOverdue).length, [tasks]);
   const unseenCompleted = useMemo(() => tasks.filter(task => task.is_creator && task.status === "Completed" && !task.completion_seen).length, [tasks]);
 
-  const memberCounts = useMemo(() => members
+  // Access-level-2: the workload covers everyone in the user's office and all of their tasks, not just the ones shared with them.
+  const workloadMembers = officeScope.enabled ? officeScope.members : members;
+  const workloadTasks = useMemo(() => officeScope.enabled
+    ? [...new Map([...tasks, ...officeScope.tasks].map(task => [task.id, task])).values()]
+    : tasks, [tasks, officeScope]);
+  const memberCounts = useMemo(() => workloadMembers
     .map(member => {
-      const assigned = tasks.filter(task => task.assignments.some(a => a.id === member.id));
+      const assigned = workloadTasks.filter(task => task.assignments.some(a => a.id === member.id));
       return { member, count: assigned.length, dueSoon: assigned.filter(isDueSoon).length };
     })
     .filter(({ count }) => count > 0)
-    .sort((a, b) => b.count - a.count), [members, tasks]);
+    .sort((a, b) => b.count - a.count), [workloadMembers, workloadTasks]);
 
   const statusCounts = useMemo(() => {
     const counts = { Pending: 0, "In-Progress": 0, Completed: 0, "Blocked/Stuck": 0 } as Record<TaskStatus, number>;
@@ -173,8 +180,12 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks", 
   const paginatedMembers = sortedMemberCounts.slice(currentWorkloadPage * WORKLOAD_PAGE_SIZE, (currentWorkloadPage + 1) * WORKLOAD_PAGE_SIZE);
   const selectedMemberWorkload = memberCounts.find(({ member }) => member.id === selectedMemberId) ?? null;
   const selectedMemberTasks = selectedMemberWorkload
-    ? tasks.filter(task => task.assignments.some(assignment => assignment.id === selectedMemberWorkload.member.id))
+    ? workloadTasks.filter(task => task.created_by === selectedMemberWorkload.member.id || task.assignments.some(assignment => assignment.id === selectedMemberWorkload.member.id))
     : [];
+  const MEMBER_TASKS_PAGE = 5;
+  const memberTaskPages = Math.max(1, Math.ceil(selectedMemberTasks.length / MEMBER_TASKS_PAGE));
+  const currentMemberPage = Math.min(memberTaskPage, memberTaskPages - 1);
+  const pagedMemberTasks = selectedMemberTasks.slice(currentMemberPage * MEMBER_TASKS_PAGE, (currentMemberPage + 1) * MEMBER_TASKS_PAGE);
 
   return (
     <div>
@@ -223,7 +234,7 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks", 
         <div className="etm-section-heading"><div><h2>Insights</h2><p>Team workload and where tasks currently stand.</p></div></div>
         <div className="etm-charts-grid">
           <div className="etm-panel etm-chart-panel">
-            <div className="etm-workload-heading"><h3 className="etm-chart-title">Team workload</h3><label>Sort<div style={{ width: 130 }}><ThemedSelect<SelectOption<"most" | "fewest">> size="small" classNamePrefix="etm-sort-select" aria-label="Sort team workload" options={WORKLOAD_SORT_OPTIONS} value={WORKLOAD_SORT_OPTIONS.find(option => option.value === workloadSort)} onChange={option => { setWorkloadSort(option?.value ?? "most"); setWorkloadPage(0); }} /></div></label></div>
+            <div className="etm-workload-heading"><h3 className="etm-chart-title">Team workload{officeScope.enabled && officeScope.office_name ? ` · ${officeScope.office_name}` : ""}</h3><label>Sort<div style={{ width: 130 }}><ThemedSelect<SelectOption<"most" | "fewest">> size="small" classNamePrefix="etm-sort-select" aria-label="Sort team workload" options={WORKLOAD_SORT_OPTIONS} value={WORKLOAD_SORT_OPTIONS.find(option => option.value === workloadSort)} onChange={option => { setWorkloadSort(option?.value ?? "most"); setWorkloadPage(0); }} /></div></label></div>
             {memberCounts.length ? <>
               <div className="etm-workload-list">
                 {paginatedMembers.map(({ member, count, dueSoon }) => <button type="button" className="etm-member-row" key={member.id} onClick={() => setSelectedMemberId(member.id)} aria-label={`Open workload for ${memberName(member)}`}>
@@ -368,12 +379,17 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks", 
         onMarkViewed={() => markViewed(viewingTask.id)}
       />}
 
-      <Modal open={!!selectedMemberWorkload} onClose={() => setSelectedMemberId(null)} title={selectedMemberWorkload ? `${memberName(selectedMemberWorkload.member)} — Team Workload` : "Team Workload"}>
+      <Modal open={!!selectedMemberWorkload} onClose={() => { setSelectedMemberId(null); setMemberTaskPage(0); }} title={selectedMemberWorkload ? `${memberName(selectedMemberWorkload.member)} — Team Workload` : "Team Workload"}>
         {selectedMemberWorkload && <div className="etm-workload-dialog">
-          <p>{selectedMemberTasks.length} assigned {selectedMemberTasks.length === 1 ? "task" : "tasks"}{selectedMemberWorkload.member.position ? ` · ${selectedMemberWorkload.member.position}` : ""}</p>
+          <p>{selectedMemberTasks.length} {selectedMemberTasks.length === 1 ? "task" : "tasks"} owned by or assigned to {memberName(selectedMemberWorkload.member)}{selectedMemberWorkload.member.position ? ` · ${selectedMemberWorkload.member.position}` : ""}</p>
           <div className="etm-workload-dialog-tasks">
-            {selectedMemberTasks.map(task => <button type="button" key={task.id} onClick={() => { setSelectedMemberId(null); navigate(`${basePath}/${task.id}`); }}><ClipboardList size={15} /><span>{task.title}<small>{task.status} · {task.project?.name ?? "Personal"}{isDueSoon(task) && <> · <b className="etm-due-soon-text">{dueSoonLabel(task)}</b></>}</small></span><ChevronRight size={15} /></button>)}
+            {pagedMemberTasks.map(task => <button type="button" key={task.id} onClick={() => { setSelectedMemberId(null); setMemberTaskPage(0); navigate(`${basePath}/${task.id}`); }}><ClipboardList size={15} /><span>{task.title}<small>{task.created_by === selectedMemberWorkload.member.id ? "Owner" : "Assigned"} · {task.status} · {task.project?.name ?? "Personal"}{isDueSoon(task) && <> · <b className="etm-due-soon-text">{dueSoonLabel(task)}</b></>}</small></span><ChevronRight size={15} /></button>)}
           </div>
+          {memberTaskPages > 1 && <div className="etm-workload-dialog-pager">
+            <button type="button" disabled={currentMemberPage === 0} onClick={() => setMemberTaskPage(currentMemberPage - 1)}>Previous</button>
+            <span>Page {currentMemberPage + 1} of {memberTaskPages}</span>
+            <button type="button" disabled={currentMemberPage >= memberTaskPages - 1} onClick={() => setMemberTaskPage(currentMemberPage + 1)}>Next</button>
+          </div>}
         </div>}
       </Modal>
 

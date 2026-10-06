@@ -138,6 +138,8 @@
 
 /* Tasks table (All Tasks page) */
 .etm-table-wrap { overflow-x: auto; overflow-y: hidden; max-width: 100%; }
+.etm-table-wrap.etm-dragging, .etm-table-wrap.etm-dragging * { cursor: grabbing !important; user-select: none; }
+.etm-table-wrap.etm-draggable { cursor: grab; }
 .etm-tasks-table { width: 100%; min-width: 1720px; border-collapse: collapse; }
 .etm-tasks-table.compact { min-width: 1600px; }
 .etm-tasks-table-dashboard { min-width: 980px; }
@@ -372,3 +374,7 @@
 .etm-reports-page-note { margin: 2px 0 0; color: var(--etm-muted); font-size: 12.5px; font-style: italic; }
 
 .etm-tab-alert-badge { display: inline-flex; align-items: center; margin-left: 6px; padding: 1px 7px; border-radius: 20px; background: #e0453c; color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .2px; text-transform: uppercase; vertical-align: middle; }
+
+.etm-workload-dialog-pager { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; color: var(--etm-muted); font-size: 12px; }
+.etm-workload-dialog-pager button { padding: 6px 12px; border: 1px solid var(--etm-border); border-radius: 8px; background: var(--etm-surface-alt); color: var(--etm-ink); font: inherit; font-size: 12px; cursor: pointer; }
+.etm-workload-dialog-pager button:disabled { opacity: .45; cursor: not-allowed; }

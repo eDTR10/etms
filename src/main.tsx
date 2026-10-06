@@ -13,6 +13,9 @@ import AdminRoute from './screens/Auth/AdminRoute.tsx';
 import GuestRoute from './screens/Auth/GuestRoute.tsx';
 import { getHomePath } from './screens/Auth/roles.ts';
 import { ThemeProvider } from './components/theme-provider.tsx';
+import { installTableDragScroll } from './dragScroll.ts';
+
+installTableDragScroll();
 
 // A long press on touch also fires "contextmenu" (the browser's right-click menu), which would pop
 // up over the row being dragged. Suppress it for touch input on touch-draggable elements only, so mouse

@@ -3,8 +3,17 @@ import type { BulkActionResult } from "./taskService";
 import type { Member, Project, Task, TaskInput, TaskStatus, TaskTemplate, TaskTemplateInput } from "./types";
 import type { DtmsDocumentTemplate } from "../dtmsDocument/dtmsDocumentTypes";
 
+// What an access-level-2 user additionally sees on the dashboard: their whole office (read-only).
+export interface OfficeScope {
+  enabled: boolean;
+  office_name: string | null;
+  members: Member[];
+  tasks: Task[];
+}
+
 export interface TaskContextValue {
   tasks: Task[];
+  officeScope: OfficeScope;
   members: Member[];
   projects: Project[];
   templates: TaskTemplate[];
@@ -46,6 +55,7 @@ export interface TaskContextValue {
   reorderSubtasks: (id: number, parentId: number | null, order: number[]) => Promise<void>;
   completeTask: (id: number) => Promise<void>;
   turnoverTask: (id: number, userId: number, note: string) => Promise<void>;
+  revertTurnover: (id: number) => Promise<void>;
   assignSubtask: (id: number, subtaskId: number, userId: number | null) => Promise<void>;
   linkSubtaskDocument: (id: number, subtaskId: number, tracknumber: string) => Promise<void>;
   unlinkSubtaskDocument: (id: number, subtaskId: number) => Promise<void>;

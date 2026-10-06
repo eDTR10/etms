@@ -1,5 +1,6 @@
 import { CalendarDays, CheckCircle2, Circle, ExternalLink, Flag, Folder, Users } from "lucide-react";
 import Modal from "../../components/ui/modal";
+import { detailsToText, RichDetails } from "./richDetails";
 import { flattenSubtasks, formatDate, formatTaskNumber, memberName, statusSlug, stripHtml, type SubTask, type Task } from "./types";
 
 // Read-only look at everything recorded on a task — used where the user only needs to
@@ -59,7 +60,7 @@ export default function TaskPreviewModal({ task, onClose, onOpenFull }: { task: 
             <span className={`etm-badge ${statusSlug(task.status)}`}>{task.status}</span>
             <span className={`etm-details-priority ${task.priority.toLowerCase()}`}><Flag size={13} />{task.priority} priority</span>
           </div>
-          <p className={`text-sm whitespace-pre-wrap ${task.details ? "text-foreground" : "text-muted-foreground italic"}`}>{task.details || "No description provided."}</p>
+          {detailsToText(task.details) ? <RichDetails className="text-sm text-foreground" value={task.details} /> : <p className="text-sm text-muted-foreground italic">No description provided.</p>}
         </div>
 
         <dl className="grid grid-cols-2 sm:grid-cols-1 gap-x-4 gap-y-3 rounded-xl border border-border bg-accent/40 p-4">

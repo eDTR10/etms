@@ -16,6 +16,7 @@ export interface Member {
   first_name: string;
   last_name: string;
   position?: string;
+  office?: number | null;
 }
 
 export interface Project {
@@ -172,6 +173,9 @@ export interface Task {
   location_barangay: string;
   priority: Priority;
   deadline: string | null;
+  eodb_compliance?: EodbCompliance | "";
+  // Set when the viewer may take back the last turnover; holds the name of whoever has the task now.
+  revert_turnover_to?: string | null;
   recurrence: Recurrence;
   recurrence_weekdays: string;
   recurrence_dates: string[];
@@ -198,6 +202,7 @@ export interface Task {
   // for a non-creator assignee's own view of the task (see mark_viewed on the backend).
   my_last_viewed_at: string | null;
   links: TaskLink[];
+  created_by?: number | null;
   created_by_name?: string | null;
 }
 
@@ -268,6 +273,7 @@ export interface TaskInput {
   location_barangay: string;
   priority: Priority;
   deadline: string | null;
+  eodb_compliance?: EodbCompliance | "";
   recurrence: Recurrence;
   recurrence_weekdays: string;
   recurrence_dates: string[];
@@ -282,6 +288,14 @@ export interface TaskInput {
 export const STATUSES: TaskStatus[] = ["Pending", "In-Progress", "Completed", "Blocked/Stuck"];
 export const PRIORITIES: Priority[] = ["Low", "Medium", "High"];
 export const ASSIGNMENT_ROLES: AssignmentRole[] = ["Editor", "Commentor", "Viewer"];
+// EODB compliance class of a task; picking one in the task form fills the deadline that many days ahead.
+export type EodbCompliance = "Simple" | "Complex" | "Highly Technical";
+export const EODB_COMPLIANCE: { value: EodbCompliance; days: number }[] = [
+  { value: "Simple", days: 3 },
+  { value: "Complex", days: 7 },
+  { value: "Highly Technical", days: 30 },
+];
+
 export const RECURRENCES: Recurrence[] = ["None", "Daily", "Weekly", "Monthly", "Specific", "Anytime"];
 export const RECURRENCE_LABELS: Record<Recurrence, string> = {
   None: "Does not repeat",

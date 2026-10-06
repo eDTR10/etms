@@ -21,18 +21,19 @@ interface FormState {
   last_name: string;
   position: string;
   office: string;
+  projects: number[];
   acc_lvl: string;
   role: string;
   is_active: boolean;
   password: string;
 }
 
-const EMPTY_FORM: FormState = { email: "", first_name: "", last_name: "", position: "", office: "", acc_lvl: "3", role: "user", is_active: true, password: "" };
+const EMPTY_FORM: FormState = { email: "", first_name: "", last_name: "", position: "", office: "", projects: [], acc_lvl: "3", role: "user", is_active: true, password: "" };
 
 function toForm(user: ManagedUser): FormState {
   return {
     email: user.email, first_name: user.first_name, last_name: user.last_name, position: user.position ?? "",
-    office: user.office ? String(user.office) : "", acc_lvl: String(user.acc_lvl ?? 3), role: user.role, is_active: user.is_active, password: "",
+    office: user.office ? String(user.office) : "", projects: user.projects ?? [], acc_lvl: String(user.acc_lvl ?? 3), role: user.role, is_active: user.is_active, password: "",
   };
 }
 
@@ -42,6 +43,9 @@ function UserFormModal({ user, offices, isSelf, onClose, onSaved }: { user: Mana
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm(current => ({ ...current, [key]: value }));
+  const [projectSearch, setProjectSearch] = useState("");
+  const toggleProject = (id: number) => setForm(current => ({ ...current, projects: current.projects.includes(id) ? current.projects.filter(item => item !== id) : [...current.projects, id] }));
+  const visibleProjects = offices.filter(office => office.name.toLowerCase().includes(projectSearch.trim().toLowerCase()));
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -52,7 +56,7 @@ function UserFormModal({ user, offices, isSelf, onClose, onSaved }: { user: Mana
     setError("");
     const input: ManagedUserInput = {
       email: form.email.trim(), first_name: form.first_name.trim(), last_name: form.last_name.trim(), position: form.position.trim(),
-      office: form.office ? Number(form.office) : null, acc_lvl: Number(form.acc_lvl) || 3, role: form.role, is_active: form.is_active,
+      office: form.office ? Number(form.office) : null, projects: form.projects, acc_lvl: Number(form.acc_lvl) || 3, role: form.role, is_active: form.is_active,
     };
     if (form.password) input.password = form.password;
     try {
@@ -85,6 +89,18 @@ function UserFormModal({ user, offices, isSelf, onClose, onSaved }: { user: Mana
               {USER_ROLES.map(role => <option key={role.value} value={role.value}>{role.label}</option>)}
             </select>
           </label>
+        </div>
+        <div className={labelClass}>
+          <span>Projects <span className="text-xs font-normal text-muted-foreground">— {form.projects.length} selected</span></span>
+          <input className={fieldClass} value={projectSearch} onChange={event => setProjectSearch(event.target.value)} placeholder="Search projects…" aria-label="Search projects" disabled={saving} />
+          <div className="max-h-40 overflow-y-auto rounded-md border border-border bg-background p-1.5 flex flex-col gap-0.5" role="group" aria-label="Projects">
+            {visibleProjects.length ? visibleProjects.map(office => (
+              <label key={office.id} className="flex items-center gap-2 rounded px-1.5 py-1 text-sm font-normal text-foreground hover:bg-muted cursor-pointer">
+                <input type="checkbox" checked={form.projects.includes(office.id)} onChange={() => toggleProject(office.id)} disabled={saving} />
+                {office.name}
+              </label>
+            )) : <p className="px-1.5 py-1 text-xs text-muted-foreground">No projects match.</p>}
+          </div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-1 gap-3">
           <label className={labelClass}>{creating ? "Password *" : "New password"}
@@ -127,16 +143,18 @@ function UsersContent() {
   }, []);
 
   const officeName = useMemo(() => new Map(offices.map(office => [office.id, office.name])), [offices]);
+  const projectNames = (user: ManagedUser) => (user.projects ?? []).map(id => officeName.get(id) ?? `#${id}`).join(", ");
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return users;
-    return users.filter(user => `${user.first_name} ${user.last_name} ${user.email} ${user.position} ${roleLabel(user.role)}`.toLowerCase().includes(query));
+    return users.filter(user => `${user.first_name} ${user.last_name} ${user.email} ${user.position} ${roleLabel(user.role)} ${projectNames(user)}`.toLowerCase().includes(query));
   }, [users, search]);
   const { sorted, sort, toggle } = useTableSort(filtered, {
     name: user => `${user.last_name} ${user.first_name}`,
     email: user => user.email,
     position: user => user.position,
     office: user => user.office ? officeName.get(user.office) : null,
+    projects: user => projectNames(user),
     role: user => roleLabel(user.role),
     status: user => user.is_active ? 1 : 0,
   });
@@ -195,6 +213,7 @@ function UsersContent() {
                 <SortTh sortKey="email" sort={sort} onSort={toggle}>Email</SortTh>
                 <SortTh sortKey="position" sort={sort} onSort={toggle}>Position</SortTh>
                 <SortTh sortKey="office" sort={sort} onSort={toggle}>Office</SortTh>
+                <SortTh sortKey="projects" sort={sort} onSort={toggle}>Projects</SortTh>
                 <SortTh sortKey="role" sort={sort} onSort={toggle}>Role</SortTh>
                 <SortTh sortKey="status" sort={sort} onSort={toggle}>Status</SortTh>
                 <th scope="col" className="etm-tasks-table-actions-col">Action Buttons</th>
@@ -208,6 +227,7 @@ function UsersContent() {
                       <td>{user.email}</td>
                       <td>{user.position || <span className="etm-tasks-table-unassigned">Not set</span>}</td>
                       <td>{user.office ? officeName.get(user.office) ?? `#${user.office}` : <span className="etm-tasks-table-unassigned">None</span>}</td>
+                      <td className="etm-tasks-table-details-col">{user.projects?.length ? <span title={projectNames(user)}>{projectNames(user)}</span> : <span className="etm-tasks-table-unassigned">None</span>}</td>
                       <td>{roleLabel(user.role)}</td>
                       <td><span className={`etm-badge ${user.is_active ? "completed" : "blocked-stuck"}`}>{user.is_active ? "Active" : "Inactive"}</span></td>
                       <td className="etm-report-group-actions">
@@ -216,7 +236,7 @@ function UsersContent() {
                       </td>
                     </tr>
                   );
-                }) : <tr><td colSpan={7} className="etm-empty-row">{users.length ? "No users match your search." : "No users yet."}</td></tr>}
+                }) : <tr><td colSpan={8} className="etm-empty-row">{users.length ? "No users match your search." : "No users yet."}</td></tr>}
               </tbody>
             </table>
           </section>

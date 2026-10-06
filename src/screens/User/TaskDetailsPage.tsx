@@ -30,8 +30,9 @@ export function TaskPageContent({ basePath = "/etms/tasks" }: { basePath?: strin
   const highlightSubtaskId = hlSubtaskMatch ? Number(hlSubtaskMatch[1]) : null;
   const highlightHeader = hl === "task";
   const highlightRemarks = hl === "remark";
-  const { tasks, members, projects, loading, error, updateTask, addProgress, editProgress, deleteProgress, addRemark, editRemark, deleteRemark, reactToRemark, addRemarkReply, addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, reorderSubtasks, assignSubtask, linkSubtaskDocument, unlinkSubtaskDocument, completeTask, turnoverTask, addRemarkAttachment, deleteRemarkAttachment, addSubtaskRemarkAttachment, deleteSubtaskRemarkAttachment, markCompletionSeen, markViewed } = useTasks();
-  const task = tasks.find(item => item.id === Number(taskId));
+  const { tasks, officeScope, members, projects, loading, error, updateTask, addProgress, editProgress, deleteProgress, addRemark, editRemark, deleteRemark, reactToRemark, addRemarkReply, addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, reorderSubtasks, assignSubtask, linkSubtaskDocument, unlinkSubtaskDocument, completeTask, turnoverTask, addRemarkAttachment, deleteRemarkAttachment, addSubtaskRemarkAttachment, deleteSubtaskRemarkAttachment, markCompletionSeen, markViewed } = useTasks();
+  // Falls back to the office view: an access-level-2 user can open (read-only) tasks of their office.
+  const task = tasks.find(item => item.id === Number(taskId)) ?? officeScope.tasks.find(item => item.id === Number(taskId));
   function goBack() {
     if (window.history.length > 1) navigate(-1);
     else navigate(basePath);

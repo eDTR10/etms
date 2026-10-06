@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type DragEvent, type FormEvent } from "react";
+import { detailsToText, RichDetails } from "./richDetails";
 import { createPortal } from "react-dom";
 import { isAxiosError } from "axios";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -398,30 +399,27 @@ function RemarkChip({ remark, members, onEdit, onDelete, canUpload, onAddAttachm
               </div>
             )}
             <button type="button" className="etm-button ghost small" disabled={saving} onClick={() => { setEditing(false); setDraft(displayMessage); setError(""); }}>Cancel</button>
-            <button type="button" className="etm-button primary small" disabled={saving || !draft.replace(/<[^>]*>/g, "").trim()} onClick={() => void save()}>{saving ? <Loader2 size={13} className="etm-form-spinner" /> : <Check size={13} />}Save</button>
+            <button type="button" className="etm-button primary small" disabled={saving || !draft.replace(/<[^>]*>/g, "").trim()} onClick={() => { void save(); }}>{saving ? <Loader2 size={13} className="etm-form-spinner" /> : <Check size={13} />}Save</button>
           </div>
         </div>
-      ) : <>{subtaskTagMatch && (
-          subtaskTagId ? <button type="button" className="etm-remark-subtask-tag" onClick={() => onOpenSubtask?.(subtaskTagId)}><CheckCheck size={11} />Subtask: {subtaskTagTitle}</button>
-          : <span className="etm-remark-subtask-tag"><CheckCheck size={11} />Subtask: {subtaskTagTitle}</span>
-        )}<span className="etm-remark-chip-message" dangerouslySetInnerHTML={{ __html: safeRichText(displayMessage) }} />{(taskMentions.length > 0 || subtaskMentions.length > 0) && <span className="etm-remark-task-links">{taskMentions.map(taskId => <button type="button" key={`task-${taskId}`} onClick={() => navigate(`/etms/tasks/${taskId}`)}>Open Task #{taskId}</button>)}{subtaskMentions.map(mention => <button type="button" key={`subtask-${mention.id}`} onClick={() => onOpenSubtask?.(mention.id)}>Open Subtask: {mention.title}</button>)}</span>}</>}
+      ) : (
+        <>
+          {subtaskTagMatch && (subtaskTagId
+            ? <button type="button" className="etm-remark-subtask-tag" onClick={() => onOpenSubtask?.(subtaskTagId)}><CheckCheck size={11} />Subtask: {subtaskTagTitle}</button>
+            : <span className="etm-remark-subtask-tag"><CheckCheck size={11} />Subtask: {subtaskTagTitle}</span>)}
+          <span className="etm-remark-chip-message" dangerouslySetInnerHTML={{ __html: safeRichText(displayMessage) }} />
+          {(taskMentions.length > 0 || subtaskMentions.length > 0) && (
+            <span className="etm-remark-task-links">
+              {taskMentions.map(id => <button type="button" key={`task-${id}`} onClick={() => navigate(`/etms/tasks/${id}`)}>Open Task #{id}</button>)}
+              {subtaskMentions.map(mention => <button type="button" key={`subtask-${mention.id}`} onClick={() => onOpenSubtask?.(mention.id)}>Open Subtask: {mention.title}</button>)}
+            </span>
+          )}
+        </>
+      )}
       {remark.reactions.length > 0 && !editing && (
         <span className="etm-reaction-pills">
           {remark.reactions.map(reaction => (
-            <button
-              type="button"
-              key={reaction.emoji}
-              className={`etm-reaction-pill ${reaction.reacted_by_me ? "active" : ""}`}
-              onClick={() => showReactors(
-                reaction.emoji,
-                reaction.reactor_names,
-                reaction.reactor_ids,
-                user?.id,
-                reaction.reacted_by_me && onReact ? () => handleReact(reaction.emoji) : undefined,
-              )}
-            >
-              {reaction.emoji} <span>{reaction.count}</span>
-            </button>
+            <button type="button" key={reaction.emoji} className={`etm-reaction-pill ${reaction.reacted_by_me ? "active" : ""}`} onClick={() => showReactors(reaction.emoji, reaction.reactor_names, reaction.reactor_ids, user?.id, reaction.reacted_by_me && onReact ? () => handleReact(reaction.emoji) : undefined)}>{reaction.emoji} <span>{reaction.count}</span></button>
           ))}
         </span>
       )}
@@ -429,12 +427,14 @@ function RemarkChip({ remark, members, onEdit, onDelete, canUpload, onAddAttachm
         <span className="etm-remark-chip-meta">{formatDate(remark.created_at, true)}{remark.created_by_name ? ` · ${remark.created_by_name}` : ""}</span>
         {!editing && (
           <span className="etm-remark-chip-actions">
-            {onReact && <ReactionPicker onPick={emoji => void handleReact(emoji)} />}
+            {onReact && <ReactionPicker onPick={emoji => { void handleReact(emoji); }} />}
             {allowReply && onReply && <button type="button" className="etm-inline-link-button" onClick={() => setReplying(value => !value)}><Reply size={10} /> Reply</button>}
-            {remark.can_edit && (<>
-              <button type="button" className="etm-inline-link-button" onClick={startEditing}><Pencil size={10} /> Edit</button>
-              <button type="button" className="etm-inline-link-button danger" onClick={() => void handleDelete()}><Trash2 size={10} /> Delete</button>
-            </>)}
+            {remark.can_edit && (
+              <>
+                <button type="button" className="etm-inline-link-button" onClick={startEditing}><Pencil size={10} /> Edit</button>
+                <button type="button" className="etm-inline-link-button danger" onClick={() => { void handleDelete(); }}><Trash2 size={10} /> Delete</button>
+              </>
+            )}
           </span>
         )}
       </span>
@@ -448,17 +448,7 @@ function RemarkChip({ remark, members, onEdit, onDelete, canUpload, onAddAttachm
           {(remark.replies ?? []).length > 0 && (
             <span className="etm-remark-reply-list">
               {remark.replies!.map(reply => (
-                <RemarkChip
-                  key={reply.id}
-                  remark={reply}
-                  members={members}
-                  onEdit={message => onEditById(reply.id, message)}
-                  onDelete={() => handleReplyDelete(reply.id)}
-                  onReact={onReactById ? emoji => onReactById(reply.id, emoji) : undefined}
-                  subtasks={subtasks}
-                  onOpenSubtask={onOpenSubtask}
-                  allowReply={false}
-                />
+                <RemarkChip key={reply.id} remark={reply} members={members} onEdit={message => onEditById(reply.id, message)} onDelete={() => handleReplyDelete(reply.id)} onReact={onReactById ? emoji => onReactById(reply.id, emoji) : undefined} subtasks={subtasks} onOpenSubtask={onOpenSubtask} allowReply={false} />
               ))}
             </span>
           )}
@@ -468,13 +458,96 @@ function RemarkChip({ remark, members, onEdit, onDelete, canUpload, onAddAttachm
               {replyError && <p className="etm-field-error">{replyError}</p>}
               <div className="etm-remark-reply-composer-actions">
                 <button type="button" className="etm-button ghost small" disabled={replySaving} onClick={() => { setReplying(false); setReplyDraft(""); setReplyError(""); }}>Cancel</button>
-                <button type="button" className="etm-button primary small" disabled={replySaving || !replyDraft.replace(/<[^>]*>/g, "").trim()} onClick={() => void submitReply()}>{replySaving ? <Loader2 size={13} className="etm-form-spinner" /> : <Send size={13} />}Reply</button>
+                <button type="button" className="etm-button primary small" disabled={replySaving || !replyDraft.replace(/<[^>]*>/g, "").trim()} onClick={() => { void submitReply(); }}>{replySaving ? <Loader2 size={13} className="etm-form-spinner" /> : <Send size={13} />}Reply</button>
               </div>
             </div>
           )}
         </span>
       )}
     </span>
+  );
+}
+
+function RichTextRemarkField({ value, onChange, disabled, members, subtasks }: { value: string; onChange: (value: string) => void; disabled?: boolean; members: Member[]; subtasks?: SubTask[] }) {
+  const editorRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { tasks } = useTasks();
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [menuBox, setMenuBox] = useState<{ top: number; left: number; width: number } | null>(null);
+
+  useEffect(() => {
+    if (editorRef.current && editorRef.current.innerHTML !== value) editorRef.current.innerHTML = value;
+  }, [value]);
+
+  function format(command: string) {
+    editorRef.current?.focus();
+    document.execCommand(command);
+    onChange(editorRef.current?.innerHTML ?? "");
+  }
+
+  const peopleMatches = members.filter(member => memberName(member).toLowerCase().replace(/\s/g, "").includes(mentionQuery.toLowerCase().replace(/\s/g, ""))).slice(0, 4);
+  const taskMatches = tasks.filter(item => item.title.toLowerCase().includes(mentionQuery.toLowerCase())).slice(0, 4);
+  const subtaskMatches = (subtasks ?? []).filter(item => item.id != null && item.title.toLowerCase().includes(mentionQuery.toLowerCase())).slice(0, 4);
+
+  function handleInput() {
+    const match = (editorRef.current?.innerText ?? "").match(/(?:^|\s)@([^\s@]*)$/);
+    setMentionOpen(match !== null);
+    setMentionQuery(match ? match[1] : "");
+    if (match !== null && containerRef.current) {
+      const box = containerRef.current.getBoundingClientRect();
+      setMenuBox({ top: box.bottom + 4, left: box.left, width: box.width });
+    }
+    onChange(editorRef.current?.innerHTML ?? "");
+  }
+
+  // Replaces the "@query" being typed with the chosen mention text.
+  function insertMention(text: string) {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
+    const selection = window.getSelection();
+    const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+    if (range && editor.contains(range.startContainer) && range.startContainer.nodeType === Node.TEXT_NODE) {
+      const node = range.startContainer as Text;
+      const length = Math.min(mentionQuery.length + 1, range.startOffset);
+      const start = range.startOffset - length;
+      node.deleteData(start, length);
+      node.insertData(start, text);
+      const caret = document.createRange();
+      const position = start + text.length;
+      caret.setStart(node, Math.min(position, node.length));
+      caret.collapse(true);
+      selection?.removeAllRanges();
+      selection?.addRange(caret);
+    } else {
+      editor.append(document.createTextNode(text));
+    }
+    onChange(editor.innerHTML);
+    setMentionOpen(false);
+    setMentionQuery("");
+  }
+
+  const showMenu = mentionOpen && menuBox && (peopleMatches.length > 0 || taskMatches.length > 0 || subtaskMatches.length > 0);
+
+  return (
+    <div className="etm-rich-text" ref={containerRef}>
+      <div className="etm-rich-text-toolbar" aria-label="Text formatting">
+        <button type="button" onMouseDown={event => event.preventDefault()} onClick={() => format("bold")} aria-label="Bold"><Bold size={14} /></button>
+        <button type="button" onMouseDown={event => event.preventDefault()} onClick={() => format("italic")} aria-label="Italic"><Italic size={14} /></button>
+        <button type="button" onMouseDown={event => event.preventDefault()} onClick={() => format("underline")} aria-label="Underline"><Underline size={14} /></button>
+        <button type="button" onMouseDown={event => event.preventDefault()} onClick={() => format("insertUnorderedList")} aria-label="Bullet list"><List size={14} /></button>
+      </div>
+      <div ref={editorRef} className="etm-rich-text-editor" contentEditable={!disabled} role="textbox" aria-multiline="true" aria-label="Add a rich-text remark" data-placeholder="Add a remark…" onInput={handleInput} onBlur={() => setTimeout(() => setMentionOpen(false), 150)} />
+      {showMenu && menuBox && createPortal(
+        <div className="etm-rich-mention-menu" style={{ top: menuBox.top, left: menuBox.left, width: menuBox.width }}>
+          {peopleMatches.map(member => <button type="button" key={`person-${member.id}`} onMouseDown={event => { event.preventDefault(); insertMention(`@${memberName(member).replace(/\s/g, "")} `); }}><User size={13} />{memberName(member)}<small>Person</small></button>)}
+          {taskMatches.map(item => <button type="button" key={`task-${item.id}`} onMouseDown={event => { event.preventDefault(); insertMention(`@Task #${item.id} `); }}><ClipboardList size={13} />{item.title}<small>Task #{item.id}</small></button>)}
+          {subtaskMatches.map(item => <button type="button" key={`subtask-${item.id}`} onMouseDown={event => { event.preventDefault(); insertMention(`@Subtask #${item.id} "${item.title}" `); }}><CheckCheck size={13} />{item.title}<small>Subtask</small></button>)}
+        </div>,
+        document.body,
+      )}
+    </div>
   );
 }
 
@@ -499,61 +572,9 @@ interface RemarkListProps {
   onAddReply?: (remarkId: number, message: string) => Promise<void>;
 }
 
-function RichTextRemarkField({ value, onChange, disabled, members, subtasks }: { value: string; onChange: (value: string) => void; disabled?: boolean; members: Member[]; subtasks?: SubTask[] }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const { tasks } = useTasks();
-  const [mentionActive, setMentionActive] = useState(false);
-  const [mentionQuery, setMentionQuery] = useState("");
-  const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null);
-  useEffect(() => { if (ref.current && ref.current.innerHTML !== value) ref.current.innerHTML = value; }, [value]);
-  function format(command: "bold" | "italic" | "underline" | "insertUnorderedList") { ref.current?.focus(); document.execCommand(command); onChange(ref.current?.innerHTML ?? ""); }
-  const people = members.filter(member => memberName(member).toLowerCase().replace(/\s/g, "").includes(mentionQuery.toLowerCase().replace(/\s/g, ""))).slice(0, 4);
-  const taskMatches = tasks.filter(task => task.title.toLowerCase().includes(mentionQuery.toLowerCase())).slice(0, 4);
-  const subtaskMatches = (subtasks ?? []).filter((subtask): subtask is SubTask & { id: number } => subtask.id != null && subtask.title.toLowerCase().includes(mentionQuery.toLowerCase())).slice(0, 4);
-  function update() {
-    const text = ref.current?.innerText ?? "";
-    const match = text.match(/(?:^|\s)@([^\s@]*)$/);
-    setMentionActive(match !== null);
-    setMentionQuery(match ? match[1] : "");
-    if (match !== null && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      setMenuPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
-    }
-    onChange(ref.current?.innerHTML ?? "");
-  }
-  function insertAtCaret(text: string) {
-    const node = ref.current;
-    if (!node) return;
-    node.focus();
-    const selection = window.getSelection();
-    const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
-    if (range && node.contains(range.startContainer) && range.startContainer.nodeType === Node.TEXT_NODE) {
-      const textNode = range.startContainer as Text;
-      const charsToRemove = Math.min(mentionQuery.length + 1, range.startOffset);
-      const insertionStart = range.startOffset - charsToRemove;
-      textNode.deleteData(insertionStart, charsToRemove);
-      textNode.insertData(insertionStart, text);
-      const newRange = document.createRange();
-      const caretPos = insertionStart + text.length;
-      newRange.setStart(textNode, Math.min(caretPos, textNode.length));
-      newRange.collapse(true);
-      selection?.removeAllRanges();
-      selection?.addRange(newRange);
-    } else {
-      node.append(document.createTextNode(text));
-    }
-    onChange(node.innerHTML);
-    setMentionActive(false);
-    setMentionQuery("");
-  }
-  function insertMention(label: string) { insertAtCaret(`@${label} `); }
-  const showMentionMenu = mentionActive && menuPos && (people.length > 0 || taskMatches.length > 0 || subtaskMatches.length > 0);
-  return <div className="etm-rich-text" ref={containerRef}><div className="etm-rich-text-toolbar" aria-label="Text formatting"><button type="button" onMouseDown={event => event.preventDefault()} onClick={() => format("bold")} aria-label="Bold"><Bold size={14} /></button><button type="button" onMouseDown={event => event.preventDefault()} onClick={() => format("italic")} aria-label="Italic"><Italic size={14} /></button><button type="button" onMouseDown={event => event.preventDefault()} onClick={() => format("underline")} aria-label="Underline"><Underline size={14} /></button><button type="button" onMouseDown={event => event.preventDefault()} onClick={() => format("insertUnorderedList")} aria-label="Bullet list"><List size={14} /></button></div><div ref={ref} className="etm-rich-text-editor" contentEditable={!disabled} role="textbox" aria-multiline="true" aria-label="Add a rich-text remark" data-placeholder="Add a remark…" onInput={update} onBlur={() => setTimeout(() => setMentionActive(false), 150)} />{showMentionMenu && menuPos && createPortal(<div className="etm-rich-mention-menu" style={{ top: menuPos.top, left: menuPos.left, width: menuPos.width }}>{people.map(member => <button type="button" key={`person-${member.id}`} onMouseDown={event => { event.preventDefault(); insertMention(memberName(member).replace(/\s/g, "")); }}><User size={13} />{memberName(member)}<small>Person</small></button>)}{taskMatches.map(task => <button type="button" key={`task-${task.id}`} onMouseDown={event => { event.preventDefault(); insertMention(`Task #${task.id}`); }}><ClipboardList size={13} />{task.title}<small>Task #{task.id}</small></button>)}{subtaskMatches.map(subtask => <button type="button" key={`subtask-${subtask.id}`} onMouseDown={event => { event.preventDefault(); insertAtCaret(`@Subtask #${subtask.id} "${subtask.title}" `); }}><CheckCheck size={13} />{subtask.title}<small>Subtask</small></button>)}</div>, document.body)}</div>;
-}
-
 function RemarkList({ remarks, canComment, members, onAdd, onEdit, onDelete, emptyText, compact, showStatusField, currentStatus, canChangeStatus, incompleteSubtaskCount, onAddAttachment, onDeleteAttachment, subtasks, onOpenSubtask, onReact, onAddReply }: RemarkListProps) {
   const [composing, setComposing] = useState(false);
+  const [pickingStatus, setPickingStatus] = useState(false);
   const [draft, setDraft] = useState("");
   const [status, setStatus] = useState<TaskStatus | undefined>(currentStatus);
   const [saving, setSaving] = useState(false);
@@ -572,15 +593,24 @@ function RemarkList({ remarks, canComment, members, onAdd, onEdit, onDelete, emp
 
   function cancelComposer() {
     setComposing(false);
+    setPickingStatus(false);
     setDraft("");
     setPendingFile(null);
     setError("");
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
-  async function submit(event: FormEvent) {
+  // Writing the remark comes first; the status it carries is asked for afterwards, in its own dialog.
+  function submit(event: FormEvent) {
     event.preventDefault();
     if (saving || !draft.replace(/<[^>]*>/g, "").trim()) return;
+    setError("");
+    if (showStatusField && canChangeStatus) { setStatus(currentStatus); setPickingStatus(true); return; }
+    void post();
+  }
+
+  async function post() {
+    if (saving) return;
     if (showStatusField && status === "Completed" && status !== currentStatus && (incompleteSubtaskCount ?? 0) > 0) {
       setError(`Complete the ${incompleteSubtaskCount} remaining subtask${incompleteSubtaskCount === 1 ? "" : "s"} before completing this task.`);
       return;
@@ -593,6 +623,7 @@ function RemarkList({ remarks, canComment, members, onAdd, onEdit, onDelete, emp
       setPendingFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       setComposing(false);
+      setPickingStatus(false);
     } catch (caught) {
       setError(remarkError(caught));
     } finally {
@@ -660,19 +691,33 @@ function RemarkList({ remarks, canComment, members, onAdd, onEdit, onDelete, emp
             </div>
           )}
           <div className="etm-remark-form-actions">
-            {showStatusField && (
-              <div style={{ width: 150 }}>
-                <ThemedSelect<SelectOption<TaskStatus>> size="small" classNamePrefix="etm-status-select" aria-label="Task status" isDisabled={saving || !canChangeStatus} isSearchable={false} options={STATUS_SELECT_OPTIONS} value={STATUS_SELECT_OPTIONS.find(option => option.value === status)} onChange={option => setStatus(option?.value ?? status)} />
-              </div>
-            )}
             <button type="button" className="etm-button ghost small" disabled={saving} onClick={cancelComposer}>Cancel</button>
-            <button type="submit" className="etm-button primary small" disabled={saving || !draft.replace(/<[^>]*>/g, "").trim()}>{saving ? <Loader2 size={15} className="etm-form-spinner" /> : <Send size={15} />}Post remark</button>
+            <button type="submit" className="etm-button primary small" disabled={saving || !draft.replace(/<[^>]*>/g, "").trim()}>{saving ? <Loader2 size={15} className="etm-form-spinner" /> : <Send size={15} />}{showStatusField && canChangeStatus ? "Next" : "Post remark"}</button>
           </div>
+          <Dialog.Root open={pickingStatus} onOpenChange={open => { if (!saving) { setPickingStatus(open); if (!open) setError(""); } }}>
+            <Dialog.Portal>
+              <Dialog.Overlay className="etm-status-pick-overlay" />
+              <Dialog.Content className="etm-status-pick" aria-describedby={undefined}>
+                <Dialog.Title className="etm-status-pick-title">What is the status for this remark?</Dialog.Title>
+                <p className="etm-status-pick-hint">Choose where the {compact ? "subtask" : "task"} stands now that the update is written.</p>
+                <div className="etm-status-pick-chips" role="radiogroup" aria-label="Status for this remark">
+                  {STATUSES.map(option => (
+                    <button key={option} type="button" role="radio" aria-checked={status === option} disabled={saving} className={`etm-status-pick-chip ${statusSlug(option)} ${status === option ? "active" : ""}`} onClick={() => setStatus(option)}>{option}</button>
+                  ))}
+                </div>
+                {error && <p className="etm-field-error">{error}</p>}
+                <div className="etm-remark-form-actions">
+                  <button type="button" className="etm-button ghost small" disabled={saving} onClick={() => { setPickingStatus(false); setError(""); }}>Back</button>
+                  <button type="button" className="etm-button primary small" disabled={saving || !status} onClick={() => void post()}>{saving ? <Loader2 size={15} className="etm-form-spinner" /> : <Send size={15} />}Post remark</button>
+                </div>
+              </Dialog.Content>
+            </Dialog.Portal>
+          </Dialog.Root>
         </form>
       ) : (
         <button type="button" className="etm-button ghost small etm-remark-add-trigger" onClick={openComposer}><Plus size={14} />Add new remark</button>
       ))}
-      {error && <p className="etm-field-error">{error}</p>}
+      {error && !pickingStatus && <p className="etm-field-error">{error}</p>}
     </div>
   );
 }
@@ -1146,6 +1191,27 @@ function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = 
   const [turnoverNote, setTurnoverNote] = useState("");
   const [turningOver, setTurningOver] = useState(false);
   const [turnoverError, setTurnoverError] = useState("");
+  const { revertTurnover } = useTasks();
+  const [reverting, setReverting] = useState(false);
+  async function returnTask() {
+    if (reverting) return;
+    const result = await Swal.fire({
+      title: task.is_creator ? "Revert this turnover?" : "Take this task back?",
+      text: `This task is currently with ${task.revert_turnover_to}. It will be assigned back to ${task.is_creator ? "the person who handed it over" : "you"}, and ${task.revert_turnover_to} will stay on it as a viewer.`,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Yes, return it",
+    });
+    if (!result.isConfirmed) return;
+    setReverting(true);
+    try {
+      await revertTurnover(task.id);
+    } catch (caught) {
+      void Swal.fire({ title: "Couldn't return the task", text: progressError(caught), icon: "error" });
+    } finally {
+      setReverting(false);
+    }
+  }
   const canTurnover = !!onTurnover && task.my_role === "Editor" && !task.is_creator && !task.is_completed;
   const turnoverCandidates = (assignableMembers ?? []).filter(member => member.id !== currentUser?.id);
   async function submitTurnover(event: FormEvent<HTMLFormElement>) {
@@ -1254,10 +1320,17 @@ function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = 
     <div className="etm-details-header" ref={headerRef}>
       <div className="etm-details-eyebrow"><span>MAJOR TASK</span><span>#{String(task.id).padStart(3, "0")}</span></div>
       {page ? <h1 className={`etm-details-title ${task.is_completed ? "completed" : ""}`}>{task.title}</h1> : <Dialog.Title className={`etm-details-title ${task.is_completed ? "completed" : ""}`}>{task.title}</Dialog.Title>}
-      {page ? <p className="etm-details-description">{task.details || "No description provided."}</p> : <Dialog.Description className="etm-details-description">{task.details || "No description provided."}</Dialog.Description>}
+      {page
+        ? <div className="etm-details-description">{detailsToText(task.details) ? <RichDetails value={task.details} /> : "No description provided."}</div>
+        : <Dialog.Description asChild><div className="etm-details-description">{detailsToText(task.details) ? <RichDetails value={task.details} /> : "No description provided."}</div></Dialog.Description>}
       <div className="etm-details-badges"><span className={`etm-badge ${statusSlug(task.status)}`}><span className="etm-details-status-dot" />{task.status}</span><span className={`etm-details-priority ${task.priority.toLowerCase()}`}><Flag size={13} />{task.priority} priority</span>{task.recurrence !== "None" && <span className="etm-badge"><Repeat size={13} />{describeRecurrence(task)}</span>}</div>
       {task.my_role === "Assignee" && <p className="etm-details-assignee-note" role="note"><Users size={14} />You can see this whole task, but you can only work on the subtask{task.subtasks.some(item => item.can_complete && item.assignee) ? "s" : ""} assigned to you. The others are read-only.</p>}
       {task.can_edit && onComplete && !task.is_completed && <button type="button" className={`etm-button primary small etm-details-complete ${page ? "page" : ""}`} onClick={() => void markComplete()} disabled={completing}>{completing ? <Loader2 size={14} className="etm-form-spinner" /> : <CheckCheck size={14} />}Mark as complete</button>}
+      {task.revert_turnover_to && !task.is_completed && (
+        <button type="button" className="etm-button ghost small etm-details-turnover" disabled={reverting} onClick={() => void returnTask()} title={`Currently with ${task.revert_turnover_to}`}>
+          {reverting ? <Loader2 size={14} className="etm-form-spinner" /> : <ArrowRightLeft size={14} />}{task.is_creator ? "Revert turnover" : "Return this task to me"}
+        </button>
+      )}
       {canTurnover && !turnoverOpen && <button type="button" className="etm-button ghost small etm-details-turnover" onClick={() => setTurnoverOpen(true)}><ArrowRightLeft size={14} />Turn over</button>}
       {canTurnover && turnoverOpen && (
         <form className="etm-turnover-panel" onSubmit={event => void submitTurnover(event)}>

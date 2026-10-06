@@ -97,7 +97,7 @@ export function useTaskFilters(tasks: Task[], options?: TaskFilterOptions) {
       if (overdueOnly && !isOverdue(task)) return false;
       if (dueSoonOnly && !isDueSoon(task)) return false;
       if (ownership === "mine" && !task.is_creator) return false;
-      if (ownership === "assigned" && (task.is_creator || !task.assignments.some(person => person.id === options?.userId))) return false;
+      if (ownership === "assigned" && !task.assignments.some(person => person.id === options?.userId)) return false;
       return true;
     });
   }, [tasks, search, deadlineRange, status, priority, projectFilter, assignedFilter, overdueOnly, dueSoonOnly, ownership, options?.userId, options?.showCompletedInAll]);
