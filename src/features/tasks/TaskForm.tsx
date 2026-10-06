@@ -4,14 +4,14 @@ import IPCRRichTextField from "../ipcr/IPCRRichTextField";
 import { cleanDetails, detailsToHtml, detailsToText, RichDetails } from "./richDetails";
 import { Link } from "react-router-dom";
 import { isAxiosError } from "axios";
-import { AlertTriangle, Bookmark, CalendarDays, Check, CheckCheck, ChevronDown, ClipboardList, Clock3, FileText, Flag, Folder, Link2, Loader2, MapPin, Plus, Repeat, Search, Trash2, User, UserPlus, Users, X } from "lucide-react";
+import { AlertTriangle, Bookmark, CalendarDays, Check, CheckCheck, ChevronDown, ClipboardList, Clock3, FileText, Flag, Folder, Link2, Loader2, Plus, Repeat, Search, Trash2, User, UserPlus, Users, X } from "lucide-react";
 import ThemedSelect, { type SelectOption } from "../../components/ThemedSelect";
 import { useTasks } from "./taskContext";
 import { taskError } from "./taskService";
 import { ASSIGNMENT_ROLES, EODB_COMPLIANCE, type EodbCompliance, formatDate, memberName, PRIORITIES, RECURRENCE_LABELS, RECURRENCES, STATUSES, type AssignmentInput, type AssignmentRole, type Member, type Priority, type Project, type TaskLinkInput, type Recurrence, type SubTask, type Task, type TaskInput, type TaskStatus, type TaskTemplate, type TemplateSubtask } from "./types";
 import { describeRecurrence, WEEKDAYS } from "./recurrence";
 import TaskLinksField from "./TaskLinksField";
-import { REGION_X_BARANGAYS, REGION_X_CITIES, REGION_X_PROVINCES } from "./regionXLocations";
+// import { REGION_X_BARANGAYS, REGION_X_CITIES, REGION_X_PROVINCES } from "./regionXLocations";  // only used by the hidden Location field
 import { addChildToSubtaskTree, flattenTree, mapSubtaskTree, removeFromSubtaskTree } from "./subtaskTree";
 import type { DtmsDocumentTemplate } from "../dtmsDocument/dtmsDocumentTypes";
 import "./forms.css";
@@ -167,7 +167,7 @@ function TaskLivePreview({ values, members }: { values: FormValues; members: Mem
   const assignedMembers = values.assignments.map(assignment => members.find(member => member.id === assignment.user)).filter((member): member is Member => !!member);
   const allSubtasks = flattenTree(values.subtasks);
   const completeSubtasks = allSubtasks.filter(subtask => subtask.is_completed).length;
-  const location = [values.location_barangay, values.location_city, values.location_province].filter(Boolean).join(", ");
+  // const location = [values.location_barangay, values.location_city, values.location_province].filter(Boolean).join(", ");
 
   return <section className="etm-panel etm-task-preview" aria-live="polite" aria-label="Task preview">
     <div className="etm-task-preview-heading"><span className="etm-form-section-icon"><ClipboardList size={19} /></span><div><span>LIVE PREVIEW</span><h2>{values.title.trim() || "New task"}</h2></div></div>
@@ -176,8 +176,10 @@ function TaskLivePreview({ values, members }: { values: FormValues; members: Mem
       <div><dt><Folder size={14} />Project / Office</dt><dd>{values.isPersonal ? "Personal task" : values.project.trim() || "Not selected"}</dd></div>
       <div><dt><CalendarDays size={14} />Deadline</dt><dd>{formatDate(values.deadline)}</dd></div>
       <div><dt><Flag size={14} />Priority</dt><dd className={values.priority.toLowerCase()}>{values.priority}</dd></div>
+      {/* Requestor and Location are hidden for now (kept in the data, not asked for):
       <div><dt><User size={14} />Requestor</dt><dd>{values.requestor.trim() || "Not specified"}</dd></div>
       {location && <div><dt><MapPin size={14} />Location</dt><dd>{location}</dd></div>}
+      */}
       {values.recurrence !== "None" && <div><dt><Repeat size={14} />Repeats</dt><dd>{describeRecurrence(values)}</dd></div>}
     </dl>
     <div className="etm-task-preview-group"><div><Users size={14} /><strong>Assigned persons</strong><span>{assignedMembers.length}</span></div>{assignedMembers.length ? <ul>{assignedMembers.slice(0, 3).map(member => <li key={member.id}><span>{member.first_name.charAt(0)}{member.last_name.charAt(0)}</span>{memberName(member)}</li>)}{assignedMembers.length > 3 && <li className="more">+{assignedMembers.length - 3} more</li>}</ul> : <p>No one assigned yet.</p>}</div>
@@ -419,11 +421,6 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
                 <span className="etm-form-required-note">* Required</span>
               </div>
               <div className="etm-form-section-body">
-                <div className="etm-field">
-                  <label htmlFor={`${fieldId}-title`}>Task title <span aria-hidden="true">*</span></label>
-                  <input data-howto="task-title" id={`${fieldId}-title`} value={values.title} onChange={event => update("title", event.target.value)} placeholder="What needs to get done?" maxLength={255} required aria-invalid={!!errors.title} aria-describedby={errors.title ? `${fieldId}-title-error` : undefined} />
-                  {errors.title && <p className="etm-field-error" id={`${fieldId}-title-error`}>{errors.title}</p>}
-                </div>
                 <fieldset className="etm-tasktype-field">
                   <legend>Task type</legend>
                   <div className="etm-tasktype-options">
@@ -437,6 +434,15 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
                     </label>
                   </div>
                 </fieldset>
+                <div className="etm-field">
+                  <label htmlFor={`${fieldId}-title`}>Task title <span aria-hidden="true">*</span></label>
+                  <input data-howto="task-title" id={`${fieldId}-title`} value={values.title} onChange={event => update("title", event.target.value)} placeholder="What needs to get done?" maxLength={255} required aria-invalid={!!errors.title} aria-describedby={errors.title ? `${fieldId}-title-error` : undefined} />
+                  {errors.title && <p className="etm-field-error" id={`${fieldId}-title-error`}>{errors.title}</p>}
+                </div>
+                <div className="etm-field">
+                  <label htmlFor={`${fieldId}-details`}>Details</label>
+                  <IPCRRichTextField value={values.details} onChange={html => update("details", html)} placeholder="Add context, deliverables, or anything the team should know…" />
+                </div>
                 <div className="etm-form-grid">
                   {values.isPersonal ? (
                     <div className="etm-field">
@@ -549,10 +555,6 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
                   <p className="etm-form-helper">{RECURRENCE_HELPER[values.recurrence]}</p>
                   </>}
                 </div>
-                <div className="etm-field">
-                  <label htmlFor={`${fieldId}-details`}>Details</label>
-                  <IPCRRichTextField value={values.details} onChange={html => update("details", html)} placeholder="Add context, deliverables, or anything the team should know…" />
-                </div>
                 {!task && (
                   <div className="etm-field etm-template-picker">
                     <label htmlFor={`${fieldId}-template`}><Bookmark size={15} /> Start from a template <span className="etm-form-optional">(optional)</span></label>
@@ -583,6 +585,7 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
             <section className="etm-panel etm-form-section" aria-labelledby={`${fieldId}-people-heading`}>
               <div className="etm-form-section-heading"><span className="etm-form-section-icon"><Users size={19} /></span><div><h2 id={`${fieldId}-people-heading`}>People & ownership</h2><p>{values.isPersonal ? "Personal tasks are just for you." : canManageAssignments ? "Bring the right people into the task." : "Only the owner can change who's assigned."}</p></div></div>
               <div className="etm-form-section-body">
+                {/* Requestor and Location are hidden for now (kept in the data, not asked for):
                 <div className="etm-field">
                   <label htmlFor={`${fieldId}-requestor`}>Requestor <span className="etm-form-optional">(optional)</span></label>
                   <input data-howto="requestor" id={`${fieldId}-requestor`} value={values.requestor} onChange={event => update("requestor", event.target.value)} placeholder="Who requested this task?" maxLength={255} />
@@ -613,6 +616,7 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
                     </label>
                   </div>
                 </fieldset>
+                */}
                 {values.isPersonal ? (
                   <div className="etm-field">
                     <label>Assigned persons</label>

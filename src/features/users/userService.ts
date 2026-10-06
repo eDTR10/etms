@@ -14,10 +14,12 @@ export const ETMS_ROLES = [
   { value: "regular_employee", label: "Regular Employee" },
   { value: "provincial_officer", label: "Provincial Officer" },
   { value: "focal_officer", label: "Focal Officer" },
+  { value: "chief", label: "Chief" },
 ] as const;
 
-export function etmsRoleLabel(role: string | undefined): string {
-  return ETMS_ROLES.find(item => item.value === role)?.label ?? "Regular Employee";
+export function etmsRolesLabel(roles: string[] | undefined): string {
+  const labels = (roles ?? []).map(role => ETMS_ROLES.find(item => item.value === role)?.label).filter(Boolean);
+  return labels.length ? labels.join(", ") : "Regular Employee";
 }
 
 export function roleLabel(role: string): string {
@@ -37,7 +39,7 @@ export interface ManagedUser {
   is_active: boolean;
   is_staff: boolean;
   role: string;
-  etms_role?: string;
+  etms_roles?: string[];
 }
 
 export interface ManagedUserInput {
@@ -51,7 +53,7 @@ export interface ManagedUserInput {
   acc_lvl?: number;
   is_active: boolean;
   role: string;
-  etms_role: string;
+  etms_roles: string[];
   // Required when creating; when editing, leave out to keep the current password.
   password?: string;
 }

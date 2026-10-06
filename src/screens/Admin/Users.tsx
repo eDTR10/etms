@@ -6,7 +6,7 @@ import Modal from "../../components/ui/modal";
 import { useAuth } from "../Auth/AuthContext";
 import { taskService } from "../../features/tasks/taskService";
 import { SortTh, useTableSort } from "../../features/tasks/useTableSort";
-import { roleLabel, USER_ROLES, userError, userService, type ManagedUser, type ManagedUserInput, ETMS_ROLES, etmsRoleLabel } from "../../features/users/userService";
+import { roleLabel, USER_ROLES, userError, userService, type ManagedUser, type ManagedUserInput, ETMS_ROLES, etmsRolesLabel } from "../../features/users/userService";
 import type { Project } from "../../features/tasks/types";
 import "../../features/tasks/etm-base.css";
 import "../../features/tasks/forms.css";
@@ -23,17 +23,17 @@ interface FormState {
   office: string;
   projects: number[];
   role: string;
-  etms_role: string;
+  etms_roles: string[];
   is_active: boolean;
   password: string;
 }
 
-const EMPTY_FORM: FormState = { email: "", first_name: "", last_name: "", position: "", office: "", projects: [], role: "user", etms_role: "regular_employee", is_active: true, password: "" };
+const EMPTY_FORM: FormState = { email: "", first_name: "", last_name: "", position: "", office: "", projects: [], role: "user", etms_roles: ["regular_employee"], is_active: true, password: "" };
 
 function toForm(user: ManagedUser): FormState {
   return {
     email: user.email, first_name: user.first_name, last_name: user.last_name, position: user.position ?? "",
-    office: user.office ? String(user.office) : "", projects: user.projects ?? [], role: user.role, etms_role: user.etms_role ?? "regular_employee", is_active: user.is_active, password: "",
+    office: user.office ? String(user.office) : "", projects: user.projects ?? [], role: user.role, etms_roles: user.etms_roles?.length ? user.etms_roles : ["regular_employee"], is_active: user.is_active, password: "",
   };
 }
 
@@ -44,6 +44,12 @@ function UserFormModal({ user, offices, isSelf, onClose, onSaved }: { user: Mana
   const [error, setError] = useState("");
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm(current => ({ ...current, [key]: value }));
   const [projectSearch, setProjectSearch] = useState("");
+  // Chips: an officer role replaces "Regular Employee", and with nothing picked a person is a Regular Employee.
+  const toggleEtmsRole = (role: string) => setForm(current => {
+    let roles = current.etms_roles.includes(role) ? current.etms_roles.filter(item => item !== role) : [...current.etms_roles.filter(item => item !== "regular_employee" || role === "regular_employee"), role];
+    if (role === "regular_employee") roles = ["regular_employee"];
+    return { ...current, etms_roles: roles.length ? roles : ["regular_employee"] };
+  });
   const toggleProject = (id: number) => setForm(current => ({ ...current, projects: current.projects.includes(id) ? current.projects.filter(item => item !== id) : [...current.projects, id] }));
   const visibleProjects = offices.filter(office => office.name.toLowerCase().includes(projectSearch.trim().toLowerCase()));
 
@@ -56,7 +62,7 @@ function UserFormModal({ user, offices, isSelf, onClose, onSaved }: { user: Mana
     setError("");
     const input: ManagedUserInput = {
       email: form.email.trim(), first_name: form.first_name.trim(), last_name: form.last_name.trim(), position: form.position.trim(),
-      office: form.office ? Number(form.office) : null, projects: form.projects, role: form.role, etms_role: form.etms_role, is_active: form.is_active,
+      office: form.office ? Number(form.office) : null, projects: form.projects, role: form.role, etms_roles: form.etms_roles, is_active: form.is_active,
     };
     if (form.password) input.password = form.password;
     try {
@@ -102,12 +108,17 @@ function UserFormModal({ user, offices, isSelf, onClose, onSaved }: { user: Mana
             )) : <p className="px-1.5 py-1 text-xs text-muted-foreground">No projects match.</p>}
           </div>
         </div>
-        <label className={labelClass}>eTMS role
-          <select className={fieldClass} value={form.etms_role} onChange={event => set("etms_role", event.target.value)} disabled={saving}>
-            {ETMS_ROLES.map(role => <option key={role.value} value={role.value}>{role.label}</option>)}
-          </select>
-          <span className="text-xs font-normal text-muted-foreground">Regular Employees only see tasks assigned to them. Provincial Officers also see their whole office's tasks; Focal Officers, their project's.</span>
-        </label>
+        <div className={labelClass}>
+          <span>eTMS roles <span className="text-xs font-normal text-muted-foreground">— pick all that apply</span></span>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="eTMS roles">
+            {ETMS_ROLES.map(role => {
+              const on = form.etms_roles.includes(role.value);
+              return <button type="button" key={role.value} role="checkbox" aria-checked={on} disabled={saving} onClick={() => toggleEtmsRole(role.value)}
+                className={`rounded-full border px-3 py-1 text-sm font-semibold transition-colors ${on ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-foreground hover:bg-muted"}`}>{on && "✓ "}{role.label}</button>;
+            })}
+          </div>
+          <span className="text-xs font-normal text-muted-foreground">Regular Employees only see tasks assigned to them. Provincial Officers also see their whole office's tasks; Focal Officers, their project's. Chiefs see the tasks of the Provincial and Focal Officers. A person can hold several.</span>
+        </div>
         <div className="grid grid-cols-1 gap-3">
           <label className={labelClass}>{creating ? "Password *" : "New password"}
             <input type="password" className={fieldClass} value={form.password} onChange={event => set("password", event.target.value)} disabled={saving} autoComplete="new-password" placeholder={creating ? "" : "Leave blank to keep the current one"} />
@@ -158,7 +169,7 @@ function UsersContent() {
     position: user => user.position,
     office: user => user.office ? officeName.get(user.office) : null,
     projects: user => projectNames(user),
-    etmsRole: user => etmsRoleLabel(user.etms_role),
+    etmsRole: user => etmsRolesLabel(user.etms_roles),
     role: user => roleLabel(user.role),
     status: user => user.is_active ? 1 : 0,
   });
@@ -234,7 +245,7 @@ function UsersContent() {
                       <td>{user.office ? officeName.get(user.office) ?? `#${user.office}` : <span className="etm-tasks-table-unassigned">None</span>}</td>
                       <td className="etm-tasks-table-details-col">{user.projects?.length ? <span title={projectNames(user)}>{projectNames(user)}</span> : <span className="etm-tasks-table-unassigned">None</span>}</td>
                       <td>{roleLabel(user.role)}</td>
-                      <td>{etmsRoleLabel(user.etms_role)}</td>
+                      <td>{etmsRolesLabel(user.etms_roles)}</td>
                       <td><span className={`etm-badge ${user.is_active ? "completed" : "blocked-stuck"}`}>{user.is_active ? "Active" : "Inactive"}</span></td>
                       <td className="etm-report-group-actions">
                         <button type="button" className="etm-icon-button" aria-label={`Edit ${user.email}`} onClick={() => setEditing(user)}><Pencil size={15} /></button>

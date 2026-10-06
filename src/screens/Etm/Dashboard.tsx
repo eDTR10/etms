@@ -129,7 +129,7 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks", 
 
   // Access-level-2: the workload covers everyone in the user's office and all of their tasks, not just the ones shared with them.
   // A Regular Employee only ever sees their own tasks in the workload; officers see their office / project.
-  const isRegularEmployee = !officeScope.enabled && (user?.etms_role ?? "regular_employee") === "regular_employee" && !user?.is_staff && user?.role !== "admin";
+  const isRegularEmployee = !officeScope.enabled && !(user?.etms_roles ?? []).some(role => role !== "regular_employee") && !user?.is_staff && user?.role !== "admin";
   // Who handed the signed-in user work: shown on their own workload row so they know where it came from.
   const assignedToMeByOthers = useMemo(() => tasks.filter(task => !task.is_creator && task.assignments.some(person => person.id === user?.id)), [tasks, user?.id]);
   const assignersToMe = useMemo(() => [...new Set(assignedToMeByOthers.map(task => task.created_by_name).filter((name): name is string => !!name))], [assignedToMeByOthers]);
@@ -139,7 +139,8 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks", 
     : tasks, [tasks, officeScope]);
   const memberCounts = useMemo(() => workloadMembers
     .map(member => {
-      const assigned = workloadTasks.filter(task => task.assignments.some(a => a.id === member.id));
+      // Same rule as the dialog that opens from the row: tasks the person owns or is assigned to.
+      const assigned = workloadTasks.filter(task => task.created_by === member.id || task.assignments.some(a => a.id === member.id));
       return { member, count: assigned.length, dueSoon: assigned.filter(isDueSoon).length };
     })
     .filter(({ count }) => count > 0)

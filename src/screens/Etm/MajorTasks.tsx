@@ -225,7 +225,9 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
               <SortTh sortKey="priority" sort={sort} onSort={toggleSort}>Priority</SortTh>
               <SortTh sortKey="repeat" sort={sort} onSort={toggleSort}>Repeat</SortTh>
               <SortTh sortKey="owner" sort={sort} onSort={toggleSort}>Task Owner</SortTh>
+              {/* Requestor column hidden for now:
               <SortTh sortKey="requestor" sort={sort} onSort={toggleSort}>Requestor</SortTh>
+              */}
               <SortTh sortKey="details" sort={sort} onSort={toggleSort}>Details</SortTh>
               <SortTh sortKey="date" sort={sort} onSort={toggleSort}>Date</SortTh>
               <SortTh sortKey="assigned" sort={sort} onSort={toggleSort}>Assigned To</SortTh>
@@ -267,7 +269,9 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
                     <td><span className={`etm-priority-pill ${task.priority.toLowerCase()}`}>{task.priority}</span></td>
                     <td>{task.recurrence !== "None" ? RECURRENCE_LABELS[task.recurrence] : <span className="etm-tasks-table-unassigned">—</span>}</td>
                     <td>{task.created_by_name ? <span className="etm-tasks-table-assignee"><span className="etm-tasks-table-assignee-avatar" aria-hidden="true">{task.created_by_name.split(" ").map(part => part.charAt(0)).slice(0, 2).join("")}</span>{task.created_by_name}</span> : <span className="etm-tasks-table-unassigned">—</span>}</td>
+                    {/* Requestor column hidden for now:
                     <td>{task.requestor || <span className="etm-tasks-table-unassigned">Not specified</span>}</td>
+                    */}
                     <td className="etm-tasks-table-details-col">{detailsToText(task.details) ? <span title={detailsToText(task.details)}>{detailsToText(task.details)}</span> : <span className="etm-tasks-table-unassigned">No details</span>}</td>
                     <td><div className="etm-task-cell-stack"><span>{formatDate(task.created_at)}</span>{task.deadline && <small>Due {formatDate(task.deadline)}</small>}</div></td>
                     <td>
@@ -294,7 +298,7 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
                   </tr>
                   {expanded && (
                     <tr className="etm-tasks-table-subrow" id={`task-subtasks-${task.id}`}>
-                      <td colSpan={11}>
+                      <td colSpan={10}>
                         <div className="etm-accordion-body">
                           {task.subtasks.map((subtask, index) => (
                             <button type="button" className={`etm-accordion-subtask ${subtask.is_completed ? "completed" : ""}`} key={subtask.id ?? index} onClick={() => { setViewingSubtaskId(subtask.id ?? null); setViewingId(task.id); }} aria-label={`Open subtask: ${subtask.title}`}>
@@ -313,7 +317,7 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
                 </Fragment>
               );
             }) : (
-              <tr><td colSpan={11} className="etm-empty-row">{
+              <tr><td colSpan={10} className="etm-empty-row">{
                 !tasks.length ? "No tasks yet — create your first one from Add Task."
                 : !scopedTasks.length ? (scope === "personal" ? "You don't have any personal tasks yet." : "No assigned tasks yet.")
                 : "No tasks match your filters."
