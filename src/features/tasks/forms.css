@@ -615,3 +615,8 @@ a.etm-task-links-text:hover strong { color: var(--etm-primary); text-decoration:
 .etm-sort-button svg { flex-shrink: 0; opacity: .45; transition: opacity .15s; }
 .etm-sort-button:hover svg, .etm-sort-button.active svg { opacity: 1; }
 .etm-sort-button.active { color: var(--etm-primary); }
+
+/* Subtask-only assignees: say so, and make the subtasks that are not theirs look read-only. */
+.etm-details-assignee-note { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; padding: 8px 12px; border: 1px solid color-mix(in srgb, var(--etm-primary) 35%, var(--etm-border)); border-radius: 9px; background: color-mix(in srgb, var(--etm-primary) 9%, var(--etm-surface)); color: var(--etm-ink); font-size: 12.5px; line-height: 1.45; }
+.etm-details-assignee-note svg { flex-shrink: 0; color: var(--etm-primary); }
+.etm-subtask-locked > *:not(ul) { opacity: .62; }

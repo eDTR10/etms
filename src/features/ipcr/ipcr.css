@@ -14,7 +14,7 @@
 
 /* ── Rich text overlay (mixed bold/underline within one cell) ───────────── */
 .etm-ipcr-richtext-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 4; }
-.etm-ipcr-richtext-cell { position: absolute; display: flex; flex-direction: column; overflow: visible; box-sizing: border-box; padding: 2px 4px; font-size: 12.5px; line-height: 1.3; white-space: pre-wrap; word-break: break-word; color: var(--etm-ink); }
+.etm-ipcr-richtext-cell { position: absolute; display: flex; flex-direction: column; overflow: visible; box-sizing: border-box; padding: 2px 4px; font-size: 12.5px; line-height: 1.3; white-space: pre-wrap; word-break: break-word; /* The sheet is always white paper, so default to black rather than the (light-on-dark) theme text colour. */ color: #000; font-family: inherit; }
 
 /* ── Admin: fill-in field registry list ─────────────────────────────────── */
 .etm-ipcr-field-list { display: grid; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
@@ -42,3 +42,32 @@
 /* ── Preview (built from the same grid data, read-only) ─────────────────── */
 .etm-ipcr-preview-wrap { margin-top: 14px; }
 .etm-ipcr-preview-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+
+/* ── Template designer: keep the column header (A, B, C…) pinned while scrolling ──────────────
+   jspreadsheet already makes the header row `position: sticky; top: 0`, but sticky pins to the
+   nearest scrolling ancestor — and the grid's own wrappers (host / content / container) each set
+   overflow:auto without actually scrolling vertically, so the header never stuck to the designer's
+   real scroll area. Letting those wrappers overflow visibly hands the job to that outer scroller. */
+.etm-ipcr-grid-overlay-wrap .etm-ipcr-grid-host,
+.etm-ipcr-grid-overlay-wrap .jss_container,
+.etm-ipcr-grid-overlay-wrap .jss_content,
+.etm-ipcr-grid-overlay-wrap .jtabs-content { overflow: visible !important; }
+/* Above the image / rich-text overlays (z-index 4–5) so cells scrolling underneath don't cover it. */
+.etm-ipcr-grid-overlay-wrap .jss_worksheet > thead > tr > td { z-index: 7; }
+
+/* Cells whose text is drawn by an overlay (mixed formatting / sample preview): hide the cell's own plain text so the
+   overlay can be transparent — the cell keeps its borders and fill — except while it is open in the editor. */
+.etm-ipcr-grid-host td[data-etm-overlay]:not(.editor) { color: transparent !important; }
+
+/* The in-cell editor is a real <input>/<textarea>, which does not inherit the cell's font on its own — so editing a cell
+   switched it to the browser's default font. Make it follow the cell it is editing. */
+.etm-ipcr-grid-host .jss_worksheet .editor > input,
+.etm-ipcr-grid-host .jss_worksheet .editor > textarea { font: inherit; color: inherit; text-align: inherit; background: transparent; }
+
+/* Links inside mixed-formatting cells (the layer is not clickable in the designer; they are links in the PDF). */
+.etm-ipcr-richtext-cell a { color: #0563c1; text-decoration: underline; }
+
+/* The Generate IPCR form is not inside .etm-task-form, so its labels never got the app's label colour and fell back to
+   the browser default (black on the dark theme). */
+.etm-form-section-body .etm-field > label, .etm-form-section-body .etm-field > legend { color: var(--etm-ink); font-size: 14px; font-weight: 600; line-height: 1.5; }
+.etm-form-section-body .etm-field { display: flex; flex-direction: column; gap: 8px; min-width: 0; }

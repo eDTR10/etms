@@ -85,7 +85,9 @@ function initialValues(task?: Task): FormValues {
     recurrence_dates: task?.recurrence_dates ?? [],
     status: task?.is_completed ? "Completed" : task?.status ?? "Pending",
     is_completed: task?.is_completed ?? task?.status === "Completed",
-    assignments: (task?.assignments ?? []).map(person => ({ user: person.id, role: person.role })),
+    // People added only because of a subtask ("Assignee") are managed from the subtask, not from this list —
+    // leaving them out here is what keeps saving the form from touching them.
+    assignments: (task?.assignments ?? []).filter(person => person.role !== "Assignee").map(person => ({ user: person.id, role: person.role as AssignmentRole })),
     subtasks: toEditableSubtasks(task?.subtasks ?? [], "existing"),
     links: (task?.links ?? []).map(({ title, url, quick_link }) => ({ title, url, quick_link: quick_link ?? null })),
     progress_message: "",

@@ -929,7 +929,7 @@ function SubtaskPanel({ task, subtask, members, canComment, onSetCompletion, onA
       .catch(() => {})
       .finally(() => setDocStatusLoading(false));
   }
-  return <li ref={panelRef} className={`etm-subtask-panel ${subtask.is_completed ? "completed" : ""} ${dragHandleProps?.className ?? ""}`} draggable={!editingSubtask && dragHandleProps?.draggable} onDragStart={dragHandleProps?.onDragStart} onDragEnd={dragHandleProps?.onDragEnd} onDragOver={dragHandleProps?.onDragOver} onDragLeave={dragHandleProps?.onDragLeave} onDrop={dragHandleProps?.onDrop}>
+  return <li ref={panelRef} className={`etm-subtask-panel ${subtask.is_completed ? "completed" : ""} ${task.my_role === "Assignee" && !canComplete ? "etm-subtask-locked" : ""} ${dragHandleProps?.className ?? ""}`} draggable={!editingSubtask && dragHandleProps?.draggable} onDragStart={dragHandleProps?.onDragStart} onDragEnd={dragHandleProps?.onDragEnd} onDragOver={dragHandleProps?.onDragOver} onDragLeave={dragHandleProps?.onDragLeave} onDrop={dragHandleProps?.onDrop}>
     <div className="etm-subtask-panel-summary">
       {task.can_edit && !editingSubtask && <GripVertical size={14} className="etm-subtask-drag-handle" aria-hidden="true" />}
       {editingSubtask ? (
@@ -947,7 +947,6 @@ function SubtaskPanel({ task, subtask, members, canComment, onSetCompletion, onA
         <button type="button" className="etm-subtask-panel-open" aria-expanded={open} onClick={() => setOpen(value => !value)}><span className="etm-details-subtask-text"><strong>{subtask.title}</strong>{subtask.description && <small>{subtask.description}</small>}</span>{subtask.assignee && <span className="etm-subtask-assignee-chip" title={`Assigned to ${memberName(subtask.assignee)}`}><User size={11} />{memberName(subtask.assignee)}</span>}{hintedDocumentTemplateName && <span className="etm-subtask-assignee-chip" title={`This subtask needs a "${hintedDocumentTemplateName}" document`}><FileText size={11} />{hintedDocumentTemplateName}</span>}{linkedTracknumber && <DocumentStatusChip tracknumber={linkedTracknumber} status={docStatus} loading={docStatusLoading} />}<span className={`etm-badge ${statusSlug(subtask.status)}`}>{subtask.status}</span><span className="etm-subtask-update-count">{commentCount} {commentCount === 1 ? "update" : "updates"}</span><ChevronRight className={open ? "open" : ""} size={16} /></button>
         {task.can_edit && (
           <span className="etm-subtask-panel-actions">
-            {id && subtask.spawned_task_id && <a className="etm-icon-button" href={`/etms/tasks/${subtask.spawned_task_id}`} target="_blank" rel="noopener noreferrer" aria-label={`Open ${subtask.assignee ? memberName(subtask.assignee) : "assignee"}'s copy of this subtask`} title="View assignee's task" onClick={event => event.stopPropagation()}><ExternalLink size={14} /></a>}
             {id && <button type="button" className="etm-icon-button" aria-label={subtask.assignee ? `Reassign subtask: ${subtask.title}` : `Assign subtask: ${subtask.title}`} title="Assign" onClick={() => setAssigningOpen(value => !value)}><UserPlus size={14} /></button>}
             {id && (linkedTracknumber
               ? <DocumentActionButtons subtaskTitle={subtask.title} tracknumber={linkedTracknumber} refreshing={docStatusLoading} unlinking={unlinkingDocument} onRefresh={handleRefreshDocStatus} onUnlink={() => void handleUnlinkDocument()} />
@@ -990,7 +989,7 @@ function SubtaskPanel({ task, subtask, members, canComment, onSetCompletion, onA
     {open && <div className="etm-subtask-panel-body">
       {id && <RemarkList
         remarks={subtask.remarks ?? []}
-        canComment={canComment}
+        canComment={canComment || canComplete}
         members={members}
         onAdd={submitUpdateWithStatus}
         onEdit={editUpdateWithStatus}
@@ -1257,6 +1256,7 @@ function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = 
       {page ? <h1 className={`etm-details-title ${task.is_completed ? "completed" : ""}`}>{task.title}</h1> : <Dialog.Title className={`etm-details-title ${task.is_completed ? "completed" : ""}`}>{task.title}</Dialog.Title>}
       {page ? <p className="etm-details-description">{task.details || "No description provided."}</p> : <Dialog.Description className="etm-details-description">{task.details || "No description provided."}</Dialog.Description>}
       <div className="etm-details-badges"><span className={`etm-badge ${statusSlug(task.status)}`}><span className="etm-details-status-dot" />{task.status}</span><span className={`etm-details-priority ${task.priority.toLowerCase()}`}><Flag size={13} />{task.priority} priority</span>{task.recurrence !== "None" && <span className="etm-badge"><Repeat size={13} />{describeRecurrence(task)}</span>}</div>
+      {task.my_role === "Assignee" && <p className="etm-details-assignee-note" role="note"><Users size={14} />You can see this whole task, but you can only work on the subtask{task.subtasks.some(item => item.can_complete && item.assignee) ? "s" : ""} assigned to you. The others are read-only.</p>}
       {task.can_edit && onComplete && !task.is_completed && <button type="button" className={`etm-button primary small etm-details-complete ${page ? "page" : ""}`} onClick={() => void markComplete()} disabled={completing}>{completing ? <Loader2 size={14} className="etm-form-spinner" /> : <CheckCheck size={14} />}Mark as complete</button>}
       {canTurnover && !turnoverOpen && <button type="button" className="etm-button ghost small etm-details-turnover" onClick={() => setTurnoverOpen(true)}><ArrowRightLeft size={14} />Turn over</button>}
       {canTurnover && turnoverOpen && (

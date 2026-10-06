@@ -1,7 +1,9 @@
 export type Priority = "Low" | "Medium" | "High";
 export type TaskStatus = "Pending" | "In-Progress" | "Completed" | "Blocked/Stuck";
 export type AssignmentRole = "Editor" | "Viewer" | "Commentor";
-export type TaskRole = "Owner" | AssignmentRole;
+// "Assignee" is someone who was given a subtask rather than a place on the task itself: they see the whole task but
+// can only work on their own subtask(s). The server sets it; it is never chosen in the people list.
+export type TaskRole = "Owner" | AssignmentRole | "Assignee";
 export type Recurrence = "None" | "Daily" | "Weekly" | "Monthly" | "Specific" | "Anytime";
 
 export interface OccurrenceCompletion {
@@ -55,7 +57,7 @@ export interface GroupedTaskInput {
 }
 
 export interface Assignment extends Member {
-  role: AssignmentRole;
+  role: AssignmentRole | "Assignee";
 }
 
 export interface AssignmentInput {
@@ -98,9 +100,6 @@ export interface SubTask {
   can_delete?: boolean;
   // Who this subtask is assigned to, if anyone.
   assignee?: Member | null;
-  // The standalone task auto-created for `assignee` so it shows up on their own
-  // Dashboard/All Tasks — present once this subtask has ever had an assignee.
-  spawned_task_id?: number | null;
   // Subtasks of this subtask, unlimited depth.
   subtasks: SubTask[];
   // Tracking number of a DTMS document linked to this subtask (see the dtmsDocument

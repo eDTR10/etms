@@ -1,8 +1,9 @@
 import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertTriangle, Ban, CheckCircle2, ChevronRight, ClipboardList, Clock, Hourglass, UserX } from "lucide-react";
+import { AlertTriangle, Ban, CheckCircle2, ChevronRight, ClipboardList, Clock, Hourglass, User, UserCheck, UserX } from "lucide-react";
 import ThemedSelect, { type SelectOption } from "../../components/ThemedSelect";
 import { useTasks } from "../../features/tasks/taskContext";
+import { useAuth } from "../Auth/AuthContext";
 import { useTaskFilters } from "../../features/tasks/useTaskFilters";
 import TaskFilterBar from "../../features/tasks/TaskFilterBar";
 import StatusChips from "../../features/tasks/StatusChips";
@@ -24,6 +25,8 @@ interface DashboardOverviewProps {
   // Lets an admin-mode instance of this same dashboard link within /etms/admin/tasks
   // instead of the regular user's /etms/tasks.
   basePath?: string;
+  // Personal-account view: adds the "My Total Tasks" and "Task Assigned" cards.
+  userView?: boolean;
 }
 
 const STATUS_COLORS: Record<TaskStatus, string> = {
@@ -70,7 +73,8 @@ function StatusRow({ label, count, total, color }: { label: string; count: numbe
   );
 }
 
-export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks" }: DashboardOverviewProps) {
+export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks", userView = false }: DashboardOverviewProps) {
+  const { user } = useAuth();
   const {
     tasks, members, projects, updateTask,
     addProgress, editProgress, deleteProgress,
@@ -85,8 +89,8 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks" }
     filtered, search, setSearch, deadlineDate, setDeadlineDate, quickFilter, setQuickFilter,
     status, setStatus, priority, setPriority, projectFilter, setProjectFilter,
     assignedFilter, setAssignedFilter, overdueOnly, setOverdueOnly,
-    dueSoonOnly, setDueSoonOnly, hasActiveFilters, clearFilters,
-  } = useTaskFilters(tasks, { initialStatus: "Pending" });
+    dueSoonOnly, setDueSoonOnly, ownership, setOwnership, hasActiveFilters, clearFilters,
+  } = useTaskFilters(tasks, { initialStatus: "Pending", userId: user?.id });
   const [viewingId, setViewingId] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null);
@@ -96,22 +100,26 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks" }
   const recentSectionRef = useRef<HTMLDivElement>(null);
 
   // Card taps filter the "Recently added tasks" table and smoothly scroll down to it.
-  const filterRecent = (kind: "unassigned" | "completed" | "overdue" | "pending" | "dueSoon" | "blocked") => {
+  const filterRecent = (kind: "unassigned" | "completed" | "overdue" | "pending" | "dueSoon" | "blocked" | "mine" | "assigned") => {
     clearFilters();
     if (kind === "unassigned") setAssignedFilter("unassigned");
     else if (kind === "completed") setStatus("Completed");
     else if (kind === "pending") setStatus("Pending");
     else if (kind === "blocked") setStatus("Blocked/Stuck");
+    else if (kind === "mine") { setOwnership("mine"); setStatus("all"); }
+    else if (kind === "assigned") { setOwnership("assigned"); setStatus("all"); }
     else if (kind === "dueSoon") setDueSoonOnly(true);
     else setOverdueOnly(true);
     recentSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
-  const activeKpi = dueSoonOnly ? "dueSoon" : overdueOnly ? "overdue" : assignedFilter === "unassigned" ? "unassigned" : status === "Completed" ? "completed" : status === "Pending" ? "pending" : status === "Blocked/Stuck" ? "blocked" : null;
+  const activeKpi = ownership !== "all" ? ownership : dueSoonOnly ? "dueSoon" : overdueOnly ? "overdue" : assignedFilter === "unassigned" ? "unassigned" : status === "Completed" ? "completed" : status === "Pending" ? "pending" : status === "Blocked/Stuck" ? "blocked" : null;
 
   const totalTasks = tasks.length;
   const totalUnassigned = useMemo(() => tasks.filter(task => task.assignments.length === 0).length, [tasks]);
   const totalCompleted = useMemo(() => tasks.filter(task => task.status === "Completed").length, [tasks]);
   const totalPending = useMemo(() => tasks.filter(task => task.status === "Pending").length, [tasks]);
+  const totalMine = useMemo(() => tasks.filter(task => task.is_creator).length, [tasks]);
+  const totalAssignedToMe = useMemo(() => tasks.filter(task => !task.is_creator && task.assignments.some(person => person.id === user?.id)).length, [tasks, user?.id]);
   const totalBlocked = useMemo(() => tasks.filter(task => task.status === "Blocked/Stuck").length, [tasks]);
   const totalDueSoon = useMemo(() => tasks.filter(isDueSoon).length, [tasks]);
   const totalPastDue = useMemo(() => tasks.filter(isOverdue).length, [tasks]);
@@ -175,6 +183,16 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks" }
           <div className="etm-kpi-card-top"><span className="etm-kpi-label">Total Tasks</span><span className="etm-kpi-icon"><ClipboardList size={17} /></span></div>
           <span className="etm-kpi-value">{totalTasks}</span>
         </button>
+        {userView && <>
+          <button type="button" className={`etm-panel etm-kpi-card etm-kpi-card-button${activeKpi === "mine" ? " selected" : ""}`} onClick={() => filterRecent("mine")}>
+            <div className="etm-kpi-card-top"><span className="etm-kpi-label">My Total Tasks</span><span className="etm-kpi-icon"><User size={17} /></span></div>
+            <span className="etm-kpi-value">{totalMine}</span>
+          </button>
+          <button type="button" className={`etm-panel etm-kpi-card etm-kpi-card-button${activeKpi === "assigned" ? " selected" : ""}`} onClick={() => filterRecent("assigned")}>
+            <div className="etm-kpi-card-top"><span className="etm-kpi-label">Task Assigned</span><span className="etm-kpi-icon"><UserCheck size={17} /></span></div>
+            <span className="etm-kpi-value">{totalAssignedToMe}</span>
+          </button>
+        </>}
         <button type="button" className={`etm-panel etm-kpi-card etm-kpi-card-button warn${activeKpi === "pending" ? " selected" : ""}`} onClick={() => filterRecent("pending")}>
           <div className="etm-kpi-card-top"><span className="etm-kpi-label">Pending Tasks</span><span className="etm-kpi-icon"><Hourglass size={17} /></span></div>
           <span className="etm-kpi-value">{totalPending}</span>
@@ -183,10 +201,10 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks" }
           <div className="etm-kpi-card-top"><span className="etm-kpi-label">Almost Due Date</span><span className="etm-kpi-icon"><Clock size={17} /></span></div>
           <span className="etm-kpi-value">{totalDueSoon}</span>
         </button>
-        <button type="button" className={`etm-panel etm-kpi-card etm-kpi-card-button warn${activeKpi === "unassigned" ? " selected" : ""}`} onClick={() => filterRecent("unassigned")}>
-          <div className="etm-kpi-card-top"><span className="etm-kpi-label">Unassigned Tasks</span><span className="etm-kpi-icon"><UserX size={17} /></span></div>
-          <span className="etm-kpi-value">{totalUnassigned}</span>
-        </button>
+        {!userView && <button type="button" className={`etm-panel etm-kpi-card etm-kpi-card-button warn${activeKpi === "unassigned" ? " selected" : ""}`} onClick={() => filterRecent("unassigned")}>
+            <div className="etm-kpi-card-top"><span className="etm-kpi-label">Unassigned Tasks</span><span className="etm-kpi-icon"><UserX size={17} /></span></div>
+            <span className="etm-kpi-value">{totalUnassigned}</span>
+          </button>}
         <button type="button" className={`etm-panel etm-kpi-card etm-kpi-card-button success${activeKpi === "completed" ? " selected" : ""}`} onClick={() => filterRecent("completed")}>
           <div className="etm-kpi-card-top"><span className="etm-kpi-label">Completed Tasks</span><span className="etm-kpi-icon"><CheckCircle2 size={17} /></span></div>
           <span className="etm-kpi-value">{totalCompleted}</span>
@@ -279,9 +297,9 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks" }
                 {sortedRecent.map(task => {
                   const lastRemark = task.remarks[0];
                   return (
-                    <tr key={task.id} className="etm-tasks-table-row-clickable" onClick={() => setViewingId(task.id)}>
+                    <tr key={task.id} className="etm-tasks-table-row-clickable" onClick={() => navigate(`${basePath}/${task.id}`)}>
                       <td className="etm-tasks-table-title-col">
-                        <TaskTitleCell task={task} onOpen={() => setViewingId(task.id)}>
+                        <TaskTitleCell task={task} onOpen={() => navigate(`${basePath}/${task.id}`)}>
                           <input
                             type="checkbox"
                             aria-label={`Select ${task.title}`}
@@ -300,7 +318,7 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks" }
                           ) : <small className="etm-progresslog-empty">No remarks yet.</small>}
                         </div>
                       </td>
-                      <td onClick={event => event.stopPropagation()}><TaskRowActions task={task} onView={() => setViewingId(task.id)} onEdit={() => setEditingId(task.id)} onDelete={() => void confirmDelete(task)} onDuplicate={() => void confirmDuplicate(task)} duplicating={isDuplicating(task.id)} /></td>
+                      <td onClick={event => event.stopPropagation()}><TaskRowActions task={task} onView={() => navigate(`${basePath}/${task.id}`)} onEdit={() => setEditingId(task.id)} onDelete={() => void confirmDelete(task)} onDuplicate={() => void confirmDuplicate(task)} duplicating={isDuplicating(task.id)} /></td>
                     </tr>
                   );
                 })}

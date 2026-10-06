@@ -6,6 +6,7 @@ import Modal from "../../components/ui/modal";
 import ThemedSelect, { type SelectOption } from "../../components/ThemedSelect";
 import UserLayout from "./UserLayout";
 import TaskProvider from "../../features/tasks/TaskProvider";
+import { useAuth } from "../Auth/AuthContext";
 import TaskFeedback from "../../features/tasks/TaskFeedback";
 import { useTasks } from "../../features/tasks/taskContext";
 import { taskError, taskService } from "../../features/tasks/taskService";
@@ -37,12 +38,24 @@ function escapeHtml(value: string): string {
   return div.innerHTML;
 }
 
-function ReportsContent() {
+interface ReportsContentProps {
+  // Where "Open full task" in the preview goes — differs between the user and admin areas.
+  taskBasePath?: string;
+  // An admin's task list holds everyone's tasks; grouping is for your own IPCR, so only the tasks
+  // you created or are assigned to are offered.
+  ownTasksOnly?: boolean;
+  // Add a "Created by" column — for the admin view, where the list holds everyone's tasks.
+  showOwner?: boolean;
+}
+
+export function ReportsContent({ taskBasePath = "/etms/tasks", ownTasksOnly = false, showOwner = false }: ReportsContentProps) {
   const { tasks, projects, loading, error, updateTask } = useTasks();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const completedTasks = useMemo(
-    () => tasks.filter(task => task.is_completed || task.status === "Completed"),
-    [tasks],
+    () => tasks.filter(task => (task.is_completed || task.status === "Completed")
+      && (!ownTasksOnly || task.is_creator || task.assignments.some(person => person.id === user?.id))),
+    [tasks, ownTasksOnly, user?.id],
   );
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   // Snapshot of which tasks the dialog will submit — seeded from the outer Completed
@@ -408,6 +421,7 @@ function ReportsContent() {
   const { sorted: sortedCompleted, sort: completedSort, toggle: toggleCompletedSort } = useTableSort(completedTasks, {
     title: task => task.title,
     finished: task => new Date(task.updated_at).getTime(),
+    owner: task => task.created_by_name,
     details: task => task.details,
   });
   const { sorted: sortedGroups, sort: groupSort, toggle: toggleGroupSort } = useTableSort(groups, {
@@ -418,7 +432,7 @@ function ReportsContent() {
 
   return (
     <div className="etm-reports">
-      <TaskPreviewModal task={completedTasks.find(task => task.id === previewTaskId) ?? null} onClose={() => setPreviewTaskId(null)} onOpenFull={task => { setPreviewTaskId(null); navigate(`/etms/tasks/${task.id}`); }} />
+      <TaskPreviewModal task={completedTasks.find(task => task.id === previewTaskId) ?? null} onClose={() => setPreviewTaskId(null)} onOpenFull={task => { setPreviewTaskId(null); navigate(`${taskBasePath}/${task.id}`); }} />
       <div className="etm-report-split">
       <div className="etm-report-column">
         <section className="etm-report-heading">
@@ -438,7 +452,7 @@ function ReportsContent() {
             <table className="etm-tasks-table etm-report-table">
               <thead><tr>
                 <th className="etm-report-check"><input type="checkbox" aria-label="Select all completed tasks" checked={allSelected} onChange={toggleAll} /></th>
-                <SortTh sortKey="title" sort={completedSort} onSort={toggleCompletedSort}>Task Title</SortTh><SortTh sortKey="finished" sort={completedSort} onSort={toggleCompletedSort}>Date and Time Finished</SortTh><SortTh sortKey="details" sort={completedSort} onSort={toggleCompletedSort}>Description</SortTh>
+                <SortTh sortKey="title" sort={completedSort} onSort={toggleCompletedSort}>Task Title</SortTh><SortTh sortKey="finished" sort={completedSort} onSort={toggleCompletedSort}>Date and Time Finished</SortTh><SortTh sortKey="details" sort={completedSort} onSort={toggleCompletedSort}>Description</SortTh>{showOwner && <SortTh sortKey="owner" sort={completedSort} onSort={toggleCompletedSort}>Created by</SortTh>}
               </tr></thead>
               <tbody>
                 {sortedCompleted.length ? sortedCompleted.map(task => (
@@ -469,8 +483,9 @@ function ReportsContent() {
                     <td className="etm-report-task-title"><GripVertical size={13} className="etm-report-drag-handle" aria-hidden="true" />{task.title}</td>
                     <td>{formatDate(task.updated_at, true)}</td>
                     <td className="etm-tasks-table-details-col">{task.details ? <span title={task.details}>{task.details}</span> : <span className="etm-tasks-table-unassigned">No details</span>}</td>
+                    {showOwner && <td>{task.created_by_name || <span className="etm-tasks-table-unassigned">Unknown</span>}</td>}
                   </tr>
-                )) : <tr><td colSpan={4} className="etm-empty-row">No completed tasks are available yet.</td></tr>}
+                )) : <tr><td colSpan={showOwner ? 5 : 4} className="etm-empty-row">No completed tasks are available yet.</td></tr>}
               </tbody>
             </table>
           </section>

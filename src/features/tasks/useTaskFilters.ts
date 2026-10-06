@@ -6,11 +6,15 @@ export type PriorityFilterValue = "all" | Priority;
 export type ProjectFilterValue = "all" | "personal" | number;
 export type QuickDeadlineFilterValue = "" | "day" | "week" | "month";
 export type AssignedFilterValue = "all" | "unassigned";
+// "mine" = tasks I created; "assigned" = tasks someone else created that I was assigned to.
+export type OwnershipFilterValue = "all" | "mine" | "assigned";
 
 export interface TaskFilterOptions {
   initialStatus?: StatusFilterValue;
   initialAssignedFilter?: AssignedFilterValue;
   initialOverdueOnly?: boolean;
+  // Needed for the ownership filter to tell which assignments are the current user's.
+  userId?: number;
   // Completed tasks are hidden under the "All" chip and only appear via the Completed filter,
   // except where the whole list is already archived tasks.
   showCompletedInAll?: boolean;
@@ -52,6 +56,7 @@ export function useTaskFilters(tasks: Task[], options?: TaskFilterOptions) {
   const [assignedFilter, setAssignedFilter] = useState<AssignedFilterValue>(options?.initialAssignedFilter ?? "all");
   const [overdueOnly, setOverdueOnly] = useState(options?.initialOverdueOnly ?? false);
   const [dueSoonOnly, setDueSoonOnly] = useState(false);
+  const [ownership, setOwnership] = useState<OwnershipFilterValue>("all");
 
   const setDeadlineDate = (value: string) => {
     setDeadlineDateState(value);
@@ -80,7 +85,8 @@ export function useTaskFilters(tasks: Task[], options?: TaskFilterOptions) {
         if (task.deadline < deadlineRange.from || task.deadline > deadlineRange.to) return false;
       }
       if (status !== "all" && task.status !== status) return false;
-      if (status === "all" && task.is_completed && !options?.showCompletedInAll) return false;
+      // Under "My Total Tasks" / "Task Assigned" the count includes finished work, so show it too.
+      if (status === "all" && task.is_completed && !options?.showCompletedInAll && ownership === "all") return false;
       if (priority !== "all" && task.priority !== priority) return false;
       if (projectFilter === "personal") {
         if (task.project) return false;
@@ -90,13 +96,15 @@ export function useTaskFilters(tasks: Task[], options?: TaskFilterOptions) {
       if (assignedFilter === "unassigned" && task.assignments.length > 0) return false;
       if (overdueOnly && !isOverdue(task)) return false;
       if (dueSoonOnly && !isDueSoon(task)) return false;
+      if (ownership === "mine" && !task.is_creator) return false;
+      if (ownership === "assigned" && (task.is_creator || !task.assignments.some(person => person.id === options?.userId))) return false;
       return true;
     });
-  }, [tasks, search, deadlineRange, status, priority, projectFilter, assignedFilter, overdueOnly, dueSoonOnly, options?.showCompletedInAll]);
+  }, [tasks, search, deadlineRange, status, priority, projectFilter, assignedFilter, overdueOnly, dueSoonOnly, ownership, options?.userId, options?.showCompletedInAll]);
 
-  const hasActiveFilters = !!search.trim() || !!deadlineDate || !!quickFilter || status !== "all" || priority !== "all" || projectFilter !== "all" || assignedFilter !== "all" || overdueOnly || dueSoonOnly;
+  const hasActiveFilters = !!search.trim() || !!deadlineDate || !!quickFilter || status !== "all" || priority !== "all" || projectFilter !== "all" || assignedFilter !== "all" || overdueOnly || dueSoonOnly || ownership !== "all";
   const clearFilters = () => {
-    setSearch(""); setDeadlineDateState(""); setQuickFilterState(""); setStatus("all"); setPriority("all"); setProjectFilter("all"); setAssignedFilter("all"); setOverdueOnly(false); setDueSoonOnly(false);
+    setSearch(""); setDeadlineDateState(""); setQuickFilterState(""); setStatus("all"); setPriority("all"); setProjectFilter("all"); setAssignedFilter("all"); setOverdueOnly(false); setDueSoonOnly(false); setOwnership("all");
   };
 
   return {
@@ -110,6 +118,7 @@ export function useTaskFilters(tasks: Task[], options?: TaskFilterOptions) {
     assignedFilter, setAssignedFilter,
     overdueOnly, setOverdueOnly,
     dueSoonOnly, setDueSoonOnly,
+    ownership, setOwnership,
     hasActiveFilters, clearFilters,
   };
 }

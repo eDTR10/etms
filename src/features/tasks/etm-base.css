@@ -260,3 +260,11 @@
 .etm-quicklink-icon-option:hover { color: var(--etm-primary); border-color: var(--etm-primary); }
 .etm-quicklink-icon-option.selected { border-color: var(--etm-primary); background: color-mix(in srgb, var(--etm-primary) 14%, var(--etm-surface-alt)); color: var(--etm-primary); }
 :root.dark .etm-quicklink-card-icon { background: #163639; }
+
+/* Dark mode: native <select> lists, date/month pickers and scrollbars follow the page theme, and the dialogs'
+   (SweetAlert2) inputs and option lists use the app's colours instead of the browser's white-on-white defaults. */
+:root.dark select, :root.dark input, :root.dark textarea { color-scheme: dark; }
+.swal2-select, .swal2-input, .swal2-textarea { background-color: var(--etm-surface-alt); color: var(--etm-ink); border: 1px solid var(--etm-border); }
+.swal2-select option { background-color: var(--etm-surface); color: var(--etm-ink); }
+.swal2-select option:disabled { color: var(--etm-muted); }
+select option { background-color: var(--etm-surface, #fff); color: var(--etm-ink, #111); }

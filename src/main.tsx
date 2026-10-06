@@ -58,6 +58,8 @@ const AdminCalendar    = lazy(() => import("./screens/Admin/Calendar.tsx"));
 const AdminQuickLinks  = lazy(() => import("./screens/Admin/QuickLinks.tsx"));
 const AdminIPCRTemplates = lazy(() => import("./screens/Admin/IPCRTemplates.tsx"));
 const AdminProfile     = lazy(() => import("./screens/Admin/Profile.tsx"));
+const AdminUsers       = lazy(() => import("./screens/Admin/Users.tsx"));
+const AdminTaskGrouping = lazy(() => import("./screens/Admin/TaskGrouping.tsx"));
 
 // Sends "/" to the right place: dashboard if logged in, login otherwise.
 const Home = () => {
@@ -180,6 +182,14 @@ const router = createBrowserRouter([
   {
     path: "/etms/admin/quick-links",
     element: <AdminRoute><Suspense fallback={<Loader />}><AdminQuickLinks /></Suspense></AdminRoute>,
+  },
+  {
+    path: "/etms/admin/task-grouping",
+    element: <AdminRoute><Suspense fallback={<Loader />}><AdminTaskGrouping /></Suspense></AdminRoute>,
+  },
+  {
+    path: "/etms/admin/users",
+    element: <AdminRoute><Suspense fallback={<Loader />}><AdminUsers /></Suspense></AdminRoute>,
   },
   {
     path: "/etms/admin/profile",

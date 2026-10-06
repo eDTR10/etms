@@ -2,12 +2,14 @@ import { CalendarDays, Star, Type, X } from "lucide-react";
 import ThemedSelect, { type SelectOption } from "../../components/ThemedSelect";
 import IPCRRichTextField from "./IPCRRichTextField";
 import type { GroupedTask } from "../tasks/types";
-import { adjectivalRating, type IPCRField, type IPCRFieldMetaEntry, type IPCRFieldValue } from "./types";
+import { adjectivalRating, MONTH_NAMES, yearChoices, type IPCRField, type IPCRFieldMetaEntry, type IPCRFieldValue } from "./types";
 import "./ipcr.css";
 
 const FIELD_ICON: Record<IPCRField["type"], typeof Type> = {
-  text: Type, textarea: Type, date: CalendarDays, number: Type, rating: Star, grouped_tasks: Type,
+  text: Type, textarea: Type, date: CalendarDays, number: Type, rating: Star, grouped_tasks: Type, month: CalendarDays, year: CalendarDays,
 };
+
+const MONTH_OPTIONS: SelectOption<number>[] = MONTH_NAMES.map((name, index) => ({ value: index + 1, label: name }));
 
 const RATING_OPTIONS: SelectOption<number>[] = [1, 2, 3, 4, 5].map(n => ({ value: n, label: `${n} — ${adjectivalRating(n)}` }));
 
@@ -56,6 +58,24 @@ export default function IPCRFillForm({ fields, values, meta, groups, onUpdateVal
             <div className="etm-ipcr-fill-field" key={field.key}>
               <label><Icon size={14} /> {field.label} <span className="etm-ipcr-field-cell">{field.cell}</span></label>
               <IPCRRichTextField value={String(values[field.key] ?? "")} onChange={html => onUpdateValue(field.key, html)} placeholder={field.label} />
+            </div>
+          );
+        }
+        if (field.type === "month" || field.type === "year") {
+          const options: SelectOption<number>[] = field.type === "month" ? MONTH_OPTIONS : yearChoices().map(year => ({ value: year, label: String(year) }));
+          return (
+            <div className="etm-ipcr-fill-field" key={field.key}>
+              <label><Icon size={14} /> {field.label} <span className="etm-ipcr-field-cell">{field.cell}</span></label>
+              <ThemedSelect<SelectOption<number>>
+                size="small"
+                classNamePrefix="etm-ipcr-period-select"
+                isSearchable={false}
+                isClearable
+                placeholder={field.type === "month" ? "Select a month…" : "Select a year…"}
+                options={options}
+                value={options.find(option => option.value === Number(values[field.key])) ?? null}
+                onChange={option => onUpdateValue(field.key, option?.value ?? null)}
+              />
             </div>
           );
         }

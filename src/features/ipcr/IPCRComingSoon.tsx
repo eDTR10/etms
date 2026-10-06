@@ -2,9 +2,10 @@ import { FileSpreadsheet } from "lucide-react";
 
 // Flip to false to turn the IPCR generator (and its admin template builder) back on: the
 // sidebar entries and the page contents both key off this one flag.
-export const IPCR_COMING_SOON = true;
+export const IPCR_COMING_SOON = false;
 
-export const IPCR_ROUTES = ["/etms/ipcr", "/etms/admin/ipcr-templates"];
+// Only the user-facing generator is on hold; the admin template builder stays available.
+export const IPCR_ROUTES = ["/etms/ipcr"];
 
 export function isIPCRComingSoon(to: string): boolean {
   return IPCR_COMING_SOON && IPCR_ROUTES.includes(to);

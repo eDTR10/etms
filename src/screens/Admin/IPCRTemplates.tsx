@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { FileSpreadsheet, Pencil, Plus, Trash2 } from "lucide-react";
 import Swal from "sweetalert2";
 import AdminLayout from "./AdminLayout";
-import IPCRComingSoon, { IPCR_COMING_SOON } from "../../features/ipcr/IPCRComingSoon";
 import IPCRTemplateForm from "../../features/ipcr/IPCRTemplateForm";
 import { ipcrService } from "../../features/ipcr/ipcrService";
 import { taskError } from "../../features/tasks/taskService";
@@ -54,8 +53,11 @@ function IPCRTemplatesContent() {
       <IPCRTemplateForm
         template={editingTemplate}
         onCancel={() => setEditing(null)}
-        onSave={async input => {
-          const saved = editingTemplate ? await ipcrService.updateTemplate(editingTemplate.id, input) : await ipcrService.createTemplate(input);
+        onSave={async (input, sample) => {
+          let saved = editingTemplate ? await ipcrService.updateTemplate(editingTemplate.id, input) : await ipcrService.createTemplate(input);
+          // The template is saved; the sample document goes up as a second request (a file can't ride in the JSON save).
+          if (sample.file) saved = await ipcrService.uploadSampleDocument(saved.id, sample.file);
+          else if (sample.remove && saved.sample_document_url) saved = await ipcrService.removeSampleDocument(saved.id);
           setTemplates(current => editingTemplate ? current.map(item => item.id === saved.id ? saved : item) : [...current, saved].sort((a, b) => a.name.localeCompare(b.name)));
           setEditing(null);
           await Swal.fire({ title: editingTemplate ? "Template updated" : "Template created", icon: "success", timer: 1400, showConfirmButton: false });
@@ -103,7 +105,7 @@ function IPCRTemplatesContent() {
 export default function AdminIPCRTemplates() {
   return (
     <AdminLayout title="IPCR Templates" subtitle="Every saved IPCR template.">
-      {IPCR_COMING_SOON ? <IPCRComingSoon /> : <IPCRTemplatesContent />}
+      <IPCRTemplatesContent />
     </AdminLayout>
   );
 }

@@ -10,6 +10,8 @@ import {
   LogOut,
   UserCircle,
   ShieldCheck,
+  Users,
+  BarChart3,
   ArrowLeftRight,
 } from "lucide-react";
 import { isIPCRComingSoon } from "../../features/ipcr/IPCRComingSoon";
@@ -26,6 +28,8 @@ const NAV_ITEMS = [
   { label: "Tasks", icon: <ListChecks className="w-4 h-4" />, to: "/etms/admin/tasks" },
   { label: "Calendar", icon: <Calendar className="w-4 h-4" />, to: "/etms/admin/calendar" },
   { label: "Templates", icon: <Bookmark className="w-4 h-4" />, to: "/etms/admin/templates" },
+  { label: "Task Grouping", icon: <BarChart3 className="w-4 h-4" />, to: "/etms/admin/task-grouping" },
+  { label: "Users", icon: <Users className="w-4 h-4" />, to: "/etms/admin/users" },
   { label: "Quick Links", icon: <Link2 className="w-4 h-4" />, to: "/etms/admin/quick-links" },
   { label: "Generate IPCR Template", icon: <FileSpreadsheet className="w-4 h-4" />, to: "/etms/admin/ipcr-templates" },
 ];

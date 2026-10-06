@@ -1,4 +1,13 @@
-export type IPCRFieldType = "text" | "textarea" | "date" | "number" | "rating" | "grouped_tasks";
+export type IPCRFieldType = "text" | "textarea" | "date" | "number" | "rating" | "grouped_tasks" | "month" | "year";
+
+// A month field stores 1-12 and prints the month's name; a year field stores and prints the year.
+export const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+// Years offered by a year picker: a decade back to a decade ahead of the current year.
+export function yearChoices(): number[] {
+  const now = new Date().getFullYear();
+  return Array.from({ length: 21 }, (_, index) => now - 10 + index);
+}
 
 export type IPCRPaperSize = "a3" | "a4" | "a5" | "letter" | "legal" | "folio" | "long";
 export type IPCROrientation = "landscape" | "portrait";
@@ -13,11 +22,23 @@ export const PAPER_SIZE_OPTIONS: { value: IPCRPaperSize; label: string }[] = [
   { value: "long", label: "Long (8.5\" x 13\")" },
 ];
 
+// Account details a text field can start out filled with (the person filling in the IPCR can still change it).
+export type IPCRAutofill = "name" | "email" | "designation" | "office";
+
 export interface IPCRField {
   cell: string;
   key: string;
   label: string;
   type: IPCRFieldType;
+  // Date fields: "today" starts the date filled in with the day the IPCR is made; "choose" (the default) leaves it for the
+  // person to pick. Either way they can change it.
+  dateMode?: "today" | "choose";
+  // Start this field with the signed-in user's own information.
+  autofill?: IPCRAutofill;
+  // Made from text highlighted inside a larger cell: only that text is replaced, not the whole cell.
+  inline?: boolean;
+  // The text an inline field replaced (e.g. "<NAME>"), put back if the field is removed.
+  placeholder?: string;
 }
 
 export interface IPCRGridImage {
@@ -27,6 +48,22 @@ export interface IPCRGridImage {
   y: number;
   width: number;
   height: number;
+}
+
+// A picture found in an imported .xlsx, positioned by the cell it was anchored to (plus an offset
+// in px inside that cell) rather than by page pixels — the designer turns it into an
+// IPCRGridImage once the grid is on screen and real cell positions are known.
+export interface IPCRImageAnchor {
+  id: string;
+  dataUrl: string;
+  col: number;
+  row: number;
+  dx: number;
+  dy: number;
+  width: number;
+  height: number;
+  // Size of the picture file itself (not the data URL).
+  bytes: number;
 }
 
 // A single styled run of text within one cell — e.g. a cell reading "I, NAME, TITLE of the
@@ -41,9 +78,17 @@ export interface IPCRRichTextRun {
   bold?: boolean;
   italic?: boolean;
   underline?: boolean;
+  // A hyperlink target: this run is a clickable link (in the PDF) to this address.
+  link?: string;
 }
 
+// Rows / columns the template's author marked as repeatable: whoever fills in the IPCR may add a copy before and/or
+// after each one. Keyed by the row / column index (0-based).
+export interface IPCRBreakpoint { before: boolean; after: boolean }
+export interface IPCRExpandable { rows: Record<number, IPCRBreakpoint>; cols: Record<number, IPCRBreakpoint> }
+
 export interface IPCRGridData {
+  expandable?: IPCRExpandable;
   data: (string | number)[][];
   style: Record<string, string>;
   mergeCells: Record<string, [number, number]>;
@@ -51,12 +96,18 @@ export interface IPCRGridData {
   rowHeights?: Record<number, number>;
   richText?: Record<string, IPCRRichTextRun[]>;
   images: IPCRGridImage[];
+  // Where the top-left corner of cell A1 sat inside the area `images` are positioned in (px), measured when
+  // the snapshot was taken. Lets exports convert an image's on-screen x/y into a position over the table.
+  imageOrigin?: { x: number; y: number };
   // Name of the source .xlsx sheet/tab this layout was imported from, if any — carried
   // through so a later .xlsx export re-uses it instead of always falling back to "IPCR".
   sheetName?: string;
 }
 
-export function emptyGrid(rows = 30, cols = 10): IPCRGridData {
+// Blank sheets start 19 columns wide (A to S), the width the OPCR/IPCR forms use.
+export const DEFAULT_GRID_COLS = 19;
+
+export function emptyGrid(rows = 30, cols = DEFAULT_GRID_COLS): IPCRGridData {
   return {
     data: Array.from({ length: rows }, () => Array.from({ length: cols }, () => "")),
     style: {},
@@ -89,10 +140,16 @@ export interface IPCRTemplate {
   fields_config: IPCRField[];
   paper_size: IPCRPaperSize;
   orientation: IPCROrientation;
+  // An example of a finished document for this template (null when none was uploaded).
+  sample_document_url?: string | null;
+  sample_document_name?: string;
   created_at: string;
   updated_at: string;
   can_manage: boolean;
 }
+
+// What the designer hands back with a save besides the template itself: a sample document to attach, or to remove.
+export interface IPCRTemplateSampleChange { file?: File | null; remove?: boolean }
 
 export interface IPCRTemplateInput {
   name: string;
