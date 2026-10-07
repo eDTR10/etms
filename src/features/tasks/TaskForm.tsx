@@ -115,7 +115,9 @@ function saveError(error: unknown): string {
   return "Your task couldn’t be saved. Your changes are still here; please try again.";
 }
 
-function SubtaskEditorRow({ subtask, index, depth, fieldId, errors, docTemplates, canComplete, onUpdate, onRemove, onAddChild }: {
+function SubtaskEditorRow({ subtask, index, depth, fieldId, errors, docTemplates, canComplete, maxDeadline, onUpdate, onRemove, onAddChild }: {
+  // The main task's deadline: a subtask can't be due after it.
+  maxDeadline?: string;
   // Completion only makes sense on a task that already exists; a brand-new one has nothing done yet.
   canComplete: boolean;
   subtask: EditableSubtask; index: number; depth: number; fieldId: string; errors: FormErrors; docTemplates: DtmsDocumentTemplate[];
@@ -141,7 +143,7 @@ function SubtaskEditorRow({ subtask, index, depth, fieldId, errors, docTemplates
       <div className="etm-subtask-meta">
         <div className={`etm-subtask-meta-item ${subtask.deadline ? "has-value" : ""}`}>
           <span className="etm-subtask-meta-label"><CalendarDays size={13} />Deadline</span>
-          <input type="date" className="etm-subtask-date" value={subtask.deadline ?? ""} onChange={event => onUpdate(subtask.localKey, { deadline: event.target.value || null })} aria-label={`Deadline for subtask ${index + 1}`} />
+          <input type="date" className="etm-subtask-date" max={maxDeadline || undefined} value={subtask.deadline ?? ""} onChange={event => onUpdate(subtask.localKey, { deadline: event.target.value || null })} aria-label={`Deadline for subtask ${index + 1}`} />
           {subtask.deadline && <button type="button" className="etm-icon-button" aria-label={`Clear the deadline of subtask ${index + 1}`} title="Clear deadline" onClick={() => onUpdate(subtask.localKey, { deadline: null })}><X size={13} /></button>}
         </div>
         {docTemplates.length > 0 && (
@@ -164,7 +166,7 @@ function SubtaskEditorRow({ subtask, index, depth, fieldId, errors, docTemplates
       {subtask.subtasks.length > 0 && (
         <div className="etm-subtask-children">
           {subtask.subtasks.map((child, childIndex) => (
-            <SubtaskEditorRow key={child.localKey} subtask={child} index={childIndex} depth={depth + 1} fieldId={fieldId} errors={errors} docTemplates={docTemplates} canComplete={canComplete} onUpdate={onUpdate} onRemove={onRemove} onAddChild={onAddChild} />
+            <SubtaskEditorRow key={child.localKey} subtask={child} index={childIndex} depth={depth + 1} fieldId={fieldId} errors={errors} docTemplates={docTemplates} canComplete={canComplete} maxDeadline={maxDeadline} onUpdate={onUpdate} onRemove={onRemove} onAddChild={onAddChild} />
           ))}
         </div>
       )}
@@ -406,6 +408,15 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
     if (saving) return;
     const nextErrors: FormErrors = {};
     if (!values.title.trim()) nextErrors.title = "Give this task a title.";
+    // A subtask can't be due after the main deadline.
+    const mainDeadline = values.deadline;
+    if (mainDeadline) {
+      const walk = (items: EditableSubtask[]) => items.forEach(item => {
+        if (item.deadline && item.deadline > mainDeadline) nextErrors[item.localKey] = `This subtask's deadline can't be after the task's deadline (${formatDate(mainDeadline)}).`;
+        walk(item.subtasks);
+      });
+      walk(values.subtasks);
+    }
     if (!values.isPersonal && !values.project.trim()) nextErrors.project = "Enter or select a project, or mark this as a personal task.";
     // The deadline is optional (a repeating task has its own schedule); when given it must be a real date.
     if (values.deadline) {
@@ -740,7 +751,7 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
               <div className="etm-form-section-body">
                 {allSubtasks.length === 0 && <div className="etm-subtask-empty"><CheckCheck size={23} /><span>No subtasks yet. Add the first step below.</span></div>}
                 <div className="etm-subtask-editor">{values.subtasks.map((subtask, index) => (
-                  <SubtaskEditorRow key={subtask.localKey} subtask={subtask} index={index} depth={0} fieldId={fieldId} errors={errors} docTemplates={docTemplates} canComplete={!!task} onUpdate={updateSubtask} onRemove={removeSubtask} onAddChild={addSubtask} />
+                  <SubtaskEditorRow key={subtask.localKey} subtask={subtask} index={index} depth={0} fieldId={fieldId} errors={errors} docTemplates={docTemplates} canComplete={!!task} maxDeadline={values.deadline || undefined} onUpdate={updateSubtask} onRemove={removeSubtask} onAddChild={addSubtask} />
                 ))}</div>
                 <button type="button" className="etm-add-subtask" onClick={() => addSubtask(null)}><Plus size={16} /> Add subtask</button>
               </div>
