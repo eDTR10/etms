@@ -1,1 +1,0 @@
-import{m as t}from"./index-C7PO07Tm.js";const c={list:async()=>(await t.get("etm/quick-links/")).data,create:async a=>(await t.post("etm/quick-links/",a)).data,update:async(a,i)=>(await t.patch(`etm/quick-links/${a}/`,i)).data,remove:async a=>{await t.delete(`etm/quick-links/${a}/`)}};export{c as q};
