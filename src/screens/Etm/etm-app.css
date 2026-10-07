@@ -386,3 +386,6 @@
 .etm-table-pagination select { margin-left: 6px; padding: 5px 8px; border: 1px solid var(--etm-border); border-radius: 8px; background: var(--etm-surface-alt); color: var(--etm-ink); font: inherit; }
 
 .etm-tasks-table-assignee-more { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 26px; padding: 0 6px; border-radius: 999px; background: color-mix(in srgb, var(--etm-primary) 18%, var(--etm-surface-alt)); color: var(--etm-primary); font-size: 11px; font-weight: 700; cursor: default; }
+
+/* Long task titles stop at two lines (the full title is in the tooltip). */
+.etm-task-title-link, .etm-tasks-table-title > .etm-task-title-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; }

@@ -49,7 +49,7 @@ export interface TaskContextValue {
   addSubtaskRemarkReply: (id: number, subtaskId: number, remarkId: number, message: string) => Promise<void>;
   setSubtaskStatus: (id: number, subtaskId: number, message: string, status: TaskStatus) => Promise<void>;
   addSubtask: (id: number, title: string, description?: string, parentId?: number) => Promise<void>;
-  editSubtask: (id: number, subtaskId: number, input: { title?: string; description?: string }) => Promise<void>;
+  editSubtask: (id: number, subtaskId: number, input: { title?: string; description?: string; deadline?: string | null }) => Promise<void>;
   deleteSubtask: (id: number, subtaskId: number) => Promise<void>;
   setSubtaskCompletion: (id: number, subtaskId: number, isCompleted: boolean) => Promise<void>;
   reorderSubtasks: (id: number, parentId: number | null, order: number[]) => Promise<void>;

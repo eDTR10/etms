@@ -135,7 +135,7 @@ export default function TaskProvider({ children }: { children: ReactNode }) {
   const addSubtask = async (id: number, title: string, description?: string, parentId?: number) => withBlockingLoader("Adding subtask…", async () => {
     replace(await taskService.addSubtask(id, title, description, parentId));
   });
-  const editSubtask = async (id: number, subtaskId: number, input: { title?: string; description?: string }) => withBlockingLoader("Saving subtask…", async () => {
+  const editSubtask = async (id: number, subtaskId: number, input: { title?: string; description?: string; deadline?: string | null }) => withBlockingLoader("Saving subtask…", async () => {
     replace(await taskService.editSubtask(id, subtaskId, input));
   });
   const deleteSubtask = async (id: number, subtaskId: number) => withBlockingLoader("Deleting subtask…", async () => {

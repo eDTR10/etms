@@ -39,7 +39,7 @@ interface TaskDetailsProps {
   onAddSubtaskRemarkReply: (subtaskId: number, remarkId: number, message: string) => Promise<void>;
   onSetSubtaskStatus: (subtaskId: number, message: string, status: TaskStatus) => Promise<void>;
   onAddSubtask: (title: string, description?: string, parentId?: number) => Promise<void>;
-  onEditSubtask: (subtaskId: number, input: { title?: string; description?: string }) => Promise<void>;
+  onEditSubtask: (subtaskId: number, input: { title?: string; description?: string; deadline?: string | null }) => Promise<void>;
   onDeleteSubtask: (subtaskId: number) => Promise<void>;
   onSetSubtaskCompletion: (subtaskId: number, isCompleted: boolean) => Promise<void>;
   onReorderSubtasks: (parentId: number | null, order: number[]) => Promise<void>;
@@ -794,7 +794,7 @@ function SubtaskPanel({ task, subtask, members, canComment, onSetCompletion, onA
   onReactRemark: (id: number, remarkId: number, emoji: string) => Promise<void>;
   onAddReplyRemark: (id: number, remarkId: number, message: string) => Promise<void>;
   onAddSubtask: (title: string, description: string | undefined, parentId: number) => Promise<void>;
-  onEditSubtask: (id: number, input: { title?: string; description?: string }) => Promise<void>;
+  onEditSubtask: (id: number, input: { title?: string; description?: string; deadline?: string | null }) => Promise<void>;
   onDeleteSubtask: (id: number) => Promise<void>;
   onReorderSubtasks: (parentId: number | null, order: number[]) => Promise<void>;
   onAssignSubtask: (subtaskId: number, userId: number | null) => Promise<void>;
@@ -813,6 +813,7 @@ function SubtaskPanel({ task, subtask, members, canComment, onSetCompletion, onA
   const [editingSubtask, setEditingSubtask] = useState(false);
   const [draftTitle, setDraftTitle] = useState(subtask.title);
   const [draftDescription, setDraftDescription] = useState(subtask.description);
+  const [draftDeadline, setDraftDeadline] = useState(subtask.deadline ?? "");
   const [savingSubtask, setSavingSubtask] = useState(false);
   const [addingChildOpen, setAddingChildOpen] = useState(false);
   const [newChildTitle, setNewChildTitle] = useState("");
@@ -874,6 +875,7 @@ function SubtaskPanel({ task, subtask, members, canComment, onSetCompletion, onA
   function startEditingSubtask() {
     setDraftTitle(subtask.title);
     setDraftDescription(subtask.description);
+    setDraftDeadline(subtask.deadline ?? "");
     setError("");
     setEditingSubtask(true);
   }
@@ -881,7 +883,7 @@ function SubtaskPanel({ task, subtask, members, canComment, onSetCompletion, onA
     if (!id || savingSubtask || !draftTitle.trim()) return;
     setSavingSubtask(true); setError("");
     try {
-      await onEditSubtask(id, { title: draftTitle.trim(), description: draftDescription.trim() });
+      await onEditSubtask(id, { title: draftTitle.trim(), description: draftDescription.trim(), deadline: draftDeadline || null });
       setEditingSubtask(false);
     } catch (caught) {
       setError(progressError(caught));
@@ -981,6 +983,10 @@ function SubtaskPanel({ task, subtask, members, canComment, onSetCompletion, onA
         <div className="etm-subtask-edit-inline">
           <input value={draftTitle} onChange={event => setDraftTitle(event.target.value)} maxLength={255} disabled={savingSubtask} aria-label="Subtask title" placeholder="Subtask title" />
           <textarea value={draftDescription} onChange={event => setDraftDescription(event.target.value)} maxLength={2000} rows={2} disabled={savingSubtask} aria-label="Subtask description" placeholder="Description (optional)" />
+          <label className="etm-subtask-deadline" style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--etm-muted)" }}>
+            <CalendarDays size={13} />Deadline <span className="etm-form-optional">(optional)</span>
+            <input type="date" value={draftDeadline} onChange={event => setDraftDeadline(event.target.value)} disabled={savingSubtask} aria-label="Subtask deadline" style={{ padding: "4px 8px" }} />
+          </label>
           {error && <p className="etm-field-error" role="alert">{error}</p>}
           <div className="etm-subtask-edit-actions">
             <button type="button" className="etm-button ghost small" disabled={savingSubtask} onClick={() => { setEditingSubtask(false); setError(""); }}>Cancel</button>
@@ -989,7 +995,7 @@ function SubtaskPanel({ task, subtask, members, canComment, onSetCompletion, onA
         </div>
       ) : (<>
         {canComplete ? <button type="button" className={`etm-details-subtask-toggle ${subtask.is_completed ? "checked" : ""}`} aria-label={`${subtask.is_completed ? "Reopen" : "Complete"} subtask: ${subtask.title}`} disabled={saving} onClick={() => void complete()}>{subtask.is_completed ? <Check size={13} /> : <Circle size={16} />}</button> : <span className="etm-details-subtask-check">{subtask.is_completed ? <Check size={13} /> : <Circle size={16} />}</span>}
-        <button type="button" className="etm-subtask-panel-open" aria-expanded={open} onClick={() => setOpen(value => !value)}><span className="etm-details-subtask-text"><strong>{subtask.title}</strong>{subtask.description && <small>{subtask.description}</small>}</span>{subtask.assignee && <span className="etm-subtask-assignee-chip" title={`Assigned to ${memberName(subtask.assignee)}`}><User size={11} />{memberName(subtask.assignee)}</span>}{hintedDocumentTemplateName && <span className="etm-subtask-assignee-chip" title={`This subtask needs a "${hintedDocumentTemplateName}" document`}><FileText size={11} />{hintedDocumentTemplateName}</span>}{linkedTracknumber && <DocumentStatusChip tracknumber={linkedTracknumber} status={docStatus} loading={docStatusLoading} />}<span className={`etm-badge ${statusSlug(subtask.status)}`}>{subtask.status}</span><span className="etm-subtask-update-count">{commentCount} {commentCount === 1 ? "update" : "updates"}</span><ChevronRight className={open ? "open" : ""} size={16} /></button>
+        <button type="button" className="etm-subtask-panel-open" aria-expanded={open} onClick={() => setOpen(value => !value)}><span className="etm-details-subtask-text"><strong>{subtask.title}</strong>{subtask.description && <small>{subtask.description}</small>}{subtask.deadline && <small className={`etm-subtask-due ${!subtask.is_completed && subtask.deadline < new Date().toLocaleDateString("en-CA") ? "overdue" : ""}`} style={!subtask.is_completed && subtask.deadline < new Date().toLocaleDateString("en-CA") ? { color: "#e5736d", fontWeight: 600 } : undefined}><CalendarDays size={11} style={{ display: "inline", verticalAlign: "-1px", marginRight: 4 }} />Due {formatDate(subtask.deadline)}{!subtask.is_completed && subtask.deadline < new Date().toLocaleDateString("en-CA") ? " · overdue" : ""}</small>}</span>{subtask.assignee && <span className="etm-subtask-assignee-chip" title={`Assigned to ${memberName(subtask.assignee)}`}><User size={11} />{memberName(subtask.assignee)}</span>}{hintedDocumentTemplateName && <span className="etm-subtask-assignee-chip" title={`This subtask needs a "${hintedDocumentTemplateName}" document`}><FileText size={11} />{hintedDocumentTemplateName}</span>}{linkedTracknumber && <DocumentStatusChip tracknumber={linkedTracknumber} status={docStatus} loading={docStatusLoading} />}<span className={`etm-badge ${statusSlug(subtask.status)}`}>{subtask.status}</span><span className="etm-subtask-update-count">{commentCount} {commentCount === 1 ? "update" : "updates"}</span><ChevronRight className={open ? "open" : ""} size={16} /></button>
         {task.can_edit && (
           <span className="etm-subtask-panel-actions">
             {id && <button type="button" className="etm-icon-button" aria-label={subtask.assignee ? `Reassign subtask: ${subtask.title}` : `Assign subtask: ${subtask.title}`} title="Assign" onClick={() => setAssigningOpen(value => !value)}><UserPlus size={14} /></button>}

@@ -16,7 +16,7 @@ export default function TaskTitleCell({ task, children, onOpen }: { task: Task; 
           {isDueSoon(task) && <span className="etm-due-soon-badge">{dueSoonLabel(task)}</span>}
           {isNew && <span className="etm-task-new-badge">New</span>}
           <span className="etm-task-title-number">{formatTaskNumber(task.id)}</span>
-          {onOpen ? <button type="button" className={`etm-task-title-link ${task.is_completed ? "completed" : ""}`} onClick={onOpen}>{task.title}</button> : <span className={task.is_completed ? "completed" : ""}>{task.title}</span>}
+          {onOpen ? <button type="button" className={`etm-task-title-link ${task.is_completed ? "completed" : ""}`} title={task.title} onClick={onOpen}>{task.title}</button> : <span className={`etm-task-title-text ${task.is_completed ? "completed" : ""}`} title={task.title}>{task.title}</span>}
         </span>
         {allSubtasks.length > 0 && <small>{allSubtasks.filter(s => s.is_completed).length}/{allSubtasks.length} subtasks</small>}
         {allSubtasks.length === 0 && children && <small>No subtasks</small>}

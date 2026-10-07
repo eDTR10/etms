@@ -63,7 +63,7 @@ export const taskService = {
     (await api.post<Task>(`etm/tasks/${id}/subtasks/${subtaskId}/progress/`, { message, status })).data,
   addSubtask: async (id: number, title: string, description = "", parentId?: number) =>
     (await api.post<Task>(`etm/tasks/${id}/subtasks/`, { title, description, ...(parentId !== undefined ? { parent: parentId } : {}) })).data,
-  editSubtask: async (id: number, subtaskId: number, input: { title?: string; description?: string }) =>
+  editSubtask: async (id: number, subtaskId: number, input: { title?: string; description?: string; deadline?: string | null }) =>
     (await api.patch<Task>(`etm/tasks/${id}/subtasks/${subtaskId}/`, input)).data,
   deleteSubtask: async (id: number, subtaskId: number) =>
     (await api.delete<Task>(`etm/tasks/${id}/subtasks/${subtaskId}/`)).data,
