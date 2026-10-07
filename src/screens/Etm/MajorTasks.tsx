@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { detailsToText } from "../../features/tasks/richDetails";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Archive, ChevronRight, Circle, Check, Clock, PlayCircle, PauseCircle, CheckCircle2 } from "lucide-react";
 import { useTasks } from "../../features/tasks/taskContext";
 import { useTaskFilters, type AssignedFilterValue } from "../../features/tasks/useTaskFilters";
@@ -39,6 +39,11 @@ interface MajorTasksProps {
   basePath?: string;
 }
 
+// Invisible full-cell link so right-click anywhere on a row offers "Open link in new tab".
+function RowLink({ to }: { to: string }) {
+  return <Link to={to} className="etm-cell-link" tabIndex={-1} aria-hidden="true" onClick={event => event.stopPropagation()} />;
+}
+
 export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps = {}) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -47,6 +52,7 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
   // e.g. ?status=Completed or ?unassigned=1 to arrive pre-filtered, and this needs to survive
   // the URL being cleared right after (below) without forgetting the filter it just set.
   const [initialFilters] = useState(() => ({
+    fromUrl: [...searchParams.keys()].length > 0,
     status: (() => {
       const raw = searchParams.get("status");
       return raw && (STATUSES as string[]).includes(raw) ? raw as TaskStatus : "all";
@@ -68,7 +74,13 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
   const confirmDelete = useDeleteTaskConfirm();
   const { confirmDuplicate, isDuplicating } = useDuplicateTask(basePath);
   const { confirmArchive, confirmDelete: confirmBulkDelete } = useBulkTaskActions();
-  const [scope, setScope] = useState<TaskScope>("assigned");
+  const [scope, setScopeState] = useState<TaskScope>(() => {
+    try { return window.localStorage.getItem("etm.allTasks.scope") === "personal" ? "personal" : "assigned"; } catch { return "assigned"; }
+  });
+  const setScope = (value: TaskScope) => {
+    setScopeState(value);
+    try { window.localStorage.setItem("etm.allTasks.scope", value); } catch { /* ignore */ }
+  };
   const [showArchived, setShowArchived] = useState(false);
   const [archivedTasks, setArchivedTasks] = useState<Task[]>([]);
   const [archivedLoading, setArchivedLoading] = useState(false);
@@ -113,7 +125,7 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
     assignedFilter, setAssignedFilter, overdueOnly, setOverdueOnly,
     personOffice, setPersonOffice, personProject, setPersonProject,
     hasActiveFilters, clearFilters,
-  } = useTaskFilters(scopedTasks, { initialStatus: initialFilters.status, initialAssignedFilter: initialFilters.assignedFilter, initialOverdueOnly: initialFilters.overdueOnly, showCompletedInAll: true, members });
+  } = useTaskFilters(scopedTasks, { initialStatus: initialFilters.status, initialAssignedFilter: initialFilters.assignedFilter, initialOverdueOnly: initialFilters.overdueOnly, showCompletedInAll: true, members, persistKey: "all-tasks", ignoreSaved: initialFilters.fromUrl });
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [viewingId, setViewingId] = useState<number | null>(null);
   const [viewingSubtaskId, setViewingSubtaskId] = useState<number | null>(null);
@@ -255,7 +267,7 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
                 <Fragment key={task.id}>
                   <tr className={`etm-tasks-table-row-clickable ${expanded ? "expanded" : ""}`} onClick={() => navigate(`${basePath}/${task.id}`)}>
                     <td className="etm-tasks-table-title-col">
-                      <TaskTitleCell task={task} onOpen={() => navigate(`${basePath}/${task.id}`)}>
+                      <TaskTitleCell task={task} to={`${basePath}/${task.id}`} onOpen={() => navigate(`${basePath}/${task.id}`)}>
                       <input
                         type="checkbox"
                         aria-label={`Select ${task.title}`}
@@ -276,18 +288,18 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
                       )}
                       </TaskTitleCell>
                     </td>
-                    <td>{task.project ? task.project.name : <span className="etm-tasks-table-unassigned">Personal</span>}</td>
-                    <td><span className={`etm-priority-pill ${task.priority.toLowerCase()}`}>{task.priority}</span></td>
+                    <td><RowLink to={`${basePath}/${task.id}`} />{task.project ? task.project.name : <span className="etm-tasks-table-unassigned">Personal</span>}</td>
+                    <td><RowLink to={`${basePath}/${task.id}`} /><span className={`etm-priority-pill ${task.priority.toLowerCase()}`}>{task.priority}</span></td>
                     {/* Repeat column hidden for now:
-                    <td>{task.recurrence !== "None" ? RECURRENCE_LABELS[task.recurrence] : <span className="etm-tasks-table-unassigned">—</span>}</td>
+                    <td><RowLink to={`${basePath}/${task.id}`} />{task.recurrence !== "None" ? RECURRENCE_LABELS[task.recurrence] : <span className="etm-tasks-table-unassigned">—</span>}</td>
                     */}
-                    <td>{task.created_by_name ? <span className="etm-tasks-table-assignee"><span className="etm-tasks-table-assignee-avatar" aria-hidden="true">{task.created_by_name.split(" ").map(part => part.charAt(0)).slice(0, 2).join("")}</span>{task.created_by_name}</span> : <span className="etm-tasks-table-unassigned">—</span>}</td>
+                    <td><RowLink to={`${basePath}/${task.id}`} />{task.created_by_name ? <span className="etm-tasks-table-assignee"><span className="etm-tasks-table-assignee-avatar" aria-hidden="true">{task.created_by_name.split(" ").map(part => part.charAt(0)).slice(0, 2).join("")}</span>{task.created_by_name}</span> : <span className="etm-tasks-table-unassigned">—</span>}</td>
                     {/* Requestor column hidden for now:
-                    <td>{task.requestor || <span className="etm-tasks-table-unassigned">Not specified</span>}</td>
+                    <td><RowLink to={`${basePath}/${task.id}`} />{task.requestor || <span className="etm-tasks-table-unassigned">Not specified</span>}</td>
                     */}
-                    <td className="etm-tasks-table-details-col">{detailsToText(task.details) ? <span title={detailsToText(task.details)}>{detailsToText(task.details)}</span> : <span className="etm-tasks-table-unassigned">No details</span>}</td>
-                    <td><div className="etm-task-cell-stack"><span>{formatDate(task.created_at)}</span>{task.deadline && <small>Due {formatDate(task.deadline)}</small>}</div></td>
-                    <td>
+                    <td className="etm-tasks-table-details-col"><RowLink to={`${basePath}/${task.id}`} />{detailsToText(task.details) ? <span title={detailsToText(task.details)}>{detailsToText(task.details)}</span> : <span className="etm-tasks-table-unassigned">No details</span>}</td>
+                    <td><RowLink to={`${basePath}/${task.id}`} /><div className="etm-task-cell-stack"><span>{formatDate(task.created_at)}</span>{task.deadline && <small>Due {formatDate(task.deadline)}</small>}</div></td>
+                    <td><RowLink to={`${basePath}/${task.id}`} />
                       {task.assignments.length ? (
                         <div className="etm-tasks-table-assignees" aria-label="Assignees">
                           {task.assignments.slice(0, 2).map(person => (
@@ -302,7 +314,7 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
                         </div>
                       ) : <span className="etm-tasks-table-unassigned">Unassigned</span>}
                     </td>
-                    <td>
+                    <td><RowLink to={`${basePath}/${task.id}`} />
                       <div className="etm-progresslog-cell">
                         <span className={`etm-badge ${statusSlug(task.status)}`}>{statusChipLabel(task)}</span>
                         {lastRemark ? (

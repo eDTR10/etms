@@ -798,12 +798,14 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
                 </div>
               </div>
             </section>}
-            <TaskLivePreview values={values} members={roster} />
+            <div className="etm-form-aside-sticky">
+              <TaskLivePreview values={values} members={roster} />
+              <div className="etm-form-aside-actions"><button className="etm-button ghost" type="button" disabled={saving} onClick={onCancel}>Cancel</button><button data-howto="submit-button" className="etm-button primary" type="submit" disabled={saving}>{saving ? <Loader2 size={17} className="etm-form-spinner" /> : <Check size={17} />}{saving ? "Saving task…" : task ? "Save changes" : "Create task"}</button></div>
+            </div>
           </aside>
         </div>
       </fieldset>
       {error && <div className="etm-form-error-banner" role="alert">{error}</div>}
-      <div className="etm-form-footer"><span>Your team’s next step starts here.</span><div><button className="etm-button ghost" type="button" disabled={saving} onClick={onCancel}>Cancel</button><button data-howto="submit-button" className="etm-button primary" type="submit" disabled={saving}>{saving ? <Loader2 size={17} className="etm-form-spinner" /> : <Check size={17} />}{saving ? "Saving task…" : task ? "Save changes" : "Create task"}</button></div></div>
     </form>
   );
 }

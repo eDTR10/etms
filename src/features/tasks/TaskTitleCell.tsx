@@ -3,7 +3,7 @@ import { ClipboardList } from "lucide-react";
 import { useAuth } from "../../screens/Auth/AuthContext";
 import { dueSoonLabel, flattenSubtasks, formatTaskNumber, isDueSoon, isUnseenAssignment, type Task } from "./types";
 
-export default function TaskTitleCell({ task, children, onOpen }: { task: Task; children?: ReactNode; onOpen?: () => void }) {
+export default function TaskTitleCell({ task, children, onOpen,  }: { task: Task; children?: ReactNode; onOpen?: () => void; to?: string }) {
   const { user } = useAuth();
   const allSubtasks = flattenSubtasks(task.subtasks);
   const isNew = isUnseenAssignment(task, user?.id);

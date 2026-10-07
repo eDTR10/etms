@@ -1242,6 +1242,15 @@ function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = 
   const [completing, setCompleting] = useState(false);
   async function markComplete() {
     if (!onComplete || completing) return;
+    const confirmation = await Swal.fire({
+      title: "Mark this task as complete?",
+      text: "The task will be moved to Completed.",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Mark as complete",
+      cancelButtonText: "Cancel",
+    });
+    if (!confirmation.isConfirmed) return;
     setCompleting(true);
     setError("");
     try {
@@ -1350,6 +1359,7 @@ function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = 
       )}
       {task.my_role === "Assignee" && <p className="etm-details-assignee-note" role="note"><Users size={14} />You can see this whole task, but you can only work on the subtask{task.subtasks.some(item => item.can_complete && item.assignee) ? "s" : ""} assigned to you. The others are read-only.</p>}
       {task.can_edit && onComplete && !task.is_completed && <button type="button" className={`etm-button primary small etm-details-complete ${page ? "page" : ""}`} onClick={() => void markComplete()} disabled={completing}>{completing ? <Loader2 size={14} className="etm-form-spinner" /> : <CheckCheck size={14} />}Mark as complete</button>}
+      {task.is_completed && <div className={`etm-details-complete etm-details-complete-actions ${page ? "page" : ""}`}><button type="button" className="etm-button ghost" onClick={onDuplicate} disabled={saving || duplicating}>{duplicating ? <Loader2 size={16} className="etm-form-spinner" /> : <Copy size={16} />}{duplicating ? "Duplicating…" : "Duplicate task"}</button>{task.can_edit && <button type="button" className="etm-button primary" onClick={onEdit} disabled={saving}><Edit3 size={16} />Edit task</button>}</div>}
       {task.revert_turnover_to && !task.is_completed && (
         <button type="button" className="etm-button ghost small etm-details-turnover" disabled={reverting} onClick={() => void returnTask()} title={`Currently with ${task.revert_turnover_to}`}>
           {reverting ? <Loader2 size={14} className="etm-form-spinner" /> : <ArrowRightLeft size={14} />}{task.is_creator ? "Revert turnover" : "Return this task to me"}
@@ -1381,9 +1391,9 @@ function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = 
     <div className="etm-details-body">
       <section className="etm-details-section etm-task-info">
         <button type="button" className="etm-task-info-toggle" aria-expanded={taskInfoOpen} aria-controls={`${fieldId}-task-info`} onClick={() => setTaskInfoOpen(value => !value)}>
-          <span>Task Info</span>
+          <span className="etm-task-info-toggle-label"><span>Task Info</span>
           <span className="etm-task-info-hint">({taskInfoOpen ? "Click to hide" : "Click to view"})</span>
-          <ChevronRight className={taskInfoOpen ? "open" : ""} size={15} />
+          <ChevronRight className={taskInfoOpen ? "open" : ""} size={15} /></span>
         </button>
         {taskInfoOpen && (
           <dl className="etm-details-metadata" id={`${fieldId}-task-info`}>
@@ -1482,11 +1492,11 @@ function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = 
         )}
       </section>
     </div>
-    <div className="etm-details-footer">
+    {(!page || !task.is_completed) && <div className="etm-details-footer">
       {!page && <button type="button" className="etm-button ghost" onClick={onClose}>Close</button>}
-      <button type="button" className="etm-button ghost" onClick={onDuplicate} disabled={saving || duplicating}>{duplicating ? <Loader2 size={16} className="etm-form-spinner" /> : <Copy size={16} />}{duplicating ? "Duplicating…" : "Duplicate task"}</button>
-      {task.can_edit && <button type="button" className="etm-button primary" onClick={onEdit} disabled={saving}><Edit3 size={16} />Edit task</button>}
-    </div>
+      {!task.is_completed && <button type="button" className="etm-button ghost" onClick={onDuplicate} disabled={saving || duplicating}>{duplicating ? <Loader2 size={16} className="etm-form-spinner" /> : <Copy size={16} />}{duplicating ? "Duplicating…" : "Duplicate task"}</button>}
+      {!task.is_completed && task.can_edit && <button type="button" className="etm-button primary" onClick={onEdit} disabled={saving}><Edit3 size={16} />Edit task</button>}
+    </div>}
   </>;
 }
 
