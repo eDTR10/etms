@@ -21,8 +21,11 @@ const PDFMAKE_PAGE_SIZE: Record<IPCRPaperSize, PageSize> = {
 // width any cell along that line asked for (thin vs. thick/double), and let color vary per
 // segment. Lines with no explicit border anywhere keep the existing uniform thin gray default.
 function buildBorderLineMaps(grid: IPCRGridData, rowCount: number, colCount: number) {
-  const DEFAULT_WIDTH = 0.75;
-  const DEFAULT_COLOR = "#9a9a9a";
+  // No explicit border => no line at all (width 0). A line that does carry a border somewhere is
+  // drawn at one width along its whole length (pdfmake limitation), so the segments on it
+  // without their own border use white to stay invisible on the page.
+  const DEFAULT_WIDTH = 0;
+  const DEFAULT_COLOR = "#ffffff";
   const hWidth = new Array(rowCount + 1).fill(DEFAULT_WIDTH);
   const vWidth = new Array(colCount + 1).fill(DEFAULT_WIDTH);
   const hColor = new Map<string, string>();
@@ -116,17 +119,28 @@ export function buildIPCRPdfDocDefinition(
   const { hWidth, vWidth, hColor, vColor, DEFAULT_COLOR } = buildBorderLineMaps(grid, rowCount, colCount);
 
   const pageMargin = 24;
+  // Use the sheet's own column widths (CSS px → pt) so the PDF has the same proportions as the
+  // designer; only shrink (never stretch) when the sheet is wider than the printable width.
+  const PAGE_POINTS: Record<IPCRPaperSize, [number, number]> = {
+    a3: [842, 1191], a4: [595, 842], a5: [420, 595], letter: [612, 792], legal: [612, 1008], folio: [612, 936], long: [612, 936],
+  };
+  const [pw, ph] = PAGE_POINTS[paperSize] ?? PAGE_POINTS.a3;
+  const printable = (orientation === "landscape" ? Math.max(pw, ph) : Math.min(pw, ph)) - pageMargin * 2;
+  const naturalWidths = Array.from({ length: colCount }, (_, c) => (grid.colWidths[c] ?? 100) * 0.75);
+  const naturalTotal = naturalWidths.reduce((sum, w) => sum + w, 0);
+  const fit = naturalTotal > printable ? printable / naturalTotal : 1;
+  const columnWidths = naturalWidths.map(w => w * fit);
   return {
     pageSize: PDFMAKE_PAGE_SIZE[paperSize] ?? "A3",
     pageOrientation: orientation,
     pageMargins: [pageMargin, pageMargin, pageMargin, pageMargin] as [number, number, number, number],
     content: [
       {
-        table: { headerRows: 0, widths: Array(colCount).fill("*"), body },
+        table: { headerRows: 0, widths: columnWidths, body },
         layout: {
           defaultBorder: true,
-          hLineWidth: (i: number) => hWidth[i] ?? 0.75,
-          vLineWidth: (i: number) => vWidth[i] ?? 0.75,
+          hLineWidth: (i: number) => hWidth[i] ?? 0,
+          vLineWidth: (i: number) => vWidth[i] ?? 0,
           hLineColor: (i: number, _node: unknown, col: number) => hColor.get(`${i}:${col}`) ?? DEFAULT_COLOR,
           vLineColor: (i: number, _node: unknown, row: number) => vColor.get(`${i}:${row}`) ?? DEFAULT_COLOR,
           paddingLeft: () => 4, paddingRight: () => 4, paddingTop: () => 3, paddingBottom: () => 3,
@@ -141,6 +155,14 @@ export function buildIPCRPdfDocDefinition(
     ],
     defaultStyle: { fontSize: 8 },
   };
+}
+
+export function getIPCRPdfBlob(
+  grid: IPCRGridData,
+  paperSize: IPCRPaperSize = "a3",
+  orientation: IPCROrientation = "landscape",
+): Promise<Blob> {
+  return pdfMake.createPdf(buildIPCRPdfDocDefinition(grid, paperSize, orientation)).getBlob();
 }
 
 export function downloadIPCRPdf(

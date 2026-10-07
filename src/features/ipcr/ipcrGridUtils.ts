@@ -49,6 +49,22 @@ export interface ParsedCellStyle {
   borderRight?: string;
 }
 
+// jspreadsheet reads styles back through the browser, which normalizes "#dbe5f1" to
+// "rgb(219, 229, 241)" — pdfmake and the .xlsx writer only understand hex, so an unconverted
+// rgb() fill rendered as solid black in the PDF. Everything that consumes cell styles goes
+// through parseCellStyle, so normalizing there fixes fills, text color and borders at once.
+const rgbColorPattern = /rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*(?:,\s*([\d.]+)\s*)?\)/gi;
+
+function rgbToHex(_match: string, r: string, g: string, b: string, alpha?: string): string {
+  if (alpha !== undefined && Number(alpha) === 0) return "transparent";
+  const hex = [r, g, b].map(part => Math.min(255, Number(part)).toString(16).padStart(2, "0")).join("");
+  return `#${hex}`;
+}
+
+export function normalizeCssColors(value: string): string {
+  return value.replace(rgbColorPattern, rgbToHex);
+}
+
 export function parseCellStyle(style: string | undefined): ParsedCellStyle {
   const parsed: ParsedCellStyle = { bold: false, italic: false, underline: false };
   if (!style) return parsed;
@@ -60,16 +76,16 @@ export function parseCellStyle(style: string | undefined): ParsedCellStyle {
     if (key === "font-weight" && (value === "bold" || Number(value) >= 600)) parsed.bold = true;
     else if (key === "font-style" && value === "italic") parsed.italic = true;
     else if (key === "text-decoration" && value.includes("underline")) parsed.underline = true;
-    else if (key === "color") parsed.color = value;
-    else if (key === "background-color") parsed.backgroundColor = value;
+    else if (key === "color") { const color = normalizeCssColors(value); if (color !== "transparent") parsed.color = color; }
+    else if (key === "background-color") { const color = normalizeCssColors(value); if (color !== "transparent") parsed.backgroundColor = color; }
     else if (key === "text-align") parsed.align = value as ParsedCellStyle["align"];
     else if (key === "vertical-align") parsed.valign = value === "middle" ? "middle" : value === "bottom" ? "bottom" : "top";
     else if (key === "font-family") parsed.fontFamily = value.replace(/^["']|["']$/g, "");
     else if (key === "font-size") { const size = parseFloat(value); if (!Number.isNaN(size)) parsed.fontSize = size; }
-    else if (key === "border-top") parsed.borderTop = value;
-    else if (key === "border-bottom") parsed.borderBottom = value;
-    else if (key === "border-left") parsed.borderLeft = value;
-    else if (key === "border-right") parsed.borderRight = value;
+    else if (key === "border-top") parsed.borderTop = normalizeCssColors(value);
+    else if (key === "border-bottom") parsed.borderBottom = normalizeCssColors(value);
+    else if (key === "border-left") parsed.borderLeft = normalizeCssColors(value);
+    else if (key === "border-right") parsed.borderRight = normalizeCssColors(value);
   }
   return parsed;
 }

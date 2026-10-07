@@ -224,7 +224,7 @@ export default function GenerateIPCRContent() {
                 <div className="etm-ipcr-preview-actions">
                   <button type="button" className="etm-button ghost small" onClick={() => { setTestPreview(true); setTestRefreshKey(key => key + 1); }}><Eye size={14} /> {testPreview ? "Update test preview" : "Test with these values"}</button>
                 </div>
-                {testPreview && <IPCRLivePreview grid={grid} fields={fields} values={values} refreshKey={testRefreshKey} />}
+                {testPreview && <IPCRLivePreview grid={grid} fields={fields} values={values} paperSize={paperSize} orientation={orientation} refreshKey={testRefreshKey} />}
               </div>
             </>}
 
@@ -248,7 +248,7 @@ export default function GenerateIPCRContent() {
             <button type="button" className="etm-button ghost small" onClick={() => void downloadIPCRWorkbook(fillGrid(normalizeGrid(preview.grid_snapshot), preview.fields_snapshot, preview.field_values), filename(preview))}><Download size={14} /> Download .xlsx</button>
             <button type="button" className="etm-button ghost small" onClick={() => downloadIPCRPdf(fillGrid(normalizeGrid(preview.grid_snapshot), preview.fields_snapshot, preview.field_values), filename(preview), preview.paper_size, preview.orientation)}><FileText size={14} /> Download PDF</button>
           </div>
-          <IPCRLivePreview grid={normalizeGrid(preview.grid_snapshot)} fields={preview.fields_snapshot} values={preview.field_values} refreshKey={`${preview.id}-${preview.updated_at}`} />
+          <IPCRLivePreview grid={normalizeGrid(preview.grid_snapshot)} fields={preview.fields_snapshot} values={preview.field_values} paperSize={preview.paper_size} orientation={preview.orientation} refreshKey={`${preview.id}-${preview.updated_at}`} />
         </section>
       )}
     </div>

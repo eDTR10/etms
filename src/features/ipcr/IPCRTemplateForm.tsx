@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import {
   AlignCenter, AlignLeft, AlignRight, ArrowDownToLine, ArrowLeftToLine, ArrowRightToLine, ArrowUpToLine,
   Baseline, Bold, Combine, Eraser, Eye, FileUp, ImagePlus, Italic, Loader2,
-  MousePointerClick, PaintBucket, RefreshCw, Search, Square, Trash2, Type, Underline, Undo2, Redo2, Ungroup, X, ZoomIn, ZoomOut,
+  MousePointerClick, PaintBucket, RefreshCw, Search, Square, Trash2, Underline, Undo2, Redo2, Ungroup, X, ZoomIn, ZoomOut,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import ThemedSelect, { type SelectOption } from "../../components/ThemedSelect";
@@ -10,14 +10,13 @@ import { taskService, taskError } from "../tasks/taskService";
 import type { GroupedTask } from "../tasks/types";
 import IPCRGrid, { type IPCRBorderKind, type IPCRGridHandle } from "./IPCRGrid";
 import IPCRGridImageOverlay from "./IPCRGridImageOverlay";
-import IPCRGridRichTextOverlay from "./IPCRGridRichTextOverlay";
+
 import IPCRFillForm from "./IPCRFillForm";
 import IPCRLivePreview from "./IPCRLivePreview";
-import IPCRRichTextField from "./IPCRRichTextField";
-import { composeGroupedTasksHtml, flattenRuns, htmlToRuns, parseCellStyle, runsNeedRichText, runsToHtml } from "./ipcrGridUtils";
+import { composeGroupedTasksHtml, parseCellStyle } from "./ipcrGridUtils";
 import { parseIPCRWorkbookFile } from "./ipcrExport";
 import { buildIPCRPdfDocDefinition } from "./ipcrPdfExport";
-import { emptyGrid, fieldToken, slugifyKey, PAPER_SIZE_OPTIONS, type IPCRField, type IPCRFieldMetaEntry, type IPCRFieldType, type IPCRFieldValue, type IPCRGridData, type IPCRGridImage, type IPCROrientation, type IPCRPaperSize, type IPCRRichTextRun, type IPCRTemplate, type IPCRTemplateInput } from "./types";
+import { emptyGrid, fieldToken, slugifyKey, PAPER_SIZE_OPTIONS, type IPCRField, type IPCRFieldMetaEntry, type IPCRFieldType, type IPCRFieldValue, type IPCRGridData, type IPCRGridImage, type IPCROrientation, type IPCRPaperSize, type IPCRTemplate, type IPCRTemplateInput } from "./types";
 import pdfMake from "pdfmake/build/pdfmake";
 
 const MAX_IMAGE_BYTES = 1.5 * 1024 * 1024;
@@ -74,9 +73,6 @@ export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTem
   const [name, setName] = useState(template?.name ?? "");
   const [fields, setFields] = useState<IPCRField[]>(template?.fields_config ?? []);
   const [images, setImages] = useState<IPCRGridImage[]>(template?.grid.images ?? []);
-  const [richText, setRichText] = useState<Record<string, IPCRRichTextRun[]>>(template?.grid.richText ?? {});
-  const [richTextModalOpen, setRichTextModalOpen] = useState(false);
-  const [richTextDraft, setRichTextDraft] = useState("");
   const [paperSize, setPaperSize] = useState<IPCRPaperSize>(template?.paper_size ?? "a3");
   const [orientation, setOrientation] = useState<IPCROrientation>(template?.orientation ?? "landscape");
   // Set only after an .xlsx import — bumping `seed` forces IPCRGrid (a mount-once, imperative
@@ -116,30 +112,23 @@ export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTem
 
   function refreshTest() {
     const snapshot = gridRef.current?.getSnapshot() ?? emptyGrid();
-    setTestGrid({ ...snapshot, images, richText });
+    setTestGrid({ ...snapshot, images });
     setTestRefreshKey(key => key + 1);
   }
 
-  function openRichTextEditor() {
-    if (!selectedCell) return;
-    const existing = richText[selectedCell];
-    const seed = existing ? runsToHtml(existing) : runsToHtml([{ text: gridRef.current?.getCellValue(selectedCell) ?? "" }]);
-    setRichTextDraft(seed);
-    setRichTextModalOpen(true);
+  // While a cell is open for editing (double-click / F2 / just start typing), B/I/U format only the
+  // words selected inside it; otherwise they style the whole selected cell(s).
+  // The sheet closes its open cell editor on any mousedown outside the cell (a document-level
+  // listener). Toolbar B/I/U must not trigger that, or the selected words lose their selection and
+  // formatting falls back to the whole cell — so keep focus in the cell and stop the event here.
+  function keepCellEditing(event: React.MouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
   }
 
-  function applyRichText() {
-    if (!selectedCell) return;
-    const runs = htmlToRuns(richTextDraft);
-    setRichText(current => {
-      const next = { ...current };
-      if (runsNeedRichText(runs)) next[selectedCell] = runs; else delete next[selectedCell];
-      return next;
-    });
-    // Keep the underlying plain cell in sync — it's what the grid itself renders/edits, and the
-    // fallback if the richText overlay/export path is ever bypassed.
-    gridRef.current?.setCellValue(selectedCell, flattenRuns(runs));
-    setRichTextModalOpen(false);
+  function formatText(command: "bold" | "italic" | "underline", property: "font-weight" | "font-style" | "text-decoration", value: string) {
+    if (gridRef.current?.isEditing()) gridRef.current.formatSelection(command);
+    else runStyleAction(() => gridRef.current?.toggleStyle(property, value));
   }
 
   function openTest() {
@@ -172,7 +161,6 @@ export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTem
     try {
       const parsed = await parseIPCRWorkbookFile(file);
       setImportedGrid(current => ({ seed: (current?.seed ?? 0) + 1, data: parsed }));
-      setRichText(parsed.richText ?? {});
       setSelectedCell(null);
       setFormulaValue("");
       setSelectedStyle("");
@@ -185,6 +173,9 @@ export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTem
 
   function commitFormulaBar() {
     if (!selectedCell) return;
+    // Only when the text was actually changed here — re-saving an unchanged value would flatten
+    // the cell's word-level bold/italic/underline.
+    if (gridRef.current?.getCellValue(selectedCell) === formulaValue) return;
     gridRef.current?.setCellValue(selectedCell, formulaValue);
   }
 
@@ -200,7 +191,6 @@ export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTem
     if (!result.isConfirmed) return;
     setImportedGrid(current => ({ seed: (current?.seed ?? 0) + 1, data: emptyGrid() }));
     setImages([]);
-    setRichText({});
     setSelectedCell(null);
     setFormulaValue("");
     setSelectedStyle("");
@@ -268,7 +258,7 @@ export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTem
     setPreviewing(true);
     try {
       const snapshot = gridRef.current?.getSnapshot() ?? emptyGrid();
-      const blob = await pdfMake.createPdf(buildIPCRPdfDocDefinition({ ...snapshot, images, richText }, paperSize, orientation)).getBlob();
+      const blob = await pdfMake.createPdf(buildIPCRPdfDocDefinition({ ...snapshot, images }, paperSize, orientation)).getBlob();
       const url = URL.createObjectURL(blob);
       setPreviewUrl(url);
     } catch {
@@ -288,7 +278,7 @@ export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTem
     setError("");
     try {
       const snapshot = gridRef.current?.getSnapshot() ?? emptyGrid();
-      await onSave({ name: name.trim(), grid: { ...snapshot, images, richText }, fields_config: fields, paper_size: paperSize, orientation });
+      await onSave({ name: name.trim(), grid: { ...snapshot, images }, fields_config: fields, paper_size: paperSize, orientation });
     } catch (caught) {
       setError(taskError(caught));
     } finally {
@@ -360,29 +350,7 @@ export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTem
                 <IPCRFillForm fields={fields} values={testValues} meta={testMeta} groups={testGroups} onUpdateValue={updateTestValue} onToggleGroupTag={toggleTestGroupTag} />
                 <button type="button" className="etm-button primary small" style={{ marginTop: 10 }} onClick={refreshTest}><RefreshCw size={14} /> Refresh preview</button>
               </div>
-              <div>{testGrid && <IPCRLivePreview grid={testGrid} fields={fields} values={testValues} refreshKey={testRefreshKey} />}</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Rich text editing modal — for cells like "I, NAME, TITLE of OFFICE, commit to..." where
-          only part of the text is bold/underlined, which the grid's one-style-per-cell model
-          can't represent directly. */}
-      {richTextModalOpen && selectedCell && (
-        <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-xl w-full max-w-lg flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
-              <p className="text-sm font-semibold text-foreground">Mixed formatting — cell {selectedCell}</p>
-              <button type="button" onClick={() => setRichTextModalOpen(false)} className="p-1 rounded hover:bg-accent" title="Close"><X className="w-4 h-4 text-muted-foreground" /></button>
-            </div>
-            <div className="p-4">
-              <p className="text-xs text-muted-foreground mb-2">Select part of the text and bold/underline just that part — e.g. a name inside a sentence.</p>
-              <IPCRRichTextField value={richTextDraft} onChange={setRichTextDraft} placeholder="Cell text" />
-            </div>
-            <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border">
-              <button type="button" className="etm-button ghost small" onClick={() => setRichTextModalOpen(false)}>Cancel</button>
-              <button type="button" className="etm-button primary small" onClick={applyRichText}>Apply</button>
+              <div>{testGrid && <IPCRLivePreview grid={testGrid} fields={fields} values={testValues} paperSize={paperSize} orientation={orientation} refreshKey={testRefreshKey} />}</div>
             </div>
           </div>
         </div>
@@ -401,6 +369,7 @@ export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTem
         <div className="shrink-0" style={{ width: 92 }} title="Paper size — used when generating a PDF">
           <ThemedSelect<SelectOption<IPCRPaperSize>>
             size="mini"
+            portal
             classNamePrefix="etm-papersize-select"
             isSearchable={false}
             options={PAPER_SIZE_OPTIONS.map(option => ({ value: option.value, label: option.label }))}
@@ -419,6 +388,7 @@ export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTem
         <div className="shrink-0" style={{ width: 120, opacity: sel ? 1 : 0.4 }} title="Font family — applies on screen and in the .xlsx export; PDF export uses a fixed font">
           <ThemedSelect<SelectOption<string>>
             size="mini"
+            portal
             classNamePrefix="etm-fontfamily-select"
             isSearchable={false}
             isDisabled={!sel}
@@ -432,10 +402,9 @@ export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTem
           className="w-12 text-[11px] border border-border rounded px-1.5 bg-background h-6 shrink-0 disabled:opacity-40" title="Font size (px)" />
         <div className="w-px h-4 bg-border mx-1 shrink-0" />
 
-        <button type="button" disabled={!sel} onClick={() => runStyleAction(() => gridRef.current?.toggleStyle("font-weight", "bold"))} className={tbActive(currentStyle.bold)} title="Bold"><Bold className="w-3.5 h-3.5" /></button>
-        <button type="button" disabled={!sel} onClick={() => runStyleAction(() => gridRef.current?.toggleStyle("font-style", "italic"))} className={tbActive(currentStyle.italic)} title="Italic"><Italic className="w-3.5 h-3.5" /></button>
-        <button type="button" disabled={!sel} onClick={() => runStyleAction(() => gridRef.current?.toggleStyle("text-decoration", "underline"))} className={tbActive(currentStyle.underline)} title="Underline"><Underline className="w-3.5 h-3.5" /></button>
-        <button type="button" disabled={!sel} onClick={openRichTextEditor} className={tbActive(!!richText[selectedCell ?? ""])} title="Mixed formatting within this cell — bold/underline just part of the text (e.g. a name inside a sentence)"><Type className="w-3.5 h-3.5" /></button>
+        <button type="button" disabled={!sel} onMouseDown={keepCellEditing} onClick={() => formatText("bold", "font-weight", "bold")} className={tbActive(currentStyle.bold)} title="Bold (Ctrl+B)"><Bold className="w-3.5 h-3.5" /></button>
+        <button type="button" disabled={!sel} onMouseDown={keepCellEditing} onClick={() => formatText("italic", "font-style", "italic")} className={tbActive(currentStyle.italic)} title="Italic (Ctrl+I)"><Italic className="w-3.5 h-3.5" /></button>
+        <button type="button" disabled={!sel} onMouseDown={keepCellEditing} onClick={() => formatText("underline", "text-decoration", "underline")} className={tbActive(currentStyle.underline)} title="Underline (Ctrl+U)"><Underline className="w-3.5 h-3.5" /></button>
         <label className={`${tb} relative cursor-pointer ${!sel ? "opacity-30 pointer-events-none" : ""}`} title="Text color">
           <Baseline className="w-3.5 h-3.5" />
           <span className="absolute bottom-0.5 left-1 right-1 h-[3px] rounded-sm" style={{ backgroundColor: currentStyle.color || "#000000" }} />
@@ -459,6 +428,7 @@ export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTem
         <div className="shrink-0" style={{ width: 74, opacity: sel ? 1 : 0.4 }} title="Vertical alignment">
           <ThemedSelect<SelectOption<"top" | "middle" | "bottom">>
             size="mini"
+            portal
             classNamePrefix="etm-valign-select"
             isSearchable={false}
             isDisabled={!sel}
@@ -474,6 +444,7 @@ export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTem
         <div className="shrink-0" style={{ width: 96, opacity: sel ? 1 : 0.4 }} title="Apply borders to the selection">
           <ThemedSelect<SelectOption<IPCRBorderKind>>
             size="mini"
+            portal
             classNamePrefix="etm-border-select"
             isSearchable={false}
             isDisabled={!sel}
@@ -545,11 +516,6 @@ export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTem
                 onDimensionsChange={setDims}
               />
               <IPCRGridImageOverlay images={images} editable onChange={setImages} />
-              <IPCRGridRichTextOverlay
-                grid={{ ...(importedGrid?.data ?? template?.grid ?? emptyGrid()), richText }}
-                gridRef={gridRef}
-                refreshKey={`${zoom}-${dims.rows}-${dims.cols}`}
-              />
             </div>
           </div>
         </div>
