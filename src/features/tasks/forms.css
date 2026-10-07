@@ -654,3 +654,29 @@ a.etm-task-links-text:hover strong { color: var(--etm-primary); text-decoration:
 .etm-subtask-date { min-height: 33px; padding: 4px 9px; border: 1px solid var(--etm-border); border-radius: 7px; background: var(--etm-surface); color: var(--etm-ink); font: inherit; font-size: 13px; }
 .etm-subtask-date:focus { outline: none; border-color: var(--etm-primary); box-shadow: 0 0 0 3px #087e8b12; }
 .etm-subtask-meta-item.has-value .etm-subtask-date { border-color: color-mix(in srgb, var(--etm-primary) 45%, var(--etm-border)); color: var(--etm-primary); font-weight: 600; }
+
+/* "Create or link a document" popover: hangs under its icon, over the content below, instead of sitting inside the actions row. */
+.etm-doc-popover-anchor { position: relative; display: inline-flex; }
+.etm-doc-popover { position: absolute; top: calc(100% + 8px); right: 0; z-index: 30; width: 290px; max-width: calc(100vw - 32px); border: 1px solid var(--etm-border); border-radius: 12px; background: var(--etm-surface); box-shadow: var(--etm-shadow, 0 14px 34px rgba(0, 0, 0, .35)); text-align: left; }
+.etm-doc-popover .etm-field input { min-width: 0; flex: 1; }
+
+/* Remark footer on small screens: the time/author line first, the Reply / Edit / Delete actions on their own line beneath,
+   never squeezed into a column that breaks the words letter by letter. */
+.etm-remark-chip-footer { flex-wrap: wrap; row-gap: 5px; }
+.etm-remark-chip-actions { flex-wrap: wrap; row-gap: 4px; }
+.etm-remark-chip-actions .etm-inline-link-button, .etm-remark-chip-actions button { white-space: nowrap; word-break: normal; overflow-wrap: normal; }
+@media (max-width: 640px) {
+  .etm-remark-chip-meta { flex: 1 1 100%; }
+  .etm-remark-chip-actions { flex: 1 1 100%; justify-content: flex-start; gap: 14px; }
+}
+
+/* Editing a remark on a narrow screen: nothing may be wider than the card (it used to push the Save button off-screen),
+   so the editor shrinks to fit and the status / Cancel / Save row wraps onto a second line when it has to. */
+.etm-progress-edit { grid-template-columns: minmax(0, 1fr); min-width: 0; max-width: 100%; }
+.etm-remark-chip, .etm-remark-item, .etm-remark-timeline-content, .etm-remark-chips, .etm-remarks { min-width: 0; max-width: 100%; }
+.etm-progress-edit .etm-rich-text, .etm-remark-form .etm-rich-text { max-width: 100%; min-width: 0; }
+.etm-progress-edit-actions, .etm-remark-form-actions { flex-wrap: wrap; }
+.etm-progress-edit-actions > div[style*="width"], .etm-remark-form-actions > div[style*="width"] { width: auto !important; flex: 1 1 150px; min-width: 130px; }
+@media (max-width: 640px) {
+  .etm-progress-edit-actions > .etm-button, .etm-remark-form-actions > .etm-button { flex: 1 1 auto; justify-content: center; }
+}
