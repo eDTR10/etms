@@ -1325,6 +1325,22 @@ function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = 
         : <Dialog.Description asChild><div className="etm-details-description">{detailsToText(task.details) ? <RichDetails value={task.details} /> : "No description provided."}</div></Dialog.Description>}
       <div className="etm-details-badges"><span className={`etm-badge ${statusSlug(task.status)}`}><span className="etm-details-status-dot" />{task.status}</span><span className={`etm-details-priority ${task.priority.toLowerCase()}`}><Flag size={13} />{task.priority} priority</span>{task.recurrence !== "None" && <span className="etm-badge"><Repeat size={13} />{describeRecurrence(task)}</span>}</div>
       {task.late_submission_blocked && !task.is_completed && <p className="etm-details-assignee-note" role="alert"><AlertTriangle size={14} />The deadline has passed and this task does not allow late submission — only the task owner can complete it now.</p>}
+      {(task.completed_at || task.occurrence_completions.some(item => item.is_completed)) && (
+        <div className="etm-details-completed-note" role="note">
+          <CheckCheck size={14} />
+          <div>
+            {task.is_completed && task.completed_at && <p><strong>Completed on {formatDate(task.completed_at, true)}</strong></p>}
+            {task.occurrence_completions.some(item => item.is_completed) && (
+              <p>
+                <strong>Completed dates:</strong>{" "}
+                {[...task.occurrence_completions].filter(item => item.is_completed).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6)
+                  .map(item => `${formatDate(item.date)}${item.completed_at ? ` (done ${formatDate(item.completed_at, true)}${item.completed_by_name ? ` by ${item.completed_by_name}` : ""})` : ""}`).join(" · ")}
+                {task.occurrence_completions.filter(item => item.is_completed).length > 6 ? ` · +${task.occurrence_completions.filter(item => item.is_completed).length - 6} earlier` : ""}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
       {task.my_role === "Assignee" && <p className="etm-details-assignee-note" role="note"><Users size={14} />You can see this whole task, but you can only work on the subtask{task.subtasks.some(item => item.can_complete && item.assignee) ? "s" : ""} assigned to you. The others are read-only.</p>}
       {task.can_edit && onComplete && !task.is_completed && <button type="button" className={`etm-button primary small etm-details-complete ${page ? "page" : ""}`} onClick={() => void markComplete()} disabled={completing}>{completing ? <Loader2 size={14} className="etm-form-spinner" /> : <CheckCheck size={14} />}Mark as complete</button>}
       {task.revert_turnover_to && !task.is_completed && (
@@ -1367,6 +1383,7 @@ function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = 
             <div><dt><Folder size={15} />Project</dt><dd>{task.project ? task.project.name : <span className="etm-details-personal-tag"><User size={12} />Personal task</span>}</dd></div>
             <div><dt><CalendarDays size={15} />Deadline</dt><dd className={isOverdue(task) ? "etm-details-overdue" : ""}>{formatDate(task.deadline)}{isOverdue(task) && <span>Overdue</span>}</dd></div>
             <div><dt><CalendarDays size={15} />Created</dt><dd>{formatDate(task.created_at, true)}</dd></div>
+            {task.is_completed && task.completed_at && <div><dt><CheckCheck size={15} />Completed</dt><dd>{formatDate(task.completed_at, true)}</dd></div>}
             <div><dt><User size={15} />Created by</dt><dd>{task.created_by_name || "Unknown"}</dd></div>
             <div><dt><Clock3 size={15} />Last progress update</dt><dd>{task.latest_progress_at ? formatDate(task.latest_progress_at, true) : "No updates yet"}</dd></div>
             <div><dt><Users size={15} />Assigned persons</dt><dd>{task.assignments.length ? <div className="etm-details-people">{task.assignments.map(person => <span className="etm-details-person" key={person.id}><span aria-hidden="true">{person.first_name?.charAt(0)}{person.last_name?.charAt(0)}</span>{memberName(person)}<span className="etm-details-person-role">{person.role}</span></span>)}</div> : <span className="etm-details-unassigned">Unassigned</span>}</dd></div>

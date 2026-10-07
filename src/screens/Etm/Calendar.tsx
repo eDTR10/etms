@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import { ChevronLeft, ChevronRight, Repeat, Search, User, X } from "lucide-react";
@@ -51,6 +51,13 @@ export default function Calendar({ basePath = "/etms/tasks", showOwner = false }
   const [projectFilter, setProjectFilter] = useState<ProjectFilterValue>("all");
   const [viewDate, setViewDate] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const dayListRef = useRef<HTMLDivElement>(null);
+  // Tapping a date smoothly brings the list of that day's tasks (below the grid) into view.
+  useEffect(() => {
+    if (!selectedDate) return;
+    const frame = requestAnimationFrame(() => dayListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    return () => cancelAnimationFrame(frame);
+  }, [selectedDate]);
 
   const hasActiveFilters = !!search.trim() || priority !== "all" || projectFilter !== "all";
   const clearFilters = () => { setSearch(""); setPriority("all"); setProjectFilter("all"); };
@@ -214,7 +221,7 @@ export default function Calendar({ basePath = "/etms/tasks", showOwner = false }
       </div>
 
       {selectedDate && (
-        <div className="etm-panel etm-calendar-daylist">
+        <div className="etm-panel etm-calendar-daylist" ref={dayListRef} style={{ scrollMarginTop: 16 }}>
           <div className="etm-calendar-daylist-header">
             <h3>Tasks due {selectedDateLabel}</h3>
             <button type="button" className="etm-icon-button" aria-label="Close" onClick={() => setSelectedDate(null)}><X size={15} /></button>

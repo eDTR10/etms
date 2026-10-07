@@ -638,3 +638,7 @@ a.etm-task-links-text:hover strong { color: var(--etm-primary); text-decoration:
 .etm-status-pick-chip { padding: 7px 14px; border: 1px solid var(--etm-border); border-radius: 999px; background: var(--etm-surface-alt); color: var(--etm-ink); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .etm-status-pick-chip:hover { border-color: var(--etm-primary); }
 .etm-status-pick-chip.active { border-color: var(--etm-primary); background: var(--etm-primary); color: #fff; }
+
+.etm-details-completed-note { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; padding: 8px 12px; border: 1px solid color-mix(in srgb, #3e9276 45%, transparent); border-radius: 10px; background: color-mix(in srgb, #3e9276 12%, transparent); color: var(--etm-ink); font-size: 12.5px; line-height: 1.5; }
+.etm-details-completed-note > svg { margin-top: 2px; color: #3e9276; flex: 0 0 auto; }
+.etm-details-completed-note p { margin: 0; }

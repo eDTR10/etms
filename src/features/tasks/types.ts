@@ -10,6 +10,8 @@ export type Recurrence = "None" | "Daily" | "Weekly" | "Monthly" | "Specific" | 
 export interface OccurrenceCompletion {
   date: string;
   is_completed: boolean;
+  completed_at?: string | null;
+  completed_by_name?: string | null;
 }
 
 export interface Member {
@@ -193,6 +195,8 @@ export interface Task {
   occurrence_completions: OccurrenceCompletion[];
   status: TaskStatus;
   is_completed: boolean;
+  // When the task as a whole was completed.
+  completed_at?: string | null;
   is_archived: boolean;
   completion_seen: boolean;
   is_creator: boolean;
