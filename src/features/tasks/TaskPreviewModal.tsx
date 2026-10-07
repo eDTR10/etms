@@ -1,6 +1,7 @@
 import { CalendarDays, CheckCircle2, Circle, ExternalLink, Flag, Folder, Users } from "lucide-react";
 import Modal from "../../components/ui/modal";
 import { detailsToText, RichDetails } from "./richDetails";
+import { roleLabel } from "./types";
 import { flattenSubtasks, formatDate, formatTaskNumber, memberName, statusSlug, stripHtml, type SubTask, type Task } from "./types";
 
 // Read-only look at everything recorded on a task — used where the user only needs to
@@ -72,7 +73,7 @@ export default function TaskPreviewModal({ task, onClose, onOpenFull }: { task: 
           {task.requestor && <Field icon={<Users size={13} />} label="Requestor">{task.requestor}</Field>}
           {location && <Field icon={<Folder size={13} />} label="Location">{location}</Field>}
           <Field icon={<Users size={13} />} label="Assigned persons">
-            {task.assignments.length ? task.assignments.map(person => `${memberName(person)} (${person.role})`).join(", ") : "Unassigned"}
+            {task.assignments.length ? task.assignments.map(person => `${memberName(person)} (${roleLabel(person.role)})`).join(", ") : "Unassigned"}
           </Field>
         </dl>
 

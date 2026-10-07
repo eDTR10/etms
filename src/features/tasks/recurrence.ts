@@ -60,8 +60,11 @@ export function getOccurrenceDates(task: RecurrenceLike, rangeStart: Date, range
     });
   }
 
-  if (!task.deadline) return [];
-  const anchor = parseDateOnlyKey(task.deadline);
+  // A repeating task with no deadline counts from the day it was created (today, while it is still being made).
+  const repeatsOnSchedule = task.recurrence === "Daily" || task.recurrence === "Weekly" || task.recurrence === "Monthly";
+  const startKey = task.deadline ?? (repeatsOnSchedule ? (("created_at" in task && typeof task.created_at === "string" && task.created_at) ? task.created_at.slice(0, 10) : dateOnlyKey(today)) : null);
+  if (!startKey) return [];
+  const anchor = parseDateOnlyKey(startKey);
   if (clampedEnd < rangeStart) return [];
 
   if (task.recurrence === "Daily") {

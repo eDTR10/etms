@@ -60,6 +60,9 @@ function readImageFile(file: Blob): Promise<string> {
 
 interface IPCRTemplateFormProps {
   template?: IPCRTemplate;
+  // The same sheet editor, opened on someone's own generated IPCR instead of an admin template: no field
+  // marking or sample document, only editing the sheet and dragging in their grouped activities.
+  submissionMode?: boolean;
   onSave: (input: IPCRTemplateInput, sample: IPCRTemplateSampleChange) => Promise<void>;
   onCancel: () => void;
 }
@@ -75,7 +78,7 @@ const FIELD_TYPE_LABEL: Record<IPCRFieldType, string> = {
   grouped_tasks: "Grouped Tasks (tag activities as evidence)",
 };
 
-export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTemplateFormProps) {
+export default function IPCRTemplateForm({ template, onSave, onCancel, submissionMode = false }: IPCRTemplateFormProps) {
   const gridRef = useRef<IPCRGridHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sampleInputRef = useRef<HTMLInputElement>(null);
@@ -787,7 +790,7 @@ export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTem
   async function handleSave() {
     if (saving) return;
     if (!name.trim()) {
-      setError("Give this template a name.");
+      setError(submissionMode ? "Give this IPCR a file name." : "Give this template a name.");
       return;
     }
     setSaving(true);
@@ -813,16 +816,16 @@ export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTem
     <div className="fixed inset-0 z-50 flex flex-col bg-background select-none">
       {/* Header */}
       <div className="h-11 border-b border-border bg-card flex items-center px-3 gap-2 shrink-0">
-        <button type="button" onClick={onCancel} className={tb} title="Close designer"><X className="w-4 h-4" /></button>
+        <button type="button" onClick={onCancel} className={tb} title={submissionMode ? "Back to Generate IPCR" : "Close designer"}><X className="w-4 h-4" /></button>
         <div className="min-w-0 flex-1">
           <input
             value={name}
             onChange={event => setName(event.target.value)}
-            placeholder="Template name"
+            placeholder={submissionMode ? "File name" : "Template name"}
             maxLength={255}
             className="text-sm font-semibold text-foreground bg-transparent border-0 outline-none w-full truncate p-0"
           />
-          <p className="text-[10px] text-muted-foreground leading-tight">IPCR Template Designer</p>
+          <p className="text-[10px] text-muted-foreground leading-tight">{submissionMode ? "Editing your IPCR — drag your grouped activities into the sheet" : "IPCR Template Designer"}</p>
         </div>
         {error && <span className="text-[11px] text-destructive shrink-0">{error}</span>}
         <button type="button" onClick={() => void handleReset()} disabled={saving}
@@ -848,7 +851,7 @@ export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTem
               <ArrowLeft className="w-3.5 h-3.5" />Back
             </button>
             <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm min-w-0">
-              <span className="text-muted-foreground shrink-0">IPCR Templates</span>
+              <span className="text-muted-foreground shrink-0">{submissionMode ? "Generate IPCR" : "IPCR Templates"}</span>
               <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
               <button type="button" onClick={closePreview} className="text-muted-foreground hover:text-foreground hover:underline truncate max-w-[40vw]" title="Back to the designer">
                 {name.trim() || "Untitled template"}
@@ -1131,6 +1134,7 @@ export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTem
 
         {/* Fill-in fields sidebar */}
         <div className="w-64 border-l border-border bg-card flex flex-col shrink-0">
+          {!submissionMode && <>
           <div className="p-3 border-b border-border">
             <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Fill-in fields</p>
             {/* onMouseDown keeps focus (and the text highlight) in the cell editor when this is clicked. */}
@@ -1209,8 +1213,9 @@ export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTem
               </div>
             );
           })()}
-          <div className="border-b border-border p-2 max-h-[45%] overflow-y-auto shrink-0">
-            <p className="flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 px-1"><Layers className="w-3 h-3" /> Grouped tasks</p>
+          </>}
+          <div className={`border-b border-border p-2 overflow-y-auto ${submissionMode ? "flex-1" : "max-h-[45%] shrink-0"}`}>
+            <p className="flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 px-1"><Layers className="w-3 h-3" /> {submissionMode ? "Your grouped activities" : "Grouped tasks"}</p>
             {groupsLoading ? <p className="text-xs text-muted-foreground px-1 py-1">Loading…</p>
               : testGroups.length === 0 ? <p className="text-xs text-muted-foreground px-1 py-1">No grouped tasks yet. Create some in Task Grouping.</p>
               : <div className="flex flex-col gap-1">
@@ -1248,6 +1253,7 @@ export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTem
                 })}
               </div>}
           </div>
+          {!submissionMode && <>
           <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-1">
             {fields.length > 4 && (
               <div className="relative mb-1">
@@ -1361,6 +1367,7 @@ export default function IPCRTemplateForm({ template, onSave, onCancel }: IPCRTem
             </button>
             <p className="text-[10px] text-muted-foreground leading-snug">PDF, Word, Excel or an image, up to 15 MB. Users can open it from the template.</p>
           </div>
+          </>}
           <div className="p-2 border-t border-border text-[10px] text-muted-foreground">
             {dims.rows} rows × {dims.cols} cols{images.length > 0 ? ` · ${images.length} image${images.length > 1 ? "s" : ""}` : ""}
           </div>

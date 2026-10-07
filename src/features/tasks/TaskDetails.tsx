@@ -128,7 +128,7 @@ function useSubtaskDragReorder(items: SubTask[], enabled: boolean, onReorder: (o
 // read as an assignment, not just "mentions the word subtask").
 const ACTIVITY_CATEGORIES: { test: (message: string) => boolean; label: string; color: string }[] = [
   { test: m => m === "Created this task" || m.startsWith("Created from subtask"), label: "Created", color: "#3e9276" },
-  { test: m => m.startsWith("Turned over"), label: "Turn over", color: "#7a6ad8" },
+  { test: m => m.startsWith("Turned over") || m.startsWith("Returned this task"), label: "Turn over", color: "#7a6ad8" },
   { test: m => m.startsWith("Assigned") || m.startsWith("Unassigned") || m.includes("role to") || m.includes("from the task"), label: "Assignment", color: "#5484bd" },
   { test: m => m === "Archived this task", label: "Archived", color: "#c0605a" },
   { test: m => m.startsWith("Duplicated from"), label: "Duplicated", color: "#8b7fd6" },
@@ -1324,6 +1324,7 @@ function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = 
         ? <div className="etm-details-description">{detailsToText(task.details) ? <RichDetails value={task.details} /> : "No description provided."}</div>
         : <Dialog.Description asChild><div className="etm-details-description">{detailsToText(task.details) ? <RichDetails value={task.details} /> : "No description provided."}</div></Dialog.Description>}
       <div className="etm-details-badges"><span className={`etm-badge ${statusSlug(task.status)}`}><span className="etm-details-status-dot" />{task.status}</span><span className={`etm-details-priority ${task.priority.toLowerCase()}`}><Flag size={13} />{task.priority} priority</span>{task.recurrence !== "None" && <span className="etm-badge"><Repeat size={13} />{describeRecurrence(task)}</span>}</div>
+      {task.late_submission_blocked && !task.is_completed && <p className="etm-details-assignee-note" role="alert"><AlertTriangle size={14} />The deadline has passed and this task does not allow late submission — only the task owner can complete it now.</p>}
       {task.my_role === "Assignee" && <p className="etm-details-assignee-note" role="note"><Users size={14} />You can see this whole task, but you can only work on the subtask{task.subtasks.some(item => item.can_complete && item.assignee) ? "s" : ""} assigned to you. The others are read-only.</p>}
       {task.can_edit && onComplete && !task.is_completed && <button type="button" className={`etm-button primary small etm-details-complete ${page ? "page" : ""}`} onClick={() => void markComplete()} disabled={completing}>{completing ? <Loader2 size={14} className="etm-form-spinner" /> : <CheckCheck size={14} />}Mark as complete</button>}
       {task.revert_turnover_to && !task.is_completed && (

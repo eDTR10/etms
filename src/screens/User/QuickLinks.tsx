@@ -144,7 +144,7 @@ export function QuickLinksContent() {
                     <span className="etm-quicklink-card-icon"><Icon size={19} /></span>
                     <span className="etm-quicklink-card-body">
                       <strong>{link.title}</strong>
-                      {link.description && <small>{link.description}</small>}
+                      {link.description && <small title={link.description}>{link.description}</small>}
                       <span className="etm-quicklink-card-url"><ExternalLink size={11} />{link.url.replace(/^https?:\/\//, "")}</span>
                     </span>
                   </a>

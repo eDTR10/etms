@@ -8,7 +8,7 @@ import { AlertTriangle, Bookmark, CalendarDays, Check, CheckCheck, ChevronDown, 
 import ThemedSelect, { type SelectOption } from "../../components/ThemedSelect";
 import { useTasks } from "./taskContext";
 import { taskError } from "./taskService";
-import { ASSIGNMENT_ROLES, EODB_COMPLIANCE, type EodbCompliance, formatDate, memberName, PRIORITIES, RECURRENCE_LABELS, RECURRENCES, STATUSES, type AssignmentInput, type AssignmentRole, type Member, type Priority, type Project, type TaskLinkInput, type Recurrence, type SubTask, type Task, type TaskInput, type TaskStatus, type TaskTemplate, type TemplateSubtask } from "./types";
+import { ASSIGNMENT_ROLES, roleLabel, EODB_COMPLIANCE, type EodbCompliance, formatDate, memberName, PRIORITIES, RECURRENCE_LABELS, RECURRENCES, STATUSES, type AssignmentInput, type AssignmentRole, type Member, type Priority, type Project, type TaskLinkInput, type Recurrence, type SubTask, type Task, type TaskInput, type TaskStatus, type TaskTemplate, type TemplateSubtask } from "./types";
 import { describeRecurrence, WEEKDAYS } from "./recurrence";
 import TaskLinksField from "./TaskLinksField";
 // import { REGION_X_BARANGAYS, REGION_X_CITIES, REGION_X_PROVINCES } from "./regionXLocations";  // only used by the hidden Location field
@@ -84,6 +84,7 @@ function initialValues(task?: Task): FormValues {
     priority: task?.priority ?? "Medium",
     deadline: task?.deadline?.slice(0, 10) ?? "",
     eodb_compliance: task?.eodb_compliance ?? "",
+    allow_late_submission: task?.allow_late_submission ?? true,
     recurrence: task?.recurrence ?? "None",
     recurrence_weekdays: task?.recurrence_weekdays ?? "",
     recurrence_dates: task?.recurrence_dates ?? [],
@@ -199,6 +200,12 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
   const [errors, setErrors] = useState<FormErrors>({});
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [memberSearch, setMemberSearch] = useState("");
+  // Only the first few chosen people are listed; the rest are behind a toggle so the form stays short.
+  const [showAllAssigned, setShowAllAssigned] = useState(false);
+  const ASSIGNED_PREVIEW = 2;
+  // Narrow the people list to one office and / or one project.
+  const [memberOffice, setMemberOffice] = useState<number | null>(null);
+  const [memberProject, setMemberProject] = useState<number | null>(null);
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -209,7 +216,18 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
   const canManageAssignments = !task || task.can_manage_assignments;
   const roster = [...new Map([...members, ...(task?.assignments ?? [])].map(member => [member.id, member])).values()];
   const projectOptions = [...new Map([...projects, ...(task?.project ? [task.project] : [])].map(project => [project.id, project])).values()].sort((a, b) => a.name.localeCompare(b.name));
-  const filteredMembers = roster.filter(member => `${memberName(member)} ${member.position ?? ""}`.toLowerCase().includes(memberSearch.trim().toLowerCase()));
+  const directory = new Map(members.map(member => [member.id, member]));
+  const filteredMembers = roster.filter(member => {
+    const known = directory.get(member.id);
+    if (memberOffice !== null && known?.office !== memberOffice) return false;
+    if (memberProject !== null && !known?.projects?.includes(memberProject)) return false;
+    return `${memberName(member)} ${member.position ?? ""}`.toLowerCase().includes(memberSearch.trim().toLowerCase());
+  });
+  // Only offer offices / projects somebody actually belongs to, so a choice never leads to an empty list.
+  const memberOfficeIds = new Set(members.map(member => member.office).filter((id): id is number => typeof id === "number"));
+  const memberProjectIds = new Set(members.flatMap(member => member.projects ?? []));
+  const memberOfficeOptions: SelectOption<number | null>[] = [{ value: null, label: "All offices" }, ...projects.filter(project => memberOfficeIds.has(project.id)).map(project => ({ value: project.id, label: project.name }))];
+  const memberProjectOptions: SelectOption<number | null>[] = [{ value: null, label: "All projects" }, ...projects.filter(project => memberProjectIds.has(project.id)).map(project => ({ value: project.id, label: project.name }))];
   const filteredProjects = projectOptions.filter(project => project.name.toLocaleLowerCase().includes(values.project.trim().toLocaleLowerCase()));
   const allSubtasks = flattenTree(values.subtasks);
   const completedSubtasks = allSubtasks.filter(subtask => subtask.is_completed).length;
@@ -249,6 +267,19 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
     setValues(current => current.assignments.some(assignment => assignment.user === currentUser.id)
       ? current
       : { ...current, assignments: [...current.assignments, { user: currentUser.id, role: "Editor" as AssignmentRole }] });
+  }
+
+  // Selects everyone currently listed (after the office / project / search filters), or clears exactly those people.
+  const allFilteredSelected = filteredMembers.length > 0 && filteredMembers.every(member => values.assignments.some(assignment => assignment.user === member.id));
+  function toggleSelectAll() {
+    setValues(current => {
+      const listed = new Set(filteredMembers.map(member => member.id));
+      if (filteredMembers.every(member => current.assignments.some(assignment => assignment.user === member.id))) {
+        return { ...current, assignments: current.assignments.filter(assignment => !listed.has(assignment.user)) };
+      }
+      const missing = filteredMembers.filter(member => !current.assignments.some(assignment => assignment.user === member.id));
+      return { ...current, assignments: [...current.assignments, ...missing.map(member => ({ user: member.id, role: "Viewer" as AssignmentRole }))] };
+    });
   }
 
   function updateAssignmentRole(id: number, role: AssignmentRole) {
@@ -368,8 +399,8 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
     const nextErrors: FormErrors = {};
     if (!values.title.trim()) nextErrors.title = "Give this task a title.";
     if (!values.isPersonal && !values.project.trim()) nextErrors.project = "Enter or select a project, or mark this as a personal task.";
-    if (!values.deadline) nextErrors.deadline = "Choose a deadline for this task.";
-    else {
+    // The deadline is optional (a repeating task has its own schedule); when given it must be a real date.
+    if (values.deadline) {
       const deadline = new Date(`${values.deadline}T00:00:00Z`);
       if (Number.isNaN(deadline.getTime()) || deadline.toISOString().slice(0, 10) !== values.deadline) nextErrors.deadline = "Enter a valid deadline.";
     }
@@ -392,6 +423,7 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
       const { isPersonal, project, ...rest } = values;
       await onSave({
         ...rest,
+        deadline: values.deadline || null,
         title: values.title.trim(),
         project: isPersonal ? null : project.trim(),
         details: cleanDetails(values.details),
@@ -462,10 +494,14 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
                     </div>
                   )}
                 <div className="etm-field">
-                  <label htmlFor={`${fieldId}-deadline`}>Deadline <span aria-hidden="true">*</span></label>
-                  <input data-howto="deadline" type="date" id={`${fieldId}-deadline`} value={values.deadline ?? ""} onChange={event => update("deadline", event.target.value)} required aria-invalid={!!errors.deadline} aria-describedby={errors.deadline ? `${fieldId}-deadline-error` : undefined} />
+                  <label htmlFor={`${fieldId}-deadline`}>Deadline <span className="etm-form-optional">(optional)</span></label>
+                  <input data-howto="deadline" type="date" id={`${fieldId}-deadline`} value={values.deadline ?? ""} onChange={event => update("deadline", event.target.value)} aria-invalid={!!errors.deadline} aria-describedby={errors.deadline ? `${fieldId}-deadline-error` : undefined} />
                   {errors.deadline && <p className="etm-field-error" id={`${fieldId}-deadline-error`}>{errors.deadline}</p>}
                 </div>
+                <label className={`etm-completion-control ${values.allow_late_submission ? "checked" : ""}`}>
+                  <input type="checkbox" checked={!!values.allow_late_submission} onChange={event => update("allow_late_submission", event.target.checked)} />
+                  <span><strong>Allow late submission?</strong><small>{values.allow_late_submission ? "The task can still be completed after its deadline." : "After the deadline only you (the owner) can complete it."}</small></span>
+                </label>
                 <div className="etm-field">
                   <label htmlFor={`${fieldId}-eodb`}>EODB Compliance</label>
                   <ThemedSelect<SelectOption<EodbCompliance>>
@@ -626,21 +662,39 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
                   <fieldset className="etm-member-field">
                     <legend>Assigned persons <span className="etm-form-count">{values.assignments.length} selected</span></legend>
                     <p className="etm-form-helper" id={`${fieldId}-people-help`}>{canManageAssignments ? "Select one or more members and give each a role. Leave empty to decide later." : "Assignment roles are managed by the task owner."}</p>
-                    {values.assignments.length > 0 && <div className="etm-selected-members">{values.assignments.map(assignment => {
+                    {values.assignments.length > 0 && <div className="etm-selected-members" style={showAllAssigned && values.assignments.length > ASSIGNED_PREVIEW ? { maxHeight: 280, overflowY: "auto", paddingRight: 4 } : undefined}>{(showAllAssigned ? values.assignments : values.assignments.slice(0, ASSIGNED_PREVIEW)).map(assignment => {
                       const person = roster.find(member => member.id === assignment.user);
                       const name = person ? memberName(person) : `Member #${assignment.user}`;
                       return <div className="etm-assignment-chip" key={assignment.user}>
                         <span className="etm-assignment-chip-name">{name}</span>
                         {canManageAssignments ? (
                           <div className="etm-role-toggle" role="radiogroup" aria-label={`Role for ${name}`}>
-                            {ASSIGNMENT_ROLES.map(role => <button type="button" key={role} className={`etm-role-toggle-option ${assignment.role === role ? "selected" : ""}`} onClick={() => updateAssignmentRole(assignment.user, role)}>{role}</button>)}
+                            {ASSIGNMENT_ROLES.map(role => <button type="button" key={role} className={`etm-role-toggle-option ${assignment.role === role ? "selected" : ""}`} onClick={() => updateAssignmentRole(assignment.user, role)}>{roleLabel(role)}</button>)}
                           </div>
-                        ) : <span className="etm-badge">{assignment.role}</span>}
+                        ) : <span className="etm-badge">{roleLabel(assignment.role)}</span>}
                         {canManageAssignments && <button type="button" onClick={() => toggleAssignment(assignment.user)} aria-label={`Remove ${name}`}><X size={13} /></button>}
                       </div>;
                     })}</div>}
-                    {canManageAssignments && currentUser && !values.assignments.some(assignment => assignment.user === currentUser.id) && (
-                      <button type="button" className="etm-button ghost small etm-assign-myself" onClick={assignToMyself}><User size={14} />Assign to myself</button>
+                    {values.assignments.length > ASSIGNED_PREVIEW && (
+                      <button type="button" className="etm-inline-link-button" style={{ marginTop: 8 }} aria-expanded={showAllAssigned} onClick={() => setShowAllAssigned(open => !open)}>
+                        <ChevronDown size={13} style={{ transform: showAllAssigned ? "rotate(180deg)" : undefined, transition: "transform .15s" }} /> {showAllAssigned ? "Show less" : `Show all ${values.assignments.length} assigned persons (+${values.assignments.length - ASSIGNED_PREVIEW} more)`}
+                      </button>
+                    )}
+                    {canManageAssignments && (
+                      <div className="etm-member-toolbar" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                        {currentUser && !values.assignments.some(assignment => assignment.user === currentUser.id) && (
+                          <button type="button" className="etm-button ghost small etm-assign-myself" onClick={assignToMyself}><User size={14} />Assign to myself</button>
+                        )}
+                        <button type="button" className="etm-button ghost small" disabled={!filteredMembers.length} onClick={toggleSelectAll}>
+                          <Users size={14} />{allFilteredSelected ? "Deselect all" : "Select all"}{filteredMembers.length ? ` (${filteredMembers.length})` : ""}
+                        </button>
+                        <div style={{ flex: "1 1 180px", minWidth: 160 }}>
+                          <ThemedSelect<SelectOption<number | null>> size="small" aria-label="Show members of an office" classNamePrefix="etm-member-office-select" options={memberOfficeOptions} value={memberOfficeOptions.find(option => option.value === memberOffice) ?? memberOfficeOptions[0]} onChange={option => setMemberOffice(option ? option.value : null)} isSearchable />
+                        </div>
+                        <div style={{ flex: "1 1 180px", minWidth: 160 }}>
+                          <ThemedSelect<SelectOption<number | null>> size="small" aria-label="Show members of a project" classNamePrefix="etm-member-project-select" options={memberProjectOptions} value={memberProjectOptions.find(option => option.value === memberProject) ?? memberProjectOptions[0]} onChange={option => setMemberProject(option ? option.value : null)} isSearchable />
+                        </div>
+                      </div>
                     )}
                     {canManageAssignments && <div className="etm-member-picker">
                       <div className="etm-member-search"><Search size={16} /><input aria-label="Search members to assign" placeholder="Search team members…" value={memberSearch} onChange={event => setMemberSearch(event.target.value)} aria-describedby={`${fieldId}-people-help`} /></div>
@@ -650,7 +704,7 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
                           <span className="etm-member-initials" aria-hidden="true">{member.first_name?.charAt(0)}{member.last_name?.charAt(0)}</span>
                           <span className="etm-member-option-name">{memberName(member)}{member.position && <small>{member.position}</small>}</span>
                         </label>)}
-                        {!filteredMembers.length && <p className="etm-member-empty">{memberSearch ? "No members match your search." : "No team members available. You can assign this task later."}</p>}
+                        {!filteredMembers.length && <p className="etm-member-empty">{memberSearch || memberOffice !== null || memberProject !== null ? "No members match your search or filters." : "No team members available. You can assign this task later."}</p>}
                       </div>
                       {!addingMember ? (
                         <button type="button" className="etm-inline-link-button etm-add-member-trigger" onClick={openAddMember}><UserPlus size={13} />Not in the list? Add a new user</button>

@@ -31,7 +31,7 @@ const NAV_GROUPS: { title?: string; items: { label: string; icon: React.ReactNod
       { label: "Add Task", icon: <Plus className="w-4 h-4" />, to: "/etms/tasks/new" },
       { label: "All Tasks", icon: <ListChecks className="w-4 h-4" />, to: "/etms/tasks" },
       { label: "Calendar", icon: <Calendar className="w-4 h-4" />, to: "/etms/calendar" },
-      { label: "Templates", icon: <Bookmark className="w-4 h-4" />, to: "/etms/templates" },
+      { label: "Task Sub-Task Templates", icon: <Bookmark className="w-4 h-4" />, to: "/etms/templates" },
     ],
   },
   {

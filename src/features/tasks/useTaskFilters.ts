@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { isDueSoon, isOverdue, memberName, type Priority, type Task, type TaskStatus } from "./types";
+import { isDueSoon, isOverdue, memberName, type Member, type Priority, type Task, type TaskStatus } from "./types";
 
 export type StatusFilterValue = "all" | TaskStatus;
 export type PriorityFilterValue = "all" | Priority;
@@ -18,6 +18,8 @@ export interface TaskFilterOptions {
   // Completed tasks are hidden under the "All" chip and only appear via the Completed filter,
   // except where the whole list is already archived tasks.
   showCompletedInAll?: boolean;
+  // Needed for the "assigned persons" office / project filters: who belongs to which.
+  members?: Member[];
 }
 
 function toDateStr(date: Date): string {
@@ -57,6 +59,9 @@ export function useTaskFilters(tasks: Task[], options?: TaskFilterOptions) {
   const [overdueOnly, setOverdueOnly] = useState(options?.initialOverdueOnly ?? false);
   const [dueSoonOnly, setDueSoonOnly] = useState(false);
   const [ownership, setOwnership] = useState<OwnershipFilterValue>("all");
+  // Only tasks with someone assigned who is in this office / this project (null = no filter).
+  const [personOffice, setPersonOffice] = useState<number | null>(null);
+  const [personProject, setPersonProject] = useState<number | null>(null);
 
   const setDeadlineDate = (value: string) => {
     setDeadlineDateState(value);
@@ -94,17 +99,23 @@ export function useTaskFilters(tasks: Task[], options?: TaskFilterOptions) {
         if (!task.project || task.project.id !== projectFilter) return false;
       }
       if (assignedFilter === "unassigned" && task.assignments.length > 0) return false;
+      if (personOffice !== null || personProject !== null) {
+        const people = task.assignments.map(person => options?.members?.find(member => member.id === person.id));
+        if (personOffice !== null && !people.some(member => member?.office === personOffice)) return false;
+        if (personProject !== null && !people.some(member => member?.projects?.includes(personProject))) return false;
+      }
       if (overdueOnly && !isOverdue(task)) return false;
       if (dueSoonOnly && !isDueSoon(task)) return false;
       if (ownership === "mine" && !task.is_creator) return false;
-      if (ownership === "assigned" && !task.assignments.some(person => person.id === options?.userId)) return false;
+      // Tasks sent to you as Task Lead are for review, not work assigned to you.
+      if (ownership === "assigned" && !task.assignments.some(person => person.id === options?.userId && person.role !== "Lead")) return false;
       return true;
     });
-  }, [tasks, search, deadlineRange, status, priority, projectFilter, assignedFilter, overdueOnly, dueSoonOnly, ownership, options?.userId, options?.showCompletedInAll]);
+  }, [tasks, search, deadlineRange, status, priority, projectFilter, assignedFilter, overdueOnly, dueSoonOnly, ownership, personOffice, personProject, options?.members, options?.userId, options?.showCompletedInAll]);
 
-  const hasActiveFilters = !!search.trim() || !!deadlineDate || !!quickFilter || status !== "all" || priority !== "all" || projectFilter !== "all" || assignedFilter !== "all" || overdueOnly || dueSoonOnly || ownership !== "all";
+  const hasActiveFilters = !!search.trim() || !!deadlineDate || !!quickFilter || status !== "all" || priority !== "all" || projectFilter !== "all" || personOffice !== null || personProject !== null || assignedFilter !== "all" || overdueOnly || dueSoonOnly || ownership !== "all";
   const clearFilters = () => {
-    setSearch(""); setDeadlineDateState(""); setQuickFilterState(""); setStatus("all"); setPriority("all"); setProjectFilter("all"); setAssignedFilter("all"); setOverdueOnly(false); setDueSoonOnly(false); setOwnership("all");
+    setSearch(""); setDeadlineDateState(""); setQuickFilterState(""); setStatus("all"); setPriority("all"); setProjectFilter("all"); setPersonOffice(null); setPersonProject(null); setAssignedFilter("all"); setOverdueOnly(false); setDueSoonOnly(false); setOwnership("all");
   };
 
   return {
@@ -119,6 +130,8 @@ export function useTaskFilters(tasks: Task[], options?: TaskFilterOptions) {
     overdueOnly, setOverdueOnly,
     dueSoonOnly, setDueSoonOnly,
     ownership, setOwnership,
+    personOffice, setPersonOffice,
+    personProject, setPersonProject,
     hasActiveFilters, clearFilters,
   };
 }

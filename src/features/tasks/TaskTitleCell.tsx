@@ -19,6 +19,7 @@ export default function TaskTitleCell({ task, children, onOpen }: { task: Task; 
           {onOpen ? <button type="button" className={`etm-task-title-link ${task.is_completed ? "completed" : ""}`} onClick={onOpen}>{task.title}</button> : <span className={task.is_completed ? "completed" : ""}>{task.title}</span>}
         </span>
         {allSubtasks.length > 0 && <small>{allSubtasks.filter(s => s.is_completed).length}/{allSubtasks.length} subtasks</small>}
+        {allSubtasks.length === 0 && children && <small>No subtasks</small>}
       </div>
     </div>
   );

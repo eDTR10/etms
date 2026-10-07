@@ -111,8 +111,9 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
     filtered, search, setSearch, deadlineDate, setDeadlineDate, quickFilter, setQuickFilter,
     status, setStatus, priority, setPriority, projectFilter, setProjectFilter,
     assignedFilter, setAssignedFilter, overdueOnly, setOverdueOnly,
+    personOffice, setPersonOffice, personProject, setPersonProject,
     hasActiveFilters, clearFilters,
-  } = useTaskFilters(scopedTasks, { initialStatus: initialFilters.status, initialAssignedFilter: initialFilters.assignedFilter, initialOverdueOnly: initialFilters.overdueOnly, showCompletedInAll: true });
+  } = useTaskFilters(scopedTasks, { initialStatus: initialFilters.status, initialAssignedFilter: initialFilters.assignedFilter, initialOverdueOnly: initialFilters.overdueOnly, showCompletedInAll: true, members });
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [viewingId, setViewingId] = useState<number | null>(null);
   const [viewingSubtaskId, setViewingSubtaskId] = useState<number | null>(null);
@@ -130,6 +131,13 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
     assigned: task => task.assignments.map(person => memberName(person)).sort().join(", "),
     progress: task => task.status,
   });
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const pageCount = Math.max(1, Math.ceil(sortedTasks.length / pageSize));
+  const currentPage = Math.min(page, pageCount - 1);
+  const pagedTasks = sortedTasks.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+  // Back to the first page whenever the list itself changes (filters, search, tab, sort).
+  useEffect(() => { setPage(0); }, [filtered.length, scope, showArchived, sort, pageSize]);
   const filteredIds = useMemo(() => filtered.map(task => task.id), [filtered]);
   const selection = useRowSelection(filteredIds);
 
@@ -191,6 +199,7 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
         projectFilter={projectFilter}
         onProjectFilterChange={setProjectFilter}
         projects={projects}
+        people={{ members, office: personOffice, onOfficeChange: setPersonOffice, project: personProject, onProjectChange: setPersonProject }}
         assignedFilter={assignedFilter}
         onAssignedFilterChange={setAssignedFilter}
         overdueOnly={overdueOnly}
@@ -223,7 +232,9 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
               }>Task Title</SortTh>
               <SortTh sortKey="project" sort={sort} onSort={toggleSort}>Project</SortTh>
               <SortTh sortKey="priority" sort={sort} onSort={toggleSort}>Priority</SortTh>
+              {/* Repeat column hidden for now:
               <SortTh sortKey="repeat" sort={sort} onSort={toggleSort}>Repeat</SortTh>
+              */}
               <SortTh sortKey="owner" sort={sort} onSort={toggleSort}>Task Owner</SortTh>
               {/* Requestor column hidden for now:
               <SortTh sortKey="requestor" sort={sort} onSort={toggleSort}>Requestor</SortTh>
@@ -236,7 +247,7 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
             </tr>
           </thead>
           <tbody>
-            {sortedTasks.length ? sortedTasks.map(task => {
+            {sortedTasks.length ? pagedTasks.map(task => {
               const expanded = expandedId === task.id;
               const hasSubtasks = task.subtasks.length > 0;
               const lastRemark = task.remarks[0];
@@ -251,7 +262,7 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
                         checked={selection.isSelected(task.id)}
                         onChange={() => selection.toggle(task.id)}
                       />
-                      {hasSubtasks && (
+                      {(
                         <button
                           type="button"
                           className={`etm-accordion-toggle-icon ${expanded ? "open" : ""}`}
@@ -267,7 +278,9 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
                     </td>
                     <td>{task.project ? task.project.name : <span className="etm-tasks-table-unassigned">Personal</span>}</td>
                     <td><span className={`etm-priority-pill ${task.priority.toLowerCase()}`}>{task.priority}</span></td>
+                    {/* Repeat column hidden for now:
                     <td>{task.recurrence !== "None" ? RECURRENCE_LABELS[task.recurrence] : <span className="etm-tasks-table-unassigned">—</span>}</td>
+                    */}
                     <td>{task.created_by_name ? <span className="etm-tasks-table-assignee"><span className="etm-tasks-table-assignee-avatar" aria-hidden="true">{task.created_by_name.split(" ").map(part => part.charAt(0)).slice(0, 2).join("")}</span>{task.created_by_name}</span> : <span className="etm-tasks-table-unassigned">—</span>}</td>
                     {/* Requestor column hidden for now:
                     <td>{task.requestor || <span className="etm-tasks-table-unassigned">Not specified</span>}</td>
@@ -277,12 +290,15 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
                     <td>
                       {task.assignments.length ? (
                         <div className="etm-tasks-table-assignees" aria-label="Assignees">
-                          {task.assignments.map(person => (
+                          {task.assignments.slice(0, 2).map(person => (
                             <span className="etm-tasks-table-assignee" key={person.id} title={`${memberName(person)} · ${person.role}`}>
                               <span className="etm-tasks-table-assignee-avatar" aria-hidden="true">{person.first_name?.charAt(0)}{person.last_name?.charAt(0)}</span>
                               {memberName(person)}
                             </span>
                           ))}
+                        {task.assignments.length > 2 && (
+                            <span className="etm-tasks-table-assignee-more" title={task.assignments.slice(2).map(person => memberName(person)).join(", ")} aria-label={`${task.assignments.length - 2} more assigned persons`}>+{task.assignments.length - 2}</span>
+                          )}
                         </div>
                       ) : <span className="etm-tasks-table-unassigned">Unassigned</span>}
                     </td>
@@ -298,8 +314,9 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
                   </tr>
                   {expanded && (
                     <tr className="etm-tasks-table-subrow" id={`task-subtasks-${task.id}`}>
-                      <td colSpan={10}>
+                      <td colSpan={9}>
                         <div className="etm-accordion-body">
+                          {!hasSubtasks && <p className="etm-accordion-empty">No subtasks for this main task.</p>}
                           {task.subtasks.map((subtask, index) => (
                             <button type="button" className={`etm-accordion-subtask ${subtask.is_completed ? "completed" : ""}`} key={subtask.id ?? index} onClick={() => { setViewingSubtaskId(subtask.id ?? null); setViewingId(task.id); }} aria-label={`Open subtask: ${subtask.title}`}>
                               {subtask.is_completed ? <Check size={13} /> : <Circle size={13} />}
@@ -317,7 +334,7 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
                 </Fragment>
               );
             }) : (
-              <tr><td colSpan={10} className="etm-empty-row">{
+              <tr><td colSpan={9} className="etm-empty-row">{
                 !tasks.length ? "No tasks yet — create your first one from Add Task."
                 : !scopedTasks.length ? (scope === "personal" ? "You don't have any personal tasks yet." : "No assigned tasks yet.")
                 : "No tasks match your filters."
@@ -326,6 +343,17 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
           </tbody>
         </table>
       </div>
+      {sortedTasks.length > 0 && (
+        <div className="etm-table-pagination">
+          <span>Showing {currentPage * pageSize + 1}–{Math.min((currentPage + 1) * pageSize, sortedTasks.length)} of {sortedTasks.length}</span>
+          <div className="etm-table-pagination-controls">
+            <label>Rows <select value={pageSize} onChange={event => setPageSize(Number(event.target.value))} aria-label="Rows per page">{[10, 25, 50, 100].map(size => <option key={size} value={size}>{size}</option>)}</select></label>
+            <button type="button" className="etm-button ghost small" onClick={() => setPage(currentPage - 1)} disabled={currentPage === 0}>Previous</button>
+            <span>Page {currentPage + 1} of {pageCount}</span>
+            <button type="button" className="etm-button ghost small" onClick={() => setPage(currentPage + 1)} disabled={currentPage >= pageCount - 1}>Next</button>
+          </div>
+        </div>
+      )}
 
       {viewingTask && <TaskDetails
         task={viewingTask}

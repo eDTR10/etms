@@ -50,6 +50,7 @@ const UserProfile    = lazy(() => import("./screens/User/Profile.tsx"));
 const UserTemplates  = lazy(() => import("./screens/User/Templates.tsx"));
 const UserQuickLinks = lazy(() => import("./screens/User/QuickLinks.tsx"));
 const UserGenerateIPCR = lazy(() => import("./screens/User/GenerateIPCR.tsx"));
+const UserIPCREditor = lazy(() => import("./screens/User/IPCREditor.tsx"));
 
 // ── Admin pages (eTM) ────────────────────────────────────────────────────
 const AdminDashboard   = lazy(() => import("./screens/Admin/Dashboard.tsx"));
@@ -131,6 +132,10 @@ const router = createBrowserRouter([
   {
     path: "/etms/ipcr",
     element: <ProtectedRoute><Suspense fallback={<Loader />}><UserGenerateIPCR /></Suspense></ProtectedRoute>,
+  },
+  {
+    path: "/etms/ipcr/:id",
+    element: <ProtectedRoute><Suspense fallback={<Loader />}><UserIPCREditor /></Suspense></ProtectedRoute>,
   },
   {
     path: "/etms/how-to",

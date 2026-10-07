@@ -17,7 +17,7 @@ import { useDuplicateTask } from "../../features/tasks/useDuplicateTask";
 import { useBulkTaskActions } from "../../features/tasks/useBulkTaskActions";
 import { useRowSelection } from "../../features/tasks/useRowSelection";
 import { SortTh, useTableSort } from "../../features/tasks/useTableSort";
-import { dueSoonLabel, formatDate, isDueSoon, isOverdue, memberName, remarkPreview, statusChipLabel, statusSlug, STATUSES, type TaskStatus } from "../../features/tasks/types";
+import { dueSoonLabel, formatDate, isDueSoon, isOverdue, memberName, remarkPreview, statusChipLabel, statusSlug, STATUSES, type Task, type TaskStatus } from "../../features/tasks/types";
 import Modal from "../../components/ui/modal";
 
 interface DashboardOverviewProps {
@@ -121,7 +121,7 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks", 
   const totalPending = useMemo(() => tasks.filter(task => task.status === "Pending").length, [tasks]);
   const totalMine = useMemo(() => tasks.filter(task => task.is_creator).length, [tasks]);
   // Includes tasks you assigned to yourself.
-  const totalAssignedToMe = useMemo(() => tasks.filter(task => task.assignments.some(person => person.id === user?.id)).length, [tasks, user?.id]);
+  const totalAssignedToMe = useMemo(() => tasks.filter(task => task.assignments.some(person => person.id === user?.id && person.role !== "Lead")).length, [tasks, user?.id]);
   const totalBlocked = useMemo(() => tasks.filter(task => task.status === "Blocked/Stuck").length, [tasks]);
   const totalDueSoon = useMemo(() => tasks.filter(isDueSoon).length, [tasks]);
   const totalPastDue = useMemo(() => tasks.filter(isOverdue).length, [tasks]);
@@ -131,9 +131,33 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks", 
   // A Regular Employee only ever sees their own tasks in the workload; officers see their office / project.
   const isRegularEmployee = !officeScope.enabled && !(user?.etms_roles ?? []).some(role => role !== "regular_employee") && !user?.is_staff && user?.role !== "admin";
   // Who handed the signed-in user work: shown on their own workload row so they know where it came from.
-  const assignedToMeByOthers = useMemo(() => tasks.filter(task => !task.is_creator && task.assignments.some(person => person.id === user?.id)), [tasks, user?.id]);
-  const assignersToMe = useMemo(() => [...new Set(assignedToMeByOthers.map(task => task.created_by_name).filter((name): name is string => !!name))], [assignedToMeByOthers]);
-  const workloadMembers = officeScope.enabled ? officeScope.members : isRegularEmployee ? members.filter(member => member.id === user?.id) : members;
+  // Tasks someone sent you as Task Lead are for your checking, so they are worded differently from work assigned to you.
+  const isLeadOn = (task: Task) => task.assignments.some(person => person.id === user?.id && person.role === "Lead");
+  // Rank: a Chief (or admin) is above the Provincial / Focal Officers, who are above Regular Employees. The
+  // "<name> assigned tasks to you" note only appears when the person who assigned you outranks you.
+  const rankOf = (roles: string[] | undefined) => (roles ?? []).includes("chief") || (roles ?? []).includes("admin") ? 3 : (roles ?? []).some(role => role === "provincial_officer" || role === "focal_officer") ? 2 : 1;
+  const myRank = rankOf([...(user?.etms_roles ?? []), ...(user?.is_staff || user?.role === "admin" ? ["admin"] : [])]);
+  // Older assignments have no recorded assigner (an empty list), so they fall back to the task's creator.
+  const assignerRank = (task: Task) => {
+    const recorded = task.assignments.find(person => person.id === user?.id)?.assigned_by_roles;
+    return rankOf(recorded?.length ? recorded : task.created_by_roles);
+  };
+  const assignedToMeByOthers = useMemo(() => tasks.filter(task => !task.is_creator && !isLeadOn(task) && task.assignments.some(person => person.id === user?.id) && assignerRank(task) > myRank), [tasks, user?.id, myRank]);
+  const forMyReview = useMemo(() => tasks.filter(task => !task.is_creator && isLeadOn(task)), [tasks, user?.id]);
+  // Whoever actually put the signed-in user on the task (the creator, or a Task Lead); the creator for older assignments.
+  const assignerOf = (task: Task, personId = user?.id) => task.assignments.find(person => person.id === personId)?.assigned_by_name ?? task.created_by_name;
+  const namesOf = (list: Task[]) => [...new Set(list.map(assignerOf).filter((name): name is string => !!name))];
+  // The other direction: tasks you created and sent to a leader as Task Lead.
+  const myLeadTasks = useMemo(() => tasks.filter(task => task.is_creator && task.assignments.some(person => person.role === "Lead" && person.id !== user?.id)), [tasks, user?.id]);
+  const myLeadNames = useMemo(() => [...new Set(myLeadTasks.flatMap(task => task.assignments.filter(person => person.role === "Lead" && person.id !== user?.id).map(person => memberName(person))))], [myLeadTasks, user?.id]);
+  const assignersToMe = useMemo(() => namesOf(assignedToMeByOthers), [assignedToMeByOthers]);
+  const reviewersToMe = useMemo(() => namesOf(forMyReview), [forMyReview]);
+  // An officer / Chief always keeps their own row too (even when their office or project is not the one in scope),
+  // so the "<name> assigned tasks to you" note reaches them like anyone else.
+  const selfMember = members.find(member => member.id === user?.id);
+  const workloadMembers = officeScope.enabled
+    ? (selfMember && !officeScope.members.some(member => member.id === selfMember.id) ? [...officeScope.members, selfMember] : officeScope.members)
+    : isRegularEmployee ? members.filter(member => member.id === user?.id) : members;
   const workloadTasks = useMemo(() => officeScope.enabled
     ? [...new Map([...tasks, ...officeScope.tasks].map(task => [task.id, task])).values()]
     : tasks, [tasks, officeScope]);
@@ -240,11 +264,11 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks", 
         <div className="etm-section-heading"><div><h2>Insights</h2><p>Team workload and where tasks currently stand.</p></div></div>
         <div className="etm-charts-grid">
           <div className="etm-panel etm-chart-panel">
-            <div className="etm-workload-heading"><h3 className="etm-chart-title">Team workload{officeScope.enabled && officeScope.office_name ? ` · ${officeScope.office_name}` : ""}</h3><label>Sort<div style={{ width: 130 }}><ThemedSelect<SelectOption<"most" | "fewest">> size="small" classNamePrefix="etm-sort-select" aria-label="Sort team workload" options={WORKLOAD_SORT_OPTIONS} value={WORKLOAD_SORT_OPTIONS.find(option => option.value === workloadSort)} onChange={option => { setWorkloadSort(option?.value ?? "most"); setWorkloadPage(0); }} /></div></label></div>
+            <div className="etm-workload-heading"><h3 className="etm-chart-title">Team workload</h3><label>Sort<div style={{ width: 130 }}><ThemedSelect<SelectOption<"most" | "fewest">> size="small" classNamePrefix="etm-sort-select" aria-label="Sort team workload" options={WORKLOAD_SORT_OPTIONS} value={WORKLOAD_SORT_OPTIONS.find(option => option.value === workloadSort)} onChange={option => { setWorkloadSort(option?.value ?? "most"); setWorkloadPage(0); }} /></div></label></div>
             {memberCounts.length ? <>
               <div className="etm-workload-list">
                 {paginatedMembers.map(({ member, count, dueSoon }) => <button type="button" className="etm-member-row" key={member.id} onClick={() => setSelectedMemberId(member.id)} aria-label={`Open workload for ${memberName(member)}`}>
-                  <span className="etm-member-row-avatar" aria-hidden="true">{member.first_name?.charAt(0)}{member.last_name?.charAt(0)}</span><span className="etm-member-row-name">{memberName(member)}{member.position && <small>{member.position}</small>}{member.id === user?.id && assignersToMe.length > 0 && <small className="etm-assigned-by-note">{assignersToMe.join(", ")} assigned task{assignedToMeByOthers.length === 1 ? "" : "s"} to you</small>}</span>{dueSoon > 0 && <span className="etm-due-soon-badge">{dueSoon} due soon</span>}<span className="etm-member-row-count">{count} {count === 1 ? "task" : "tasks"}</span><ChevronRight className="etm-member-workload-chevron" size={16} />
+                  <span className="etm-member-row-avatar" aria-hidden="true">{member.first_name?.charAt(0)}{member.last_name?.charAt(0)}</span><span className="etm-member-row-name">{memberName(member)}{member.position && <small>{member.position}</small>}{member.id === user?.id && assignersToMe.length > 0 && <small className="etm-assigned-by-note">{assignersToMe.join(", ")} assigned task{assignedToMeByOthers.length === 1 ? "" : "s"} to you</small>}{member.id === user?.id && myLeadNames.length > 0 && <small className="etm-assigned-by-note">{myLeadTasks.length === 1 ? "Task" : `${myLeadTasks.length} tasks`} you created with {myLeadNames.join(", ")} as your Task Lead</small>}{member.id === user?.id && reviewersToMe.length > 0 && <small className="etm-assigned-by-note">{reviewersToMe.join(", ")} {reviewersToMe.length === 1 ? "has" : "have"} {forMyReview.length === 1 ? "a task" : `${forMyReview.length} tasks`} for your checking</small>}</span>{dueSoon > 0 && <span className="etm-due-soon-badge">{dueSoon} due soon</span>}<span className="etm-member-row-count">{count} {count === 1 ? "task" : "tasks"}</span><ChevronRight className="etm-member-workload-chevron" size={16} />
                 </button>)}
               </div>
               <div className="etm-workload-pagination"><button type="button" className="etm-button ghost small" onClick={() => setWorkloadPage(page => Math.max(0, page - 1))} disabled={currentWorkloadPage === 0}>Previous</button><span>Page {currentWorkloadPage + 1} of {workloadPageCount}</span><button type="button" className="etm-button ghost small" onClick={() => setWorkloadPage(page => Math.min(workloadPageCount - 1, page + 1))} disabled={currentWorkloadPage === workloadPageCount - 1}>Next</button></div>
@@ -389,7 +413,7 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks", 
         {selectedMemberWorkload && <div className="etm-workload-dialog">
           <p>{selectedMemberTasks.length} {selectedMemberTasks.length === 1 ? "task" : "tasks"} owned by or assigned to {memberName(selectedMemberWorkload.member)}{selectedMemberWorkload.member.position ? ` · ${selectedMemberWorkload.member.position}` : ""}</p>
           <div className="etm-workload-dialog-tasks">
-            {pagedMemberTasks.map(task => <button type="button" key={task.id} onClick={() => { setSelectedMemberId(null); setMemberTaskPage(0); navigate(`${basePath}/${task.id}`); }}><ClipboardList size={15} /><span>{task.title}<small>{task.created_by === selectedMemberWorkload.member.id ? "Owner" : task.created_by_name ? `Assigned by ${task.created_by_name}` : "Assigned"} · {task.status} · {task.project?.name ?? "Personal"}{isDueSoon(task) && <> · <b className="etm-due-soon-text">{dueSoonLabel(task)}</b></>}</small></span><ChevronRight size={15} /></button>)}
+            {pagedMemberTasks.map(task => <button type="button" key={task.id} onClick={() => { setSelectedMemberId(null); setMemberTaskPage(0); navigate(`${basePath}/${task.id}`); }}><ClipboardList size={15} /><span>{task.title}<small>{task.created_by === selectedMemberWorkload.member.id ? "Owner" : task.assignments.some(person => person.id === selectedMemberWorkload.member.id && person.role === "Lead") ? `For review${assignerOf(task, selectedMemberWorkload.member.id) ? ` · from ${assignerOf(task, selectedMemberWorkload.member.id)}` : ""}` : assignerOf(task, selectedMemberWorkload.member.id) ? `Assigned by ${assignerOf(task, selectedMemberWorkload.member.id)}` : "Assigned"} · {task.status} · {task.project?.name ?? "Personal"}{isDueSoon(task) && <> · <b className="etm-due-soon-text">{dueSoonLabel(task)}</b></>}</small></span><ChevronRight size={15} /></button>)}
           </div>
           {memberTaskPages > 1 && <div className="etm-workload-dialog-pager">
             <button type="button" disabled={currentMemberPage === 0} onClick={() => setMemberTaskPage(currentMemberPage - 1)}>Previous</button>

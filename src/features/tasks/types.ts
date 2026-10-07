@@ -1,6 +1,7 @@
 export type Priority = "Low" | "Medium" | "High";
 export type TaskStatus = "Pending" | "In-Progress" | "Completed" | "Blocked/Stuck";
-export type AssignmentRole = "Editor" | "Viewer" | "Commentor";
+// "Lead" (shown as "Task Lead") is a leader the task is sent to for checking / review: an editor's powers, but the work is not assigned to them.
+export type AssignmentRole = "Editor" | "Lead" | "Viewer" | "Commentor";
 // "Assignee" is someone who was given a subtask rather than a place on the task itself: they see the whole task but
 // can only work on their own subtask(s). The server sets it; it is never chosen in the people list.
 export type TaskRole = "Owner" | AssignmentRole | "Assignee";
@@ -17,6 +18,8 @@ export interface Member {
   last_name: string;
   position?: string;
   office?: number | null;
+  // Ids of the projects this person belongs to (directory entries, like `office`).
+  projects?: number[];
 }
 
 export interface Project {
@@ -58,6 +61,9 @@ export interface GroupedTaskInput {
 }
 
 export interface Assignment extends Member {
+  // Who put this person on the task (creator, Task Lead or an editor); absent on older assignments.
+  assigned_by_name?: string | null;
+  assigned_by_roles?: string[];
   role: AssignmentRole | "Assignee";
 }
 
@@ -174,6 +180,11 @@ export interface Task {
   priority: Priority;
   deadline: string | null;
   eodb_compliance?: EodbCompliance | "";
+  // Off: once the deadline has passed only the owner can complete the task / its subtasks.
+  allow_late_submission?: boolean;
+  late_submission_blocked?: boolean;
+  // The creator's eTMS roles (and 'admin'), used to decide who outranks whom on the dashboard.
+  created_by_roles?: string[];
   // Set when the viewer may take back the last turnover; holds the name of whoever has the task now.
   revert_turnover_to?: string | null;
   recurrence: Recurrence;
@@ -274,6 +285,7 @@ export interface TaskInput {
   priority: Priority;
   deadline: string | null;
   eodb_compliance?: EodbCompliance | "";
+  allow_late_submission?: boolean;
   recurrence: Recurrence;
   recurrence_weekdays: string;
   recurrence_dates: string[];
@@ -287,7 +299,11 @@ export interface TaskInput {
 
 export const STATUSES: TaskStatus[] = ["Pending", "In-Progress", "Completed", "Blocked/Stuck"];
 export const PRIORITIES: Priority[] = ["Low", "Medium", "High"];
-export const ASSIGNMENT_ROLES: AssignmentRole[] = ["Editor", "Commentor", "Viewer"];
+export const ASSIGNMENT_ROLES: AssignmentRole[] = ["Editor", "Lead", "Commentor", "Viewer"];
+
+export function roleLabel(role: string): string {
+  return role === "Lead" ? "Task Lead" : role;
+}
 // EODB compliance class of a task; picking one in the task form fills the deadline that many days ahead.
 export type EodbCompliance = "Simple" | "Complex" | "Highly Technical";
 export const EODB_COMPLIANCE: { value: EodbCompliance; days: number }[] = [

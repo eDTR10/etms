@@ -380,3 +380,9 @@
 .etm-workload-dialog-pager button:disabled { opacity: .45; cursor: not-allowed; }
 
 .etm-member-row-name .etm-assigned-by-note { color: var(--etm-primary); font-weight: 600; }
+
+.etm-table-pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; color: var(--etm-muted); font-size: 12px; font-weight: 600; }
+.etm-table-pagination-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.etm-table-pagination select { margin-left: 6px; padding: 5px 8px; border: 1px solid var(--etm-border); border-radius: 8px; background: var(--etm-surface-alt); color: var(--etm-ink); font: inherit; }
+
+.etm-tasks-table-assignee-more { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 26px; padding: 0 6px; border-radius: 999px; background: color-mix(in srgb, var(--etm-primary) 18%, var(--etm-surface-alt)); color: var(--etm-primary); font-size: 11px; font-weight: 700; cursor: default; }
