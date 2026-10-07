@@ -60,10 +60,11 @@ function toEditableSubtasks(subtasks: SubTask[], keyPrefix: string): EditableSub
 }
 
 function serializeSubtasks(subtasks: EditableSubtask[]): SubTask[] {
-  return subtasks.map(({ id, title, description, status, is_completed, default_document_template, subtasks: children }) => ({
+  return subtasks.map(({ id, title, description, deadline, status, is_completed, default_document_template, subtasks: children }) => ({
     ...(id !== undefined ? { id } : {}),
     title: title.trim(),
     description: description.trim(),
+    deadline: deadline || null,
     status,
     is_completed,
     default_document_template: default_document_template ?? null,
@@ -118,7 +119,7 @@ function SubtaskEditorRow({ subtask, index, depth, fieldId, errors, docTemplates
   // Completion only makes sense on a task that already exists; a brand-new one has nothing done yet.
   canComplete: boolean;
   subtask: EditableSubtask; index: number; depth: number; fieldId: string; errors: FormErrors; docTemplates: DtmsDocumentTemplate[];
-  onUpdate: (localKey: string, change: Partial<Pick<SubTask, "title" | "description" | "status" | "is_completed" | "default_document_template">>) => void;
+  onUpdate: (localKey: string, change: Partial<Pick<SubTask, "title" | "description" | "deadline" | "status" | "is_completed" | "default_document_template">>) => void;
   onRemove: (localKey: string) => void;
   onAddChild: (parentKey: string) => void;
 }) {
@@ -137,22 +138,29 @@ function SubtaskEditorRow({ subtask, index, depth, fieldId, errors, docTemplates
       </div>
       {errors[subtask.localKey] && <p className="etm-field-error" id={`${fieldId}-${subtask.localKey}-error`}>{errors[subtask.localKey]}</p>}
       <textarea className="etm-subtask-description" value={subtask.description} onChange={event => onUpdate(subtask.localKey, { description: event.target.value })} placeholder="Add a short description for this subtask (optional)…" aria-label={`Subtask ${index + 1} description`} rows={2} maxLength={2000} />
-      {docTemplates.length > 0 && (
-        <div className={`etm-subtask-doc-picker ${subtask.default_document_template ? "has-value" : ""}`}>
-          <span className="etm-subtask-doc-picker-label"><FileText size={13} />Document</span>
-          <div style={{ flex: 1, minWidth: 0, maxWidth: 240 }}>
-            <ThemedSelect<SelectOption<number | "">>
-              size="small"
-              classNamePrefix="etm-subtask-doc-select"
-              isSearchable
-              aria-label={`Document to create for subtask ${index + 1}`}
-              options={docTemplateOptions}
-              value={docTemplateOptions.find(option => option.value === (subtask.default_document_template ?? "")) ?? docTemplateOptions[0]}
-              onChange={option => onUpdate(subtask.localKey, { default_document_template: option && option.value !== "" ? option.value : null })}
-            />
-          </div>
+      <div className="etm-subtask-meta">
+        <div className={`etm-subtask-meta-item ${subtask.deadline ? "has-value" : ""}`}>
+          <span className="etm-subtask-meta-label"><CalendarDays size={13} />Deadline</span>
+          <input type="date" className="etm-subtask-date" value={subtask.deadline ?? ""} onChange={event => onUpdate(subtask.localKey, { deadline: event.target.value || null })} aria-label={`Deadline for subtask ${index + 1}`} />
+          {subtask.deadline && <button type="button" className="etm-icon-button" aria-label={`Clear the deadline of subtask ${index + 1}`} title="Clear deadline" onClick={() => onUpdate(subtask.localKey, { deadline: null })}><X size={13} /></button>}
         </div>
-      )}
+        {docTemplates.length > 0 && (
+          <div className={`etm-subtask-meta-item ${subtask.default_document_template ? "has-value" : ""}`}>
+            <span className="etm-subtask-meta-label"><FileText size={13} />Document</span>
+            <div style={{ flex: 1, minWidth: 180, maxWidth: 260 }}>
+              <ThemedSelect<SelectOption<number | "">>
+                size="small"
+                classNamePrefix="etm-subtask-doc-select"
+                isSearchable
+                aria-label={`Document to create for subtask ${index + 1}`}
+                options={docTemplateOptions}
+                value={docTemplateOptions.find(option => option.value === (subtask.default_document_template ?? "")) ?? docTemplateOptions[0]}
+                onChange={option => onUpdate(subtask.localKey, { default_document_template: option && option.value !== "" ? option.value : null })}
+              />
+            </div>
+          </div>
+        )}
+      </div>
       {subtask.subtasks.length > 0 && (
         <div className="etm-subtask-children">
           {subtask.subtasks.map((child, childIndex) => (
@@ -320,7 +328,7 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
     }
   }
 
-  function updateSubtask(localKey: string, change: Partial<Pick<SubTask, "title" | "description" | "status" | "is_completed" | "default_document_template">>) {
+  function updateSubtask(localKey: string, change: Partial<Pick<SubTask, "title" | "description" | "deadline" | "status" | "is_completed" | "default_document_template">>) {
     setValues(current => ({ ...current, subtasks: mapSubtaskTree(current.subtasks, localKey, subtask => ({ ...subtask, ...change })) }));
     if (errors[localKey] || (change.is_completed !== undefined && errors.status)) setErrors(current => ({ ...current, [localKey]: "", ...(change.is_completed !== undefined ? { status: "" } : {}) }));
   }

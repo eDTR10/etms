@@ -6,56 +6,6 @@ import "jspreadsheet-ce/dist/jspreadsheet.themes.css";
 // widgets need this stylesheet, so it's pulled from jspreadsheet-ce's nested copy rather
 // than adding a second, independently-versioned top-level jsuites dependency.
 import "jspreadsheet-ce/node_modules/jsuites/dist/jsuites.css";
-<<<<<<< HEAD
-import { cellCoords, cellName, flattenRuns, htmlToRuns, parseCellStyle, runsToHtml } from "./ipcrGridUtils";
-import type { IPCRGridData, IPCRRichTextRun } from "./types";
-import "./ipcr.css";
-
-// The sheet's cells hold HTML (jspreadsheet parseHTML) so a word inside a cell can be bold/italic/
-// underlined on its own, exactly like Google Sheets — but everything outside this file (saved
-// templates, .xlsx/PDF export, fill-in tokens) keeps the existing model: plain text in `data`, with
-// mixed-formatting cells' runs in `richText`. These two helpers are the only translation layer.
-const hasFormatting = (runs: IPCRRichTextRun[]) => runs.some(run => run.bold || run.italic || run.underline);
-
-function cellHtmlToModel(html: unknown): { text: string | number; runs: IPCRRichTextRun[] | null } {
-  if (typeof html !== "string") return { text: html as number, runs: null };
-  if (!/[<&]/.test(html)) return { text: html, runs: null };
-  const runs = htmlToRuns(html);
-  return { text: flattenRuns(runs), runs: hasFormatting(runs) ? runs : null };
-}
-
-function cellHtmlToPlain(html: unknown): string {
-  const { text } = cellHtmlToModel(html);
-  return String(text ?? "");
-}
-
-// One shared custom column editor: the cell itself turns contentEditable, so typing and
-// formatting happen right in the cell (no floating popup). Ctrl+B/I/U work natively on the
-// selected words; the toolbar's B/I/U call formatSelection below for the same effect.
-let editingRichCell: HTMLElement | null = null;
-
-const richTextColumn = {
-  openEditor(cell: HTMLTableCellElement) {
-    editingRichCell = cell;
-    cell.contentEditable = "true";
-    cell.classList.add("etm-ipcr-cell-editing");
-    cell.focus();
-    const range = document.createRange();
-    range.selectNodeContents(cell);
-    range.collapse(false);
-    const selection = window.getSelection();
-    selection?.removeAllRanges();
-    selection?.addRange(range);
-  },
-  closeEditor(cell: HTMLTableCellElement) {
-    cell.contentEditable = "false";
-    cell.classList.remove("etm-ipcr-cell-editing");
-    editingRichCell = null;
-    return runsToHtml(htmlToRuns(cell.innerHTML));
-  },
-};
-
-=======
 import { cellCoords } from "./ipcrGridUtils";
 import { MANAGED_PROPERTIES, parseClipboardTable, type ParsedPaste } from "./ipcrPaste";
 import type { IPCRGridData, IPCRRichTextRun } from "./types";
@@ -69,7 +19,6 @@ function setStyleProp(instance: WorksheetInstance, cell: string, property: strin
   else instance.setStyle(cell, property, value, true);
 }
 
->>>>>>> 739aa73a74a27f107df3823a7c123207d932a33c
 export type IPCRBorderKind = "all" | "outer" | "top" | "bottom" | "left" | "right" | "none";
 
 export interface IPCRGridSelectionInfo {
@@ -97,13 +46,6 @@ export interface IPCRGridCellRect {
 export interface IPCRGridHandle {
   getSnapshot: () => IPCRGridData;
   getSelectedCell: () => string | null;
-  // Programmatically selects a single cell (fires the same onSelectionChange a click would) —
-  // used so clicking a rich-text overlay, which sits on top of the real cell, still selects it.
-  selectCell: (cell: string) => void;
-  // True while a cell is being edited in place; then bold/italic/underline should format the
-  // selected words (formatSelection) instead of the whole cell (toggleStyle).
-  isEditing: () => boolean;
-  formatSelection: (command: "bold" | "italic" | "underline") => void;
   getCellValue: (cell: string) => string;
   // Close an open in-cell editor, throwing away what is typed in it.
   cancelEdit: () => void;
@@ -218,15 +160,8 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
     container.innerHTML = "";
     const rowCount = Math.max(value.data.length, minRows);
     const colCount = Math.max(value.data[0]?.length ?? 0, minCols);
-    // Seed each cell with HTML: its saved rich-text runs if it has any, else its plain text
-    // (escaped, so a literal "<" or "&" in a cell can't turn into markup).
     const data = Array.from({ length: rowCount }, (_, y) =>
-      Array.from({ length: colCount }, (_, x) => {
-        const runs = value.richText?.[cellName(x, y)];
-        if (runs?.length) return runsToHtml(runs);
-        const plain = value.data[y]?.[x] ?? "";
-        return typeof plain === "string" && plain ? runsToHtml([{ text: plain }]) : plain;
-      }));
+      Array.from({ length: colCount }, (_, x) => value.data[y]?.[x] ?? ""));
 
     const notifyDimensions = (worksheet: WorksheetInstance) => {
       onDimensionsChangeRef.current?.({ rows: worksheet.rows.length, cols: worksheet.cols.length });
@@ -241,11 +176,7 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
         selectedRef.current = cell;
         selectionRangeRef.current = [x1, y1, x2, y2];
         const cellStyle = worksheet.getStyle(cell);
-<<<<<<< HEAD
-        onSelectionChangeRef.current?.({ cell, value: cellHtmlToPlain(worksheet.getValue(cell)), style: typeof cellStyle === "string" ? cellStyle : "" });
-=======
         onSelectionChangeRef.current?.({ cell, value: String(worksheet.getValue(cell) ?? ""), style: typeof cellStyle === "string" ? cellStyle : "", range: [x1, y1, x2, y2], rows: worksheet.rows.length, cols: worksheet.cols.length });
->>>>>>> 739aa73a74a27f107df3823a7c123207d932a33c
       },
       oneditionstart: (_worksheet, _td, x, y) => { onEditingChangeRef.current?.(`${columnName(x)}${y + 1}`); },
       oneditionend: (_worksheet, _td, x, y, editorValue, wasSaved) => {
@@ -258,16 +189,10 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
       ondeleterow: notifyDimensions,
       oninsertcolumn: notifyDimensions,
       ondeletecolumn: notifyDimensions,
-      parseHTML: true,
       worksheets: [{
         data,
-<<<<<<< HEAD
-        columns: Array.from({ length: colCount }, () => ({ type: richTextColumn })),
-        style: value.style,
-=======
         // Older templates were marked with a dashed `border`; drop that so it can't cover the cell's real borders.
         style: Object.fromEntries(Object.entries(value.style).map(([cell, css]) => [cell, css.replace(/(^|;)\s*border\s*:\s*2px dashed[^;]*;?/gi, "$1")])),
->>>>>>> 739aa73a74a27f107df3823a7c123207d932a33c
         // NOT passing mergeCells here — jspreadsheet-ce's init-time merge application doesn't
         // reliably take effect (verified: cells came back unmerged despite correct data), so
         // merges are applied explicitly via setMerge() below instead, the same proven-working
@@ -517,14 +442,7 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
     getSnapshot: () => {
       const instance = instanceRef.current;
       if (!instance) return value;
-      // Translate the cells' HTML back into the saved model: plain text in `data`, and runs in
-      // `richText` for any cell that has bold/italic/underline on part of (or all of) its text.
-      const richText: Record<string, IPCRRichTextRun[]> = {};
-      const data = (instance.getData() as unknown[][]).map((row, y) => row.map((cellHtml, x) => {
-        const { text, runs } = cellHtmlToModel(cellHtml);
-        if (runs) richText[cellName(x, y)] = runs;
-        return text;
-      })) as (string | number)[][];
+      const data = instance.getData() as (string | number)[][];
       const style = (instance.getStyle() as Record<string, string>) ?? {};
       const merge = (instance.getMerge() as Record<string, [number, number]> | null) ?? {};
       const widths = instance.getWidth() as (number | string)[];
@@ -541,18 +459,6 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
         const numeric = parseFloat(String(height));
         if (numeric > 0) rowHeights[index] = numeric;
       });
-<<<<<<< HEAD
-      return { data, style, mergeCells: merge, colWidths, rowHeights, richText, images: value.images, sheetName: value.sheetName };
-    },
-    getSelectedCell: () => selectedRef.current,
-    selectCell: cell => {
-      const { col, row } = cellCoords(cell);
-      instanceRef.current?.updateSelectionFromCoords(col, row, col, row);
-    },
-    isEditing: () => !!editingRichCell && !!containerRef.current?.contains(editingRichCell),
-    formatSelection: command => { document.execCommand(command); },
-    getCellValue: cell => cellHtmlToPlain(instanceRef.current?.getValue(cell)),
-=======
       // Where A1 sits inside the wrapper (images are positioned from its top, 10px lower — see the image
       // layer's CSS), so exports can turn an image's x/y into a position over the table itself.
       const wrapper = containerRef.current?.parentElement;
@@ -613,7 +519,6 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
       const instance = instanceRef.current;
       if (instance?.edition) { try { instance.closeEditor(instance.edition[0], false); } catch { /* editor already closed */ } }
     },
->>>>>>> 739aa73a74a27f107df3823a7c123207d932a33c
     getCellStyle: cell => {
       const cellStyle = instanceRef.current?.getStyle(cell);
       return typeof cellStyle === "string" ? cellStyle : "";
@@ -651,7 +556,7 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
       const instance = instanceRef.current;
       return instance ? { rows: instance.rows.length, cols: instance.cols.length } : { rows: value.data.length, cols: value.data[0]?.length ?? 0 };
     },
-    setCellValue: (cell, cellValue) => { instanceRef.current?.setValue(cell, cellValue ? runsToHtml([{ text: cellValue }]) : ""); },
+    setCellValue: (cell, cellValue) => { instanceRef.current?.setValue(cell, cellValue); },
     markCell: (cell, marked) => {
       // An outline, not a border: a dashed `border` shorthand fights with the cell's real borders (the browser folds
       // them into one rule, so a bottom line drawn on a marked cell was lost on save and missing from the PDF).
@@ -664,7 +569,7 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
       const instance = instanceRef.current;
       const range = selectionRangeRef.current;
       const columnNumber = range ? Math.max(range[0], range[2]) : undefined;
-      instance?.insertColumn(1, position === "left" ? (range ? Math.min(range[0], range[2]) : undefined) : columnNumber, position === "left", [{ type: richTextColumn }]);
+      instance?.insertColumn(1, position === "left" ? (range ? Math.min(range[0], range[2]) : undefined) : columnNumber, position === "left");
     },
     insertRow: (position = "below") => {
       const instance = instanceRef.current;
@@ -736,19 +641,9 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
       for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) {
         for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) cells.push(`${columnName(x)}${y + 1}`);
       }
-<<<<<<< HEAD
-      // Read the toggle state from the parsed style string, not getStyle(cell, property): the
-      // browser hands back a normalized form (font-weight 700, "underline solid …") that never
-      // equals onValue, so a style that was on could never be switched off again.
-      const parsed = parseCellStyle(String(instance.getStyle(cells[0]) ?? ""));
-      const isOn = property === "font-weight" ? parsed.bold : property === "font-style" ? parsed.italic : parsed.underline;
-      const next = isOn ? "" : onValue;
-      cells.forEach(cell => instance.setStyle(cell, property, next, true));
-=======
       const current = instance.getStyle(cells[0], property);
       const next = current === onValue ? "" : onValue;
       cells.forEach(cell => setStyleProp(instance, cell, property, next));
->>>>>>> 739aa73a74a27f107df3823a7c123207d932a33c
     },
     setSelectionColor: (property, value) => {
       const instance = instanceRef.current;

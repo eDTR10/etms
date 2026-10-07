@@ -218,26 +218,34 @@ export function buildIPCRPdfDocDefinition(
     body.push(line);
   }
 
-  const { hWidth, vWidth, hColor, vColor, DEFAULT_COLOR } = buildBorderLineMaps(grid, rowCount, colCount);
-
-  const pageMargin = 24;
+  // Images are positioned in on-screen px from the wrapper around the grid; move that origin onto the
+  // table's top-left and apply the same scale as everything else.
+  const origin = grid.imageOrigin ?? FALLBACK_IMAGE_ORIGIN;
   return {
     pageSize: PDFMAKE_PAGE_SIZE[paperSize] ?? "A3",
     pageOrientation: orientation,
     pageMargins: [PAGE_MARGIN, PAGE_MARGIN, PAGE_MARGIN, PAGE_MARGIN] as [number, number, number, number],
     content: [
       {
-        table: { headerRows: 0, widths: Array(colCount).fill("*"), body },
+        table: {
+          headerRows: 0,
+          widths,
+          // A row is at least as tall as in the designer (and grows if its text needs more room).
+          heights: (row: number) => rowPt(row),
+          body,
+        },
         layout: {
-          defaultBorder: true,
-          hLineWidth: (i: number) => hWidth[i] ?? 0.75,
-          vLineWidth: (i: number) => vWidth[i] ?? 0.75,
-          hLineColor: (i: number, _node: unknown, col: number) => hColor.get(`${i}:${col}`) ?? DEFAULT_COLOR,
-          vLineColor: (i: number, _node: unknown, row: number) => vColor.get(`${i}:${row}`) ?? DEFAULT_COLOR,
-          paddingLeft: () => 4, paddingRight: () => 4, paddingTop: () => 3, paddingBottom: () => 3,
+          defaultBorder: false,
+          hLineWidth: (i: number) => hWidth[i] ?? 0,
+          vLineWidth: (i: number) => vWidth[i] ?? 0,
+          paddingLeft: () => padX, paddingRight: () => padX, paddingTop: () => padY, paddingBottom: () => padY,
         },
       },
-      ...grid.images.map(image => ({
+    ],
+    // Pictures are positioned over the top of the sheet, so they go on page 1 as a page background. Placing them
+    // in the content (after the table) put them on whichever page the table happened to END on.
+    background: (currentPage: number) => currentPage === 1 && grid.images.length
+      ? grid.images.map(image => ({
         image: image.dataUrl,
         width: image.width * PX_TO_PT * scale,
         height: image.height * PX_TO_PT * scale,
@@ -249,14 +257,6 @@ export function buildIPCRPdfDocDefinition(
       : null,
     defaultStyle: { fontSize: 8 * scale, font: "Helvetica" as PdfFont },
   };
-}
-
-export function getIPCRPdfBlob(
-  grid: IPCRGridData,
-  paperSize: IPCRPaperSize = "a3",
-  orientation: IPCROrientation = "landscape",
-): Promise<Blob> {
-  return pdfMake.createPdf(buildIPCRPdfDocDefinition(grid, paperSize, orientation)).getBlob();
 }
 
 export function downloadIPCRPdf(

@@ -149,31 +149,6 @@ export default function GenerateIPCRContent() {
               <label htmlFor="ipcr-label">File name <span aria-hidden="true">*</span></label>
               <input id="ipcr-label" value={label} onChange={event => setLabel(event.target.value)} placeholder="e.g. IPCR January to June 2026" maxLength={255} onKeyDown={event => { if (event.key === "Enter") void generate(); }} />
             </div>
-<<<<<<< HEAD
-
-            {fields.length > 0 && <>
-              <div className="etm-field">
-                <label htmlFor="ipcr-label">Label for this IPCR <span className="etm-form-optional">(optional, e.g. the review period)</span></label>
-                <input id="ipcr-label" value={label} onChange={event => setLabel(event.target.value)} placeholder="e.g. January to June 2026" maxLength={255} />
-              </div>
-
-              <div className="etm-field">
-                <label>Fill in the marked portions</label>
-                <IPCRFillForm fields={fields} values={values} meta={meta} groups={groups} onUpdateValue={updateValue} onToggleGroupTag={toggleGroupTag} />
-              </div>
-
-              {liveFinalRating !== null && <div className="etm-ipcr-final-rating-banner"><Star size={16} /> Final rating so far: {liveFinalRating} — {adjectivalRating(liveFinalRating)}</div>}
-
-              <div className="etm-field">
-                <div className="etm-ipcr-preview-actions">
-                  <button type="button" className="etm-button ghost small" onClick={() => { setTestPreview(true); setTestRefreshKey(key => key + 1); }}><Eye size={14} /> {testPreview ? "Update test preview" : "Test with these values"}</button>
-                </div>
-                {testPreview && <IPCRLivePreview grid={grid} fields={fields} values={values} paperSize={paperSize} orientation={orientation} refreshKey={testRefreshKey} />}
-              </div>
-            </>}
-
-=======
->>>>>>> 739aa73a74a27f107df3823a7c123207d932a33c
             <div className="etm-form-footer">
               <span>You can edit the whole sheet on the next screen.</span>
               <div>
@@ -209,16 +184,7 @@ export default function GenerateIPCRContent() {
               </div>
             ))}
           </div>
-<<<<<<< HEAD
-          <div className="etm-ipcr-preview-actions">
-            <button type="button" className="etm-button ghost small" onClick={() => void downloadIPCRWorkbook(fillGrid(normalizeGrid(preview.grid_snapshot), preview.fields_snapshot, preview.field_values), filename(preview))}><Download size={14} /> Download .xlsx</button>
-            <button type="button" className="etm-button ghost small" onClick={() => downloadIPCRPdf(fillGrid(normalizeGrid(preview.grid_snapshot), preview.fields_snapshot, preview.field_values), filename(preview), preview.paper_size, preview.orientation)}><FileText size={14} /> Download PDF</button>
-          </div>
-          <IPCRLivePreview grid={normalizeGrid(preview.grid_snapshot)} fields={preview.fields_snapshot} values={preview.field_values} paperSize={preview.paper_size} orientation={preview.orientation} refreshKey={`${preview.id}-${preview.updated_at}`} />
-        </section>
-=======
         ) : <p className="etm-empty-row">No IPCRs generated yet. Create one to get started.</p>
->>>>>>> 739aa73a74a27f107df3823a7c123207d932a33c
       )}
     </div>
   );

@@ -1,14 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import {
-<<<<<<< HEAD
-  AlignCenter, AlignLeft, AlignRight, ArrowDownToLine, ArrowLeftToLine, ArrowRightToLine, ArrowUpToLine,
-  Baseline, Bold, Combine, Eraser, Eye, FileUp, ImagePlus, Italic, Loader2,
-  MousePointerClick, PaintBucket, RefreshCw, Search, Square, Trash2, Underline, Undo2, Redo2, Ungroup, X, ZoomIn, ZoomOut,
-=======
   AlignCenter, AlignLeft, AlignRight, ArrowLeft, Ban, ChevronRight, Grid2x2, PanelBottom, PanelLeft, PanelRight, PanelTop, ArrowDownToLine, ArrowLeftToLine, ArrowRightToLine, ArrowUpToLine,
   Baseline, Bold, Combine, Eraser, Eye, FileText, FileUp, GripVertical, ImagePlus, Italic, Layers, Loader2,
   MousePointerClick, PaintBucket, RefreshCw, Search, Square, Trash2, Type, Underline, Undo2, Redo2, RotateCcw, Upload, Ungroup, X, ZoomIn, ZoomOut,
->>>>>>> 739aa73a74a27f107df3823a7c123207d932a33c
 } from "lucide-react";
 import Swal from "sweetalert2";
 import ThemedSelect, { type SelectOption } from "../../components/ThemedSelect";
@@ -16,15 +10,6 @@ import { taskService, taskError } from "../tasks/taskService";
 import type { GroupedTask } from "../tasks/types";
 import IPCRGrid, { type IPCRGridHandle } from "./IPCRGrid";
 import IPCRGridImageOverlay from "./IPCRGridImageOverlay";
-<<<<<<< HEAD
-
-import IPCRFillForm from "./IPCRFillForm";
-import IPCRLivePreview from "./IPCRLivePreview";
-import { composeGroupedTasksHtml, parseCellStyle } from "./ipcrGridUtils";
-import { parseIPCRWorkbookFile } from "./ipcrExport";
-import { buildIPCRPdfDocDefinition } from "./ipcrPdfExport";
-import { emptyGrid, fieldToken, slugifyKey, PAPER_SIZE_OPTIONS, type IPCRField, type IPCRFieldMetaEntry, type IPCRFieldType, type IPCRFieldValue, type IPCRGridData, type IPCRGridImage, type IPCROrientation, type IPCRPaperSize, type IPCRTemplate, type IPCRTemplateInput } from "./types";
-=======
 import { compressImage, formatBytes } from "./imageCompress";
 import IPCRGridRichTextOverlay from "./IPCRGridRichTextOverlay";
 import IPCRFillForm from "./IPCRFillForm";
@@ -35,7 +20,6 @@ import { cellCoords, cellName, composeGroupedTasksHtml, fillGrid, flattenRuns, h
 import { parseIPCRWorkbookFile } from "./ipcrExport";
 import { buildIPCRPdfDocDefinition } from "./ipcrPdfExport";
 import { DEFAULT_GRID_COLS, MONTH_NAMES, yearChoices, emptyGrid, fieldToken, slugifyKey, PAPER_SIZE_OPTIONS, type IPCRAutofill, type IPCRExpandable, type IPCRField, type IPCRFieldMetaEntry, type IPCRImageAnchor, type IPCRFieldType, type IPCRFieldValue, type IPCRGridData, type IPCRGridImage, type IPCROrientation, type IPCRPaperSize, type IPCRRichTextRun, type IPCRTemplate, type IPCRTemplateInput, type IPCRTemplateSampleChange } from "./types";
->>>>>>> 739aa73a74a27f107df3823a7c123207d932a33c
 import pdfMake from "pdfmake/build/pdfmake";
 
 const MAX_IMAGE_BYTES = 1.5 * 1024 * 1024;
@@ -108,8 +92,6 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
   const [name, setName] = useState(template?.name ?? "");
   const [fields, setFields] = useState<IPCRField[]>(template?.fields_config ?? []);
   const [images, setImages] = useState<IPCRGridImage[]>(template?.grid.images ?? []);
-<<<<<<< HEAD
-=======
   const [richText, setRichText] = useState<Record<string, IPCRRichTextRun[]>>(template?.grid.richText ?? {});
   // Rows / columns marked so whoever fills in the IPCR can add copies of them. Saved with the sheet.
   const [expandable, setExpandable] = useState<IPCRExpandable>(template?.grid.expandable ?? { rows: {}, cols: {} });
@@ -117,7 +99,6 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
   // The cell the mixed-formatting editor is open on.
   const [richTextCell, setRichTextCell] = useState<string | null>(null);
   const [richTextDraft, setRichTextDraft] = useState("");
->>>>>>> 739aa73a74a27f107df3823a7c123207d932a33c
   const [paperSize, setPaperSize] = useState<IPCRPaperSize>(template?.paper_size ?? "a3");
   const [orientation, setOrientation] = useState<IPCROrientation>(template?.orientation ?? "landscape");
   // Set only after an .xlsx import — bumping `seed` forces IPCRGrid (a mount-once, imperative
@@ -206,25 +187,6 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
 
   function refreshTest() {
     const snapshot = gridRef.current?.getSnapshot() ?? emptyGrid();
-<<<<<<< HEAD
-    setTestGrid({ ...snapshot, images });
-    setTestRefreshKey(key => key + 1);
-  }
-
-  // While a cell is open for editing (double-click / F2 / just start typing), B/I/U format only the
-  // words selected inside it; otherwise they style the whole selected cell(s).
-  // The sheet closes its open cell editor on any mousedown outside the cell (a document-level
-  // listener). Toolbar B/I/U must not trigger that, or the selected words lose their selection and
-  // formatting falls back to the whole cell — so keep focus in the cell and stop the event here.
-  function keepCellEditing(event: React.MouseEvent) {
-    event.preventDefault();
-    event.stopPropagation();
-  }
-
-  function formatText(command: "bold" | "italic" | "underline", property: "font-weight" | "font-style" | "text-decoration", value: string) {
-    if (gridRef.current?.isEditing()) gridRef.current.formatSelection(command);
-    else runStyleAction(() => gridRef.current?.toggleStyle(property, value));
-=======
     setTestGrid({ ...snapshot, images, richText, expandable });
     setTestRefreshKey(key => key + 1);
   }
@@ -286,7 +248,6 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
     setRichText(current => applyRichUpdates(current, { [cell]: after }));
     if (stepId !== null) pasteRichHistory.current.set(stepId, { before: { [cell]: before }, after: { [cell]: after } });
     setRichTextModalOpen(false);
->>>>>>> 739aa73a74a27f107df3823a7c123207d932a33c
   }
 
   // Double-clicking a cell with mixed formatting (a bold name in a list, a sentence with one underlined word) would
@@ -504,8 +465,6 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
     try {
       const parsed = await parseIPCRWorkbookFile(file);
       setImportedGrid(current => ({ seed: (current?.seed ?? 0) + 1, data: parsed }));
-<<<<<<< HEAD
-=======
       setRichText(parsed.richText ?? {});
       // The new sheet replaces the old one, pictures included; the imported ones are placed once the
       // new grid is on screen (their position is a cell + offset, which needs real cell positions).
@@ -528,7 +487,6 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
       } else if (shrunk) {
         void Swal.fire({ title: "Pictures compressed", text: `${shrunk} picture${shrunk > 1 ? "s were" : " was"} over ${formatBytes(MAX_IMAGE_BYTES)} and ${shrunk > 1 ? "were" : "was"} compressed to fit.`, icon: "info", timer: 2600, showConfirmButton: false });
       }
->>>>>>> 739aa73a74a27f107df3823a7c123207d932a33c
       setSelectedCell(null);
       setFormulaValue("");
       setSelectedStyle("");
@@ -541,9 +499,6 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
 
   function commitFormulaBar() {
     if (!selectedCell) return;
-    // Only when the text was actually changed here — re-saving an unchanged value would flatten
-    // the cell's word-level bold/italic/underline.
-    if (gridRef.current?.getCellValue(selectedCell) === formulaValue) return;
     gridRef.current?.setCellValue(selectedCell, formulaValue);
   }
 
@@ -559,6 +514,7 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
     if (!result.isConfirmed) return;
     setImportedGrid(current => ({ seed: (current?.seed ?? 0) + 1, data: emptyGrid() }));
     setImages([]);
+    setRichText({});
     setSelectedCell(null);
     setFormulaValue("");
     setSelectedStyle("");
@@ -762,13 +718,8 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
     }
     setPreviewing(true);
     try {
-<<<<<<< HEAD
-      const snapshot = gridRef.current?.getSnapshot() ?? emptyGrid();
-      const blob = await pdfMake.createPdf(buildIPCRPdfDocDefinition({ ...snapshot, images }, paperSize, orientation)).getBlob();
-=======
       const snapshot = current;
       const blob = await pdfMake.createPdf(buildIPCRPdfDocDefinition({ ...snapshot, images, expandable }, paperSize, orientation)).getBlob();
->>>>>>> 739aa73a74a27f107df3823a7c123207d932a33c
       const url = URL.createObjectURL(blob);
       setPreviewUrl(url);
       // The preview is a page of its own: give it a history entry so the browser's Back button returns to the
@@ -846,11 +797,7 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
     setError("");
     try {
       const snapshot = gridRef.current?.getSnapshot() ?? emptyGrid();
-<<<<<<< HEAD
-      await onSave({ name: name.trim(), grid: { ...snapshot, images }, fields_config: fields, paper_size: paperSize, orientation });
-=======
       await onSave({ name: name.trim(), grid: { ...snapshot, images, richText, expandable }, fields_config: fields, paper_size: paperSize, orientation }, { file: sampleFile, remove: removeSample && !sampleFile });
->>>>>>> 739aa73a74a27f107df3823a7c123207d932a33c
     } catch (caught) {
       setError(taskError(caught));
     } finally {
@@ -931,9 +878,6 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
                 <IPCRFillForm fields={fields} values={testValues} meta={testMeta} groups={testGroups} onUpdateValue={updateTestValue} onToggleGroupTag={toggleTestGroupTag} />
                 <button type="button" className="etm-button primary small" style={{ marginTop: 10 }} onClick={refreshTest}><RefreshCw size={14} /> Refresh preview</button>
               </div>
-<<<<<<< HEAD
-              <div>{testGrid && <IPCRLivePreview grid={testGrid} fields={fields} values={testValues} paperSize={paperSize} orientation={orientation} refreshKey={testRefreshKey} />}</div>
-=======
               <div>{testGrid && <IPCRLivePreview grid={testGrid} fields={fields} values={testValues} refreshKey={testRefreshKey} />}</div>
             </div>
           </div>
@@ -957,7 +901,6 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
             <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border">
               <button type="button" className="etm-button ghost small" onClick={() => setRichTextModalOpen(false)}>Cancel</button>
               <button type="button" className="etm-button primary small" onClick={applyRichText}>Apply</button>
->>>>>>> 739aa73a74a27f107df3823a7c123207d932a33c
             </div>
           </div>
         </div>
@@ -976,7 +919,6 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
         <div className="shrink-0" style={{ width: 92 }} title="Paper size — used when generating a PDF">
           <ThemedSelect<SelectOption<IPCRPaperSize>>
             size="mini"
-            portal
             classNamePrefix="etm-papersize-select"
             isSearchable={false}
             options={PAPER_SIZE_OPTIONS.map(option => ({ value: option.value, label: option.label }))}
@@ -995,7 +937,6 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
         <div className="shrink-0" style={{ width: 120, opacity: sel ? 1 : 0.4 }} title="Font family — applies on screen and in the .xlsx export; PDF export uses a fixed font">
           <ThemedSelect<SelectOption<string>>
             size="mini"
-            portal
             classNamePrefix="etm-fontfamily-select"
             isSearchable={false}
             isDisabled={!sel}
@@ -1009,16 +950,10 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
           className="w-12 text-[11px] border border-border rounded px-1.5 bg-background h-6 shrink-0 disabled:opacity-40" title="Font size (px)" />
         <div className="w-px h-4 bg-border mx-1 shrink-0" />
 
-<<<<<<< HEAD
-        <button type="button" disabled={!sel} onMouseDown={keepCellEditing} onClick={() => formatText("bold", "font-weight", "bold")} className={tbActive(currentStyle.bold)} title="Bold (Ctrl+B)"><Bold className="w-3.5 h-3.5" /></button>
-        <button type="button" disabled={!sel} onMouseDown={keepCellEditing} onClick={() => formatText("italic", "font-style", "italic")} className={tbActive(currentStyle.italic)} title="Italic (Ctrl+I)"><Italic className="w-3.5 h-3.5" /></button>
-        <button type="button" disabled={!sel} onMouseDown={keepCellEditing} onClick={() => formatText("underline", "text-decoration", "underline")} className={tbActive(currentStyle.underline)} title="Underline (Ctrl+U)"><Underline className="w-3.5 h-3.5" /></button>
-=======
         <button type="button" disabled={!sel} onClick={() => runStyleAction(() => gridRef.current?.toggleStyle("font-weight", "bold"))} className={tbActive(currentStyle.bold)} title="Bold"><Bold className="w-3.5 h-3.5" /></button>
         <button type="button" disabled={!sel} onClick={() => runStyleAction(() => gridRef.current?.toggleStyle("font-style", "italic"))} className={tbActive(currentStyle.italic)} title="Italic"><Italic className="w-3.5 h-3.5" /></button>
         <button type="button" disabled={!sel} onClick={() => runStyleAction(() => gridRef.current?.toggleStyle("text-decoration", "underline"))} className={tbActive(currentStyle.underline)} title="Underline"><Underline className="w-3.5 h-3.5" /></button>
         <button type="button" disabled={!sel} onClick={() => openRichTextEditor()} className={tbActive(!!richText[selectedCell ?? ""])} title="Mixed formatting within this cell — bold/underline just part of the text (e.g. a name inside a sentence)"><Type className="w-3.5 h-3.5" /></button>
->>>>>>> 739aa73a74a27f107df3823a7c123207d932a33c
         <label className={`${tb} relative cursor-pointer ${!sel ? "opacity-30 pointer-events-none" : ""}`} title="Text color">
           <Baseline className="w-3.5 h-3.5" />
           <span className="absolute bottom-0.5 left-1 right-1 h-[3px] rounded-sm" style={{ backgroundColor: currentStyle.color || "#000000" }} />
@@ -1042,7 +977,6 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
         <div className="shrink-0" style={{ width: 74, opacity: sel ? 1 : 0.4 }} title="Vertical alignment">
           <ThemedSelect<SelectOption<"top" | "middle" | "bottom">>
             size="mini"
-            portal
             classNamePrefix="etm-valign-select"
             isSearchable={false}
             isDisabled={!sel}
@@ -1055,20 +989,6 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
 
         <button type="button" onClick={() => gridRef.current?.mergeSelection()} className={`${tb} text-[10px] font-medium px-1.5 shrink-0`} title="Merge selected cells"><Combine className="w-3.5 h-3.5" /></button>
         <button type="button" onClick={() => gridRef.current?.unmergeSelection()} className={`${tb} text-[10px] font-medium px-1.5 shrink-0`} title="Unmerge cell"><Ungroup className="w-3.5 h-3.5" /></button>
-<<<<<<< HEAD
-        <div className="shrink-0" style={{ width: 96, opacity: sel ? 1 : 0.4 }} title="Apply borders to the selection">
-          <ThemedSelect<SelectOption<IPCRBorderKind>>
-            size="mini"
-            portal
-            classNamePrefix="etm-border-select"
-            isSearchable={false}
-            isDisabled={!sel}
-            placeholder="Borders…"
-            options={BORDER_OPTIONS}
-            value={null}
-            onChange={option => { if (option) gridRef.current?.applyBorder(option.value, borderColor); }}
-          />
-=======
         <div className={`flex items-center shrink-0 ${!sel ? "opacity-40 pointer-events-none" : ""}`} role="group" aria-label="Cell borders">
           <button type="button" className={tb} title="Top border (click again to remove)" onClick={() => gridRef.current?.applyBorder("top", borderColor, borderWidth)}><PanelTop className="w-3.5 h-3.5" /></button>
           <button type="button" className={tb} title="Left border (click again to remove)" onClick={() => gridRef.current?.applyBorder("left", borderColor, borderWidth)}><PanelLeft className="w-3.5 h-3.5" /></button>
@@ -1083,7 +1003,6 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
             <option value={2}>2px</option>
             <option value={3}>3px</option>
           </select>
->>>>>>> 739aa73a74a27f107df3823a7c123207d932a33c
         </div>
         <label className={`${tb} relative cursor-pointer ${!sel ? "opacity-30 pointer-events-none" : ""}`} title="Border color">
           <Square className="w-3.5 h-3.5" />
@@ -1187,8 +1106,6 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
                 }}
               />
               <IPCRGridImageOverlay images={images} editable onChange={setImages} />
-<<<<<<< HEAD
-=======
               <IPCRGridRichTextOverlay
                 grid={{ ...(importedGrid?.data ?? template?.grid ?? emptyGrid()), richText: Object.fromEntries(Object.entries(richText).filter(([cell]) => cell !== editingCell && !(samplePreview?.richText && cell in samplePreview.richText))) }}
                 gridRef={gridRef}
@@ -1211,7 +1128,6 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
                   refreshKey={`${zoom}-${dims.rows}-${dims.cols}-${layoutVersion}-sample-${Object.entries(sampleValues).map(([key, value]) => `${key}=${value}`).join("|")}`}
                 />
               )}
->>>>>>> 739aa73a74a27f107df3823a7c123207d932a33c
             </div>
           </div>
         </div>

@@ -1,49 +1,28 @@
-import { useEffect, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
-import { getIPCRPdfBlob } from "./ipcrPdfExport";
+import { useRef } from "react";
+import IPCRGrid, { type IPCRGridHandle } from "./IPCRGrid";
+import IPCRGridImageOverlay from "./IPCRGridImageOverlay";
+import IPCRGridRichTextOverlay from "./IPCRGridRichTextOverlay";
 import { fillGrid } from "./ipcrGridUtils";
-import type { IPCRField, IPCRFieldValue, IPCRGridData, IPCROrientation, IPCRPaperSize } from "./types";
+import type { IPCRField, IPCRFieldValue, IPCRGridData } from "./types";
 
 interface IPCRLivePreviewProps {
   grid: IPCRGridData;
   fields: IPCRField[];
   values: Record<string, IPCRFieldValue>;
-  paperSize?: IPCRPaperSize;
-  orientation?: IPCROrientation;
-  // Bump this from the caller (e.g. a "Refresh preview" button) to regenerate the PDF with the
-  // latest values — it doesn't react to value changes on its own, so typing doesn't rebuild a
-  // full PDF per keystroke.
+  // Bump this from the caller (e.g. a "Refresh preview" button) to force the read-only grid
+  // to remount with the latest values — it doesn't react to value changes on its own, the
+  // same as the editable grid, so typing doesn't thrash a full spreadsheet re-init per keystroke.
   refreshKey: number | string;
 }
 
-// Renders the actual PDF that "Download PDF" produces (same pdfmake pipeline), so the preview
-// can never drift from the exported file the way an HTML approximation of the grid could.
-export default function IPCRLivePreview({ grid, fields, values, paperSize = "a3", orientation = "landscape", refreshKey }: IPCRLivePreviewProps) {
-  const [url, setUrl] = useState<string | null>(null);
-  const [error, setError] = useState("");
-  const latest = useRef({ grid, fields, values, paperSize, orientation });
-  latest.current = { grid, fields, values, paperSize, orientation };
-
-  useEffect(() => {
-    let cancelled = false;
-    let objectUrl: string | null = null;
-    setUrl(null);
-    setError("");
-    const current = latest.current;
-    getIPCRPdfBlob(fillGrid(current.grid, current.fields, current.values), current.paperSize, current.orientation)
-      .then(blob => {
-        if (cancelled) return;
-        objectUrl = URL.createObjectURL(blob);
-        setUrl(objectUrl);
-      })
-      .catch(() => { if (!cancelled) setError("Couldn't generate the PDF preview."); });
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [refreshKey]);
-
-  if (error) return <p className="etm-field-error" role="alert">{error}</p>;
-  if (!url) return <div className="etm-ipcr-pdf-preview loading"><Loader2 size={22} className="etm-form-spinner" /></div>;
-  return <iframe className="etm-ipcr-pdf-preview" src={`${url}#toolbar=1&navpanes=0`} title="IPCR PDF preview" />;
+export default function IPCRLivePreview({ grid, fields, values, refreshKey }: IPCRLivePreviewProps) {
+  const gridRef = useRef<IPCRGridHandle>(null);
+  const filled = fillGrid(grid, fields, values);
+  return (
+    <div className="etm-ipcr-grid-overlay-wrap">
+      <IPCRGrid key={refreshKey} ref={gridRef} value={filled} editable={false} />
+      <IPCRGridImageOverlay images={grid.images} editable={false} />
+      <IPCRGridRichTextOverlay grid={filled} gridRef={gridRef} refreshKey={refreshKey} />
+    </div>
+  );
 }

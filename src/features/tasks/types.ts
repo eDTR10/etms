@@ -100,6 +100,8 @@ export interface SubTask {
   id?: number;
   title: string;
   description: string;
+  // Optional due date of this subtask (YYYY-MM-DD).
+  deadline?: string | null;
   status: TaskStatus;
   is_completed: boolean;
   remarks?: Remark[];

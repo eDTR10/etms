@@ -37,7 +37,6 @@ function buildStyles<Option, IsMulti extends boolean>(size: Size): StylesConfig<
     indicatorSeparator: () => ({ display: "none" }),
     dropdownIndicator: base => ({ ...base, color: "var(--etm-muted)", padding: size === "mini" ? "0 4px" : size === "small" ? "0 6px" : "0 8px" }),
     clearIndicator: base => ({ ...base, color: "var(--etm-muted)" }),
-    menuPortal: base => ({ ...base, zIndex: 9999 }),
     menu: base => ({ ...base, backgroundColor: "var(--etm-surface)", border: "1px solid var(--etm-border)", borderRadius: 8, overflow: "hidden", zIndex: 20 }),
     // Used when the menu is portalled to <body> (see the "mini" toolbar selects below).
     menuPortal: base => ({ ...base, zIndex: 9999 }),
@@ -66,16 +65,12 @@ const multiStylesBySize: Record<Size, StylesConfig<unknown, true>> = {
 
 export type ThemedSelectProps<Option, IsMulti extends boolean = false> = SelectProps<Option, IsMulti, GroupBase<Option>> & {
   size?: Size;
-  // Renders the menu in a body-level portal so it can't be clipped by an overflow:auto/hidden
-  // ancestor (e.g. a horizontally-scrolling toolbar). Skip inside Radix dialogs, whose focus
-  // trap treats a portaled menu as an outside click.
-  portal?: boolean;
 };
 
 // Drop-in replacement for a native <select> styled to match the rest of the app, with
 // search-as-you-type built in. Pass `isMulti` for a multi-select, `size="small"`/`"mini"` for
 // the more compact rows this app already uses (subtask editors, table cells, dense toolbars).
-export default function ThemedSelect<Option, IsMulti extends boolean = false>({ size = "default", styles, portal, ...props }: ThemedSelectProps<Option, IsMulti>) {
+export default function ThemedSelect<Option, IsMulti extends boolean = false>({ size = "default", styles, ...props }: ThemedSelectProps<Option, IsMulti>) {
   const base = props.isMulti ? multiStylesBySize[size] : stylesBySize[size];
   return (
     <Select<Option, IsMulti, GroupBase<Option>>
@@ -84,7 +79,6 @@ export default function ThemedSelect<Option, IsMulti extends boolean = false>({ 
       menuPortalTarget={size === "mini" && typeof document !== "undefined" ? document.body : undefined}
       menuPosition={size === "mini" ? "fixed" : "absolute"}
       styles={styles ? { ...(base as StylesConfig<Option, IsMulti>), ...styles } : (base as StylesConfig<Option, IsMulti>)}
-      {...(portal ? { menuPortalTarget: document.body, menuPosition: "fixed" as const } : {})}
       {...props}
     />
   );
