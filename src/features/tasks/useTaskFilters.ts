@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { isDueSoon, isOverdue, memberName, type Member, type Priority, type Task, type TaskStatus } from "./types";
+import { DUE_SOON_DAYS, daysUntilDue, isDueSoon, isOverdue, memberName, type Member, type Priority, type Task, type TaskStatus } from "./types";
 
 export type StatusFilterValue = "all" | TaskStatus;
 export type PriorityFilterValue = "all" | Priority;
@@ -7,6 +7,7 @@ export type ProjectFilterValue = "all" | "personal" | number;
 export type QuickDeadlineFilterValue = "" | "day" | "week" | "month";
 export type AssignedFilterValue = "all" | "unassigned";
 // "mine" = tasks I created; "assigned" = tasks someone else created that I was assigned to.
+export type DeadlineBucketValue = "" | "upcoming" | "none";
 export type OwnershipFilterValue = "all" | "mine" | "assigned";
 
 export interface TaskFilterOptions {
@@ -23,14 +24,33 @@ export interface TaskFilterOptions {
   // When set, the filter state survives leaving and re-entering the screen (e.g. open a task,
   // press Back) — kept in memory per key, so a page reload still starts fresh.
   persistKey?: string;
+  // Skip any saved state and use the initial* values (e.g. arriving via a Dashboard card link).
+  ignoreSaved?: boolean;
 }
 
 interface SavedFilters {
   search: string; deadlineDate: string; quickFilter: QuickDeadlineFilterValue; status: StatusFilterValue; priority: PriorityFilterValue;
   projectFilter: ProjectFilterValue; assignedFilter: AssignedFilterValue; overdueOnly: boolean; dueSoonOnly: boolean; ownership: OwnershipFilterValue;
   personOffice: number | null; personProject: number | null;
+  deadlineBucket?: DeadlineBucketValue; includeCompleted?: boolean;
 }
 const savedFilters = new Map<string, SavedFilters>();
+const storageKey = (key: string) => `etm.filters.${key}`;
+// Memory first (instant, survives navigation), then localStorage (survives a page reload).
+function loadSavedFilters(key: string): SavedFilters | undefined {
+  const inMemory = savedFilters.get(key);
+  if (inMemory) return inMemory;
+  try {
+    const raw = window.localStorage.getItem(storageKey(key));
+    return raw ? JSON.parse(raw) as SavedFilters : undefined;
+  } catch {
+    return undefined;
+  }
+}
+function storeFilters(key: string, value: SavedFilters) {
+  savedFilters.set(key, value);
+  try { window.localStorage.setItem(storageKey(key), JSON.stringify(value)); } catch { /* storage unavailable — memory copy still works */ }
+}
 
 function toDateStr(date: Date): string {
   const year = date.getFullYear();
@@ -59,7 +79,7 @@ function quickFilterRange(value: QuickDeadlineFilterValue): { from: string; to: 
 }
 
 export function useTaskFilters(tasks: Task[], options?: TaskFilterOptions) {
-  const [saved] = useState(() => options?.persistKey ? savedFilters.get(options.persistKey) : undefined);
+  const [saved] = useState(() => options?.persistKey && !options.ignoreSaved ? loadSavedFilters(options.persistKey) : undefined);
   const [search, setSearch] = useState(saved?.search ?? "");
   const [deadlineDate, setDeadlineDateState] = useState(saved?.deadlineDate ?? "");
   const [quickFilter, setQuickFilterState] = useState<QuickDeadlineFilterValue>(saved?.quickFilter ?? "");
@@ -73,10 +93,14 @@ export function useTaskFilters(tasks: Task[], options?: TaskFilterOptions) {
   // Only tasks with someone assigned who is in this office / this project (null = no filter).
   const [personOffice, setPersonOffice] = useState<number | null>(saved?.personOffice ?? null);
   const [personProject, setPersonProject] = useState<number | null>(saved?.personProject ?? null);
+  // Set by the dashboard charts: "upcoming" = open with a deadline beyond the due-soon window, "none" = open without a deadline.
+  const [deadlineBucket, setDeadlineBucket] = useState<DeadlineBucketValue>(saved?.deadlineBucket ?? "");
+  // Show finished tasks even under status "all" (priority counts include them).
+  const [includeCompleted, setIncludeCompleted] = useState(saved?.includeCompleted ?? false);
   const persistKey = options?.persistKey;
   useEffect(() => {
-    if (persistKey) savedFilters.set(persistKey, { search, deadlineDate, quickFilter, status, priority, projectFilter, assignedFilter, overdueOnly, dueSoonOnly, ownership, personOffice, personProject });
-  }, [persistKey, search, deadlineDate, quickFilter, status, priority, projectFilter, assignedFilter, overdueOnly, dueSoonOnly, ownership, personOffice, personProject]);
+    if (persistKey) storeFilters(persistKey, { search, deadlineDate, quickFilter, status, priority, projectFilter, assignedFilter, overdueOnly, dueSoonOnly, ownership, personOffice, personProject, deadlineBucket, includeCompleted });
+  }, [persistKey, deadlineBucket, includeCompleted, search, deadlineDate, quickFilter, status, priority, projectFilter, assignedFilter, overdueOnly, dueSoonOnly, ownership, personOffice, personProject]);
 
   const setDeadlineDate = (value: string) => {
     setDeadlineDateState(value);
@@ -106,7 +130,7 @@ export function useTaskFilters(tasks: Task[], options?: TaskFilterOptions) {
       }
       if (status !== "all" && task.status !== status) return false;
       // Under "My Total Tasks" / "Task Assigned" the count includes finished work, so show it too.
-      if (status === "all" && task.is_completed && !options?.showCompletedInAll && ownership === "all") return false;
+      if (status === "all" && task.is_completed && !options?.showCompletedInAll && !includeCompleted && ownership === "all") return false;
       if (priority !== "all" && task.priority !== priority) return false;
       if (projectFilter === "personal") {
         if (task.project) return false;
@@ -121,16 +145,21 @@ export function useTaskFilters(tasks: Task[], options?: TaskFilterOptions) {
       }
       if (overdueOnly && !isOverdue(task)) return false;
       if (dueSoonOnly && !isDueSoon(task)) return false;
+      if (deadlineBucket) {
+        if (task.is_completed) return false;
+        const days = daysUntilDue(task);
+        if (deadlineBucket === "none" ? !!task.deadline : (days === null || days <= DUE_SOON_DAYS)) return false;
+      }
       if (ownership === "mine" && !task.is_creator) return false;
       // Tasks sent to you as Task Lead are for review, not work assigned to you.
       if (ownership === "assigned" && !task.assignments.some(person => person.id === options?.userId && person.role !== "Lead")) return false;
       return true;
     });
-  }, [tasks, search, deadlineRange, status, priority, projectFilter, assignedFilter, overdueOnly, dueSoonOnly, ownership, personOffice, personProject, options?.members, options?.userId, options?.showCompletedInAll]);
+  }, [tasks, search, deadlineRange, status, priority, projectFilter, assignedFilter, overdueOnly, dueSoonOnly, ownership, personOffice, personProject, options?.members, options?.userId, options?.showCompletedInAll, deadlineBucket, includeCompleted]);
 
-  const hasActiveFilters = !!search.trim() || !!deadlineDate || !!quickFilter || status !== "all" || priority !== "all" || projectFilter !== "all" || personOffice !== null || personProject !== null || assignedFilter !== "all" || overdueOnly || dueSoonOnly || ownership !== "all";
+  const hasActiveFilters = !!search.trim() || !!deadlineDate || !!quickFilter || status !== "all" || priority !== "all" || projectFilter !== "all" || personOffice !== null || personProject !== null || assignedFilter !== "all" || overdueOnly || dueSoonOnly || ownership !== "all" || !!deadlineBucket || includeCompleted;
   const clearFilters = () => {
-    setSearch(""); setDeadlineDateState(""); setQuickFilterState(""); setStatus("all"); setPriority("all"); setProjectFilter("all"); setPersonOffice(null); setPersonProject(null); setAssignedFilter("all"); setOverdueOnly(false); setDueSoonOnly(false); setOwnership("all");
+    setSearch(""); setDeadlineDateState(""); setQuickFilterState(""); setStatus("all"); setPriority("all"); setProjectFilter("all"); setPersonOffice(null); setPersonProject(null); setAssignedFilter("all"); setOverdueOnly(false); setDueSoonOnly(false); setOwnership("all"); setDeadlineBucket(""); setIncludeCompleted(false);
   };
 
   return {
@@ -144,6 +173,8 @@ export function useTaskFilters(tasks: Task[], options?: TaskFilterOptions) {
     assignedFilter, setAssignedFilter,
     overdueOnly, setOverdueOnly,
     dueSoonOnly, setDueSoonOnly,
+    deadlineBucket, setDeadlineBucket,
+    includeCompleted, setIncludeCompleted,
     ownership, setOwnership,
     personOffice, setPersonOffice,
     personProject, setPersonProject,

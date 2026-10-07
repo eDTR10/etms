@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { AlertTriangle, Ban, CheckCircle2, ChevronRight, ClipboardList, Clock, Hourglass, User, UserCheck, UserX } from "lucide-react";
 import ThemedSelect, { type SelectOption } from "../../components/ThemedSelect";
 import { useTasks } from "../../features/tasks/taskContext";
@@ -17,7 +17,7 @@ import { useDuplicateTask } from "../../features/tasks/useDuplicateTask";
 import { useBulkTaskActions } from "../../features/tasks/useBulkTaskActions";
 import { useRowSelection } from "../../features/tasks/useRowSelection";
 import { SortTh, useTableSort } from "../../features/tasks/useTableSort";
-import { dueSoonLabel, formatDate, isDueSoon, isOverdue, memberName, remarkPreview, statusChipLabel, statusSlug, STATUSES, type Task, type TaskStatus } from "../../features/tasks/types";
+import { daysUntilDue, dueSoonLabel, formatDate, isDueSoon, isOverdue, memberName, remarkPreview, statusChipLabel, statusSlug, STATUSES, type Task, type TaskStatus } from "../../features/tasks/types";
 import Modal from "../../components/ui/modal";
 
 interface DashboardOverviewProps {
@@ -36,33 +36,55 @@ const STATUS_COLORS: Record<TaskStatus, string> = {
   "Blocked/Stuck": "#c0605a",
 };
 
+const PRIORITY_COLORS = { High: "#be7770", Medium: "#a47f3c", Low: "#649784" } as const;
+type ChartView = "status" | "priority" | "deadline";
+const CHART_VIEWS: { value: ChartView; label: string }[] = [
+  { value: "status", label: "Status" },
+  { value: "priority", label: "Priority" },
+  { value: "deadline", label: "Deadlines" },
+];
+
 const WORKLOAD_PAGE_SIZE = 5;
 const WORKLOAD_SORT_OPTIONS: SelectOption<"most" | "fewest">[] = [
   { value: "most", label: "Most tasks" },
   { value: "fewest", label: "Fewest tasks" },
 ];
 
-function StatusDonut({ segments, centerPct, centerLabel }: { segments: { color: string; start: number; end: number }[]; centerPct: number; centerLabel: string }) {
-  const hasData = segments.some(segment => segment.end > segment.start);
-  const gradient = hasData
-    ? segments.map(segment => `${segment.color} ${segment.start}% ${segment.end}%`).join(", ")
-    : "var(--etm-surface-sunken) 0% 100%";
+interface DonutSegment { color: string; start: number; end: number; label: string; count: number }
+
+function StatusDonut({ segments, centerValue, centerLabel, unit = "%" }: { segments: DonutSegment[]; centerValue: number; centerLabel: string; unit?: string }) {
+  const [hovered, setHovered] = useState<string | null>(null);
+  const active = segments.find(segment => segment.label === hovered && segment.end > segment.start);
+  const radius = 52;
+  const circumference = 2 * Math.PI * radius;
+  const visible = segments.filter(segment => segment.end > segment.start);
+  // A thin gap between arcs gives a clean straight divider (skipped when there is only one).
+  const gap = visible.length > 1 ? 3 : 0;
   return (
     <div className="etm-donut-wrap">
-      <div className="etm-donut" style={{ background: `conic-gradient(${gradient})` }}>
+      <div className="etm-donut">
+        <svg viewBox="0 0 132 132" aria-hidden="true">
+          <circle className="etm-donut-track" cx="66" cy="66" r={radius} />
+          {visible.map(segment => {
+            const length = Math.max(((segment.end - segment.start) / 100) * circumference - gap, 0.5);
+            return <circle key={segment.color} className={`etm-donut-arc ${active ? (active === segment ? "active" : "dim") : ""}`} cx="66" cy="66" r={radius} stroke={segment.color}
+              onMouseEnter={() => setHovered(segment.label)} onMouseLeave={() => setHovered(null)}
+              strokeDasharray={`${length} ${circumference - length}`} strokeDashoffset={-((segment.start / 100) * circumference + gap / 2)}><title>{`${segment.label}: ${segment.count} (${Math.round(segment.end - segment.start)}%)`}</title></circle>;
+          })}
+        </svg>
         <div className="etm-donut-center">
-          <span className="etm-donut-pct">{centerPct}%</span>
-          <span className="etm-donut-label">{centerLabel}</span>
+          <span className="etm-donut-pct" style={active ? { color: active.color } : undefined}>{active ? Math.round(active.end - active.start) : centerValue}<small>{active ? "%" : unit}</small></span>
+          <span className="etm-donut-label">{active ? `${active.label} · ${active.count}` : centerLabel}</span>
         </div>
       </div>
     </div>
   );
 }
 
-function StatusRow({ label, count, total, color }: { label: string; count: number; total: number; color: string }) {
+function StatusRow({ label, count, total, color, onSelect }: { label: string; count: number; total: number; color: string; onSelect?: () => void }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
   return (
-    <div className="etm-donut-row">
+    <div className={`etm-donut-row ${onSelect ? "clickable" : ""}`} style={{ "--row-color": color } as React.CSSProperties} {...(onSelect ? { role: "button", tabIndex: 0, title: "Show these tasks in the table", onClick: onSelect, onKeyDown: (event: React.KeyboardEvent) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(); } } } : {})}>
       <div className="etm-donut-row-top">
         <span className="etm-donut-row-label"><span className="etm-donut-dot" style={{ backgroundColor: color }} />{label}</span>
         <span className="etm-donut-row-count">{count}</span>
@@ -71,6 +93,11 @@ function StatusRow({ label, count, total, color }: { label: string; count: numbe
       <span className="etm-donut-row-caption">{pct}% of all tasks</span>
     </div>
   );
+}
+
+// Invisible full-cell link so right-click anywhere on a row offers "Open link in new tab".
+function RowLink({ to }: { to: string }) {
+  return <Link to={to} className="etm-cell-link" tabIndex={-1} aria-hidden="true" onClick={event => event.stopPropagation()} />;
 }
 
 export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks", userView = false }: DashboardOverviewProps) {
@@ -89,7 +116,7 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks", 
     filtered, search, setSearch, deadlineDate, setDeadlineDate, quickFilter, setQuickFilter,
     status, setStatus, priority, setPriority, projectFilter, setProjectFilter,
     assignedFilter, setAssignedFilter, overdueOnly, setOverdueOnly,
-    dueSoonOnly, setDueSoonOnly, ownership, setOwnership, hasActiveFilters, clearFilters,
+    dueSoonOnly, setDueSoonOnly, ownership, setOwnership, setDeadlineBucket, setIncludeCompleted, hasActiveFilters, clearFilters,
   } = useTaskFilters(tasks, { initialStatus: "Pending", userId: user?.id, persistKey: "dashboard" });
   const [viewingId, setViewingId] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -111,6 +138,12 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks", 
     else if (kind === "assigned") { setOwnership("assigned"); setStatus("all"); }
     else if (kind === "dueSoon") setDueSoonOnly(true);
     else setOverdueOnly(true);
+    recentSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  // Chart clicks reuse the card behaviour: reset, apply one filter, scroll to the table.
+  const filterFromChart = (apply: () => void) => {
+    clearFilters();
+    apply();
     recentSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
   const activeKpi = ownership !== "all" ? ownership : dueSoonOnly ? "dueSoon" : overdueOnly ? "overdue" : assignedFilter === "unassigned" ? "unassigned" : status === "Completed" ? "completed" : status === "Pending" ? "pending" : status === "Blocked/Stuck" ? "blocked" : null;
@@ -182,9 +215,37 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks", 
       const start = totalTasks > 0
         ? STATUSES.slice(0, index).reduce((sum, previous) => sum + (statusCounts[previous] / totalTasks) * 100, 0)
         : 0;
-      return { color: STATUS_COLORS[item], start, end: start + pct };
+      return { color: STATUS_COLORS[item], start, end: start + pct, label: item, count: statusCounts[item] };
     });
   }, [statusCounts, totalTasks]);
+
+  const [chartView, setChartView] = useState<ChartView>("status");
+  const priorityCounts = useMemo(() => {
+    const counts = { High: 0, Medium: 0, Low: 0 };
+    tasks.forEach(task => { counts[task.priority] += 1; });
+    return counts;
+  }, [tasks]);
+  const priorityKeys = ["High", "Medium", "Low"] as const;
+  const prioritySegments = useMemo<DonutSegment[]>(() => {
+    let cursor = 0;
+    return priorityKeys.map(key => {
+      const pct = totalTasks > 0 ? (priorityCounts[key] / totalTasks) * 100 : 0;
+      const segment = { color: PRIORITY_COLORS[key], start: cursor, end: cursor + pct, label: key, count: priorityCounts[key] };
+      cursor += pct;
+      return segment;
+    });
+  }, [priorityCounts, totalTasks]);
+  // Open work only — a finished task has no deadline pressure.
+  const deadlineBuckets = useMemo(() => {
+    const open = tasks.filter(task => !task.is_completed);
+    return [
+      { label: "Overdue", kind: "overdue" as const, count: open.filter(isOverdue).length, color: "#c0605a" },
+      { label: "Due soon", kind: "dueSoon" as const, count: open.filter(isDueSoon).length, color: "#c18a31" },
+      { label: "Upcoming", kind: "upcoming" as const, count: open.filter(task => { const days = daysUntilDue(task); return days !== null && days > 2; }).length, color: "#5484bd" },
+      { label: "No deadline", kind: "none" as const, count: open.filter(task => !task.deadline).length, color: "#8a97a3" },
+    ];
+  }, [tasks]);
+  const deadlineMax = Math.max(1, ...deadlineBuckets.map(bucket => bucket.count));
 
   const recentTasks = useMemo(() => [...filtered].sort((a, b) =>
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -275,13 +336,44 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks", 
             </> : <p className="etm-empty-row">No one has a task assigned yet.</p>}
           </div>
           <div className="etm-panel etm-chart-panel">
-            <h3 className="etm-chart-title">Task progression</h3>
-            <StatusDonut segments={donutSegments} centerPct={completionPct} centerLabel="Completed" />
-            <div className="etm-donut-rows">
-              {STATUSES.map(item => (
-                <StatusRow key={item} label={item} count={statusCounts[item]} total={totalTasks} color={STATUS_COLORS[item]} />
-              ))}
+            <div className="etm-chart-head">
+              <h3 className="etm-chart-title">{chartView === "status" ? "Task progression" : chartView === "priority" ? "Priority breakdown" : "Deadline outlook"}</h3>
+              <div className="etm-chart-tabs" role="tablist" aria-label="Chart view">
+                {CHART_VIEWS.map(view => (
+                  <button key={view.value} type="button" role="tab" aria-selected={chartView === view.value} className={chartView === view.value ? "active" : ""} onClick={() => setChartView(view.value)}>{view.label}</button>
+                ))}
+              </div>
             </div>
+            {chartView === "status" && <>
+              <StatusDonut segments={donutSegments} centerValue={completionPct} centerLabel="Completed" />
+              <div className="etm-donut-rows">
+                {(["Completed", "In-Progress", "Pending", "Blocked/Stuck"] as TaskStatus[]).map(item => (
+                  <StatusRow key={item} label={item} count={statusCounts[item]} total={totalTasks} color={STATUS_COLORS[item]} onSelect={() => filterFromChart(() => setStatus(item))} />
+                ))}
+              </div>
+            </>}
+            {chartView === "priority" && <>
+              <StatusDonut segments={prioritySegments} centerValue={totalTasks} unit="" centerLabel="Total tasks" />
+              <div className="etm-donut-rows">
+                {priorityKeys.map(key => (
+                  <StatusRow key={key} label={`${key} priority`} count={priorityCounts[key]} total={totalTasks} color={PRIORITY_COLORS[key]} onSelect={() => filterFromChart(() => { setPriority(key); setIncludeCompleted(true); })} />
+                ))}
+              </div>
+            </>}
+            {chartView === "deadline" && <>
+              <div className="etm-vbar-chart-frame etm-deadline-chart">
+                <div className="etm-vbar-chart">
+                  {deadlineBuckets.map(bucket => (
+                    <button type="button" key={bucket.label} disabled={bucket.count === 0} className={`etm-vbar-col etm-vbar-col-button ${bucket.count === 0 ? "etm-vbar-col-empty" : ""}`} title={bucket.count ? `Show ${bucket.count} ${bucket.label.toLowerCase()} in the table` : `${bucket.label}: none`} onClick={() => filterFromChart(() => { if (bucket.kind === "overdue") setOverdueOnly(true); else if (bucket.kind === "dueSoon") setDueSoonOnly(true); else setDeadlineBucket(bucket.kind); })}>
+                      <span className="etm-vbar-value">{bucket.count}</span>
+                      <div className="etm-vbar-track"><div className="etm-vbar-fill" style={{ height: `${(bucket.count / deadlineMax) * 100}%`, background: bucket.color }} /></div>
+                      <span className="etm-vbar-label">{bucket.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <p className="etm-chart-note">Open tasks only — completed work is left out.</p>
+            </>}
           </div>
         </div>
       </div>
@@ -349,9 +441,9 @@ export default function Dashboard({ onViewMajorTasks, basePath = "/etms/tasks", 
                           />
                         </TaskTitleCell>
                       </td>
-                      <td><div className="etm-task-cell-stack"><span>{formatDate(task.created_at)}</span>{task.deadline && <small>Due {formatDate(task.deadline)}</small>}</div></td>
-                      <td><span className={`etm-priority-pill ${task.priority.toLowerCase()}`}>{task.priority}</span></td>
-                      <td>
+                      <td><RowLink to={`${basePath}/${task.id}`} /><div className="etm-task-cell-stack"><span>{formatDate(task.created_at)}</span>{task.deadline && <small>Due {formatDate(task.deadline)}</small>}</div></td>
+                      <td><RowLink to={`${basePath}/${task.id}`} /><span className={`etm-priority-pill ${task.priority.toLowerCase()}`}>{task.priority}</span></td>
+                      <td><RowLink to={`${basePath}/${task.id}`} />
                         <div className="etm-progresslog-cell">
                           <span className={`etm-badge ${statusSlug(task.status)}`}>{statusChipLabel(task)}</span>
                           {lastRemark ? (
