@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ExternalLink, FileText, Link2, Loader2, RefreshCw, Unlink } from "lucide-react";
 import { taskError } from "../tasks/taskService";
 import CreateDocumentDialog from "./CreateDocumentDialog";
@@ -85,13 +85,23 @@ export function DocumentLinkButton({ subtaskTitle, linking, defaultDocumentTempl
     }
   }
 
+  // The panel is a small popover hanging under its button (not a block inside the actions row); a click outside closes it.
+  const anchorRef = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!panelOpen) return;
+    const dismiss = (event: PointerEvent) => { if (!anchorRef.current?.contains(event.target as Node)) setPanelOpen(false); };
+    document.addEventListener("pointerdown", dismiss);
+    return () => document.removeEventListener("pointerdown", dismiss);
+  }, [panelOpen]);
+
   return <>
+    <span className="etm-doc-popover-anchor" ref={anchorRef}>
     <button type="button" className="etm-icon-button" aria-label={`Attach a document to subtask: ${subtaskTitle}`} title="Create or link a document" disabled={linking} onClick={() => setPanelOpen(value => !value)}>
       {linking ? <Loader2 size={14} className="etm-form-spinner" /> : <FileText size={14} />}
     </button>
     {panelOpen && (
-      <div className="etm-member-picker etm-subtask-assign-picker">
-        <div className="etm-form-section-body" style={{ padding: 10, gap: 10 }}>
+      <div className="etm-doc-popover" role="dialog" aria-label="Attach a document">
+        <div className="etm-form-section-body" style={{ padding: 12, gap: 10 }}>
           <button type="button" className="etm-button primary small" onClick={() => { setCreateOpen(true); setPanelOpen(false); }}><FileText size={14} />Create a new document</button>
           <div className="etm-field" style={{ margin: 0 }}>
             <label style={{ fontSize: 12 }}>Or link an existing tracking number</label>
@@ -104,6 +114,7 @@ export function DocumentLinkButton({ subtaskTitle, linking, defaultDocumentTempl
         </div>
       </div>
     )}
+    </span>
     <CreateDocumentDialog open={createOpen} defaultTitle={subtaskTitle} initialTemplateId={defaultDocumentTemplateId} onClose={() => setCreateOpen(false)} onCreated={onCreated} />
   </>;
 }
