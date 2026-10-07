@@ -364,7 +364,10 @@ export function formatDate(value: string | null | undefined, withTime = false): 
   }).format(date);
 }
 
-export function isOverdue(task: Task): boolean {
+// Anything with a deadline and a done-ness: a task, or a subtask.
+export type HasDeadline = { is_completed: boolean; deadline?: string | null };
+
+export function isOverdue(task: HasDeadline): boolean {
   return !task.is_completed && !!task.deadline && new Date(`${task.deadline}T23:59:59`) < new Date();
 }
 
@@ -373,7 +376,7 @@ export const DUE_SOON_DAYS = 2;
 
 // Whole calendar days from today to the deadline (0 = today, negative = past). Null when
 // there's nothing to count down to.
-export function daysUntilDue(task: Task): number | null {
+export function daysUntilDue(task: HasDeadline): number | null {
   if (task.is_completed || !task.deadline) return null;
   const [year, month, day] = task.deadline.split("-").map(Number);
   const now = new Date();
@@ -381,12 +384,12 @@ export function daysUntilDue(task: Task): number | null {
   return Math.round((new Date(year, month - 1, day).getTime() - today.getTime()) / 86_400_000);
 }
 
-export function isDueSoon(task: Task): boolean {
+export function isDueSoon(task: HasDeadline): boolean {
   const days = daysUntilDue(task);
   return days !== null && days >= 0 && days <= DUE_SOON_DAYS;
 }
 
-export function dueSoonLabel(task: Task): string {
+export function dueSoonLabel(task: HasDeadline): string {
   const days = daysUntilDue(task);
   if (days === 0) return "Due today";
   return `${days} ${days === 1 ? "day" : "days"} left`;
