@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { detailsToText } from "../../features/tasks/richDetails";
 import { useNavigate } from "react-router-dom";
-import { Check, CheckCircle2, ChevronDown, ChevronRight, FolderKanban, GripVertical, Layers, Pencil, Plus, Target, Trash2, X } from "lucide-react";
+import { Check, CheckCircle2, ChevronDown, ChevronRight, FolderKanban, GripVertical, Layers, Pencil, Plus, Search, Target, Trash2, X } from "lucide-react";
 import Swal from "sweetalert2";
 import Modal from "../../components/ui/modal";
 import ThemedSelect, { type SelectOption } from "../../components/ThemedSelect";
@@ -67,6 +67,9 @@ export function ReportsContent({ taskBasePath = "/etms/tasks", ownTasksOnly = fa
   const [renameValue, setRenameValue] = useState("");
   const [renaming, setRenaming] = useState(false);
   const [dragTaskId, setDragTaskId] = useState<number | null>(null);
+  const [taskSearch, setTaskSearch] = useState("");
+  // The ids a drag carries: just the dragged task, or every ticked task when a ticked one is picked up.
+  const dragIdsRef = useRef<number[]>([]);
   const [previewTaskId, setPreviewTaskId] = useState<number | null>(null);
   // A drag ends with a click on some browsers; that click shouldn't open the preview.
   const lastDragEnd = useRef(0);
@@ -122,8 +125,13 @@ export function ReportsContent({ taskBasePath = "/etms/tasks", ownTasksOnly = fa
     project => project.name.toLocaleLowerCase() === typedProjectName.toLocaleLowerCase(),
   );
 
+  const visibleCompleted = useMemo(() => {
+    const query = taskSearch.trim().toLowerCase();
+    if (!query) return completedTasks;
+    return completedTasks.filter(task => `${task.title} ${detailsToText(task.details)} ${task.created_by_name ?? ""}`.toLowerCase().includes(query));
+  }, [completedTasks, taskSearch]);
   const selectedCompleted = completedTasks.filter(task => selectedIds.has(task.id));
-  const allSelected = completedTasks.length > 0 && completedTasks.every(task => selectedIds.has(task.id));
+  const allSelected = visibleCompleted.length > 0 && visibleCompleted.every(task => selectedIds.has(task.id));
   const dialogTaggedTasks = completedTasks.filter(task => dialogTaskIds.has(task.id));
 
   const toggleTask = (id: number) => {
@@ -137,8 +145,12 @@ export function ReportsContent({ taskBasePath = "/etms/tasks", ownTasksOnly = fa
 
   const toggleAll = () => {
     setSelectedIds(current => {
-      if (completedTasks.length && completedTasks.every(task => current.has(task.id))) return new Set();
-      return new Set(completedTasks.map(task => task.id));
+      if (visibleCompleted.length && visibleCompleted.every(task => current.has(task.id))) {
+        const next = new Set(current);
+        visibleCompleted.forEach(task => next.delete(task.id));
+        return next;
+      }
+      return new Set([...current, ...visibleCompleted.map(task => task.id)]);
     });
   };
 
@@ -280,19 +292,30 @@ export function ReportsContent({ taskBasePath = "/etms/tasks", ownTasksOnly = fa
 
   const DRAG_TASK_TYPE = "application/x-etm-task-id";
 
+  // Which tasks a drag started on `taskId` carries: all the ticked tasks if that one is ticked, else just it.
+  const idsForDrag = (taskId: number) => selectedIds.has(taskId) && selectedIds.size > 1 ? [...selectedIds] : [taskId];
+
   const addTaskToGroupByDrag = async (group: GroupedTask, taskId: number) => {
-    if (!taskId || Number.isNaN(taskId)) return;
-    if (group.tasks.some(item => item.id === taskId)) {
-      void Swal.fire({ title: "Already tagged", text: "This task is already part of this group.", icon: "info", timer: 1400, showConfirmButton: false });
+    const carried = dragIdsRef.current.includes(taskId) ? dragIdsRef.current : [taskId];
+    dragIdsRef.current = [];
+    const ids = carried.filter(id => id && !Number.isNaN(id));
+    if (!ids.length) return;
+    const fresh = ids.filter(id => !group.tasks.some(item => item.id === id));
+    if (!fresh.length) {
+      void Swal.fire({ title: "Already tagged", text: ids.length > 1 ? "These tasks are already part of this group." : "This task is already part of this group.", icon: "info", timer: 1400, showConfirmButton: false });
       return;
     }
-    const task = completedTasks.find(item => item.id === taskId);
+    const first = completedTasks.find(item => item.id === fresh[0]);
     try {
-      const updated = await taskService.updateGroupedTask(group.id, { task_ids: [...group.tasks.map(item => item.id), taskId] });
+      const updated = await taskService.updateGroupedTask(group.id, { task_ids: [...group.tasks.map(item => item.id), ...fresh] });
       setGroups(current => current.map(item => item.id === updated.id ? updated : item));
-      void Swal.fire({ title: "Task added to group", text: task ? `"${task.title}" was tagged to "${group.name}."` : undefined, icon: "success", timer: 1400, showConfirmButton: false });
+      void Swal.fire({
+        title: fresh.length > 1 ? `${fresh.length} tasks added to group` : "Task added to group",
+        text: fresh.length > 1 ? `They were tagged to "${group.name}."${fresh.length < ids.length ? ` (${ids.length - fresh.length} already in it.)` : ""}` : first ? `"${first.title}" was tagged to "${group.name}."` : undefined,
+        icon: "success", timer: 1600, showConfirmButton: false,
+      });
     } catch (err) {
-      void Swal.fire({ title: "Couldn't add task to group", text: taskError(err), icon: "error" });
+      void Swal.fire({ title: "Couldn't add to group", text: taskError(err), icon: "error" });
     }
   };
 
@@ -329,10 +352,11 @@ export function ReportsContent({ taskBasePath = "/etms/tasks", ownTasksOnly = fa
     const begin = () => {
       active = true;
       touchDragActive.current = true;
+      dragIdsRef.current = idsForDrag(task.id);
       setDragTaskId(task.id);
       navigator.vibrate?.(30);
       ghost = document.createElement("div");
-      ghost.textContent = task.title;
+      ghost.textContent = dragIdsRef.current.length > 1 ? `${dragIdsRef.current.length} tasks` : task.title;
       ghost.style.cssText = "position:fixed;left:0;top:0;z-index:9999;max-width:240px;padding:8px 12px;border-radius:10px;background:var(--etm-primary,#17b3ac);color:#fff;font:600 13px sans-serif;box-shadow:0 8px 24px #0006;pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.95";
       document.body.appendChild(ghost);
       moveGhost();
@@ -419,7 +443,7 @@ export function ReportsContent({ taskBasePath = "/etms/tasks", ownTasksOnly = fa
     return `${total}/${group.target_value ?? total}`;
   };
 
-  const { sorted: sortedCompleted, sort: completedSort, toggle: toggleCompletedSort } = useTableSort(completedTasks, {
+  const { sorted: sortedCompleted, sort: completedSort, toggle: toggleCompletedSort } = useTableSort(visibleCompleted, {
     title: task => task.title,
     finished: task => new Date(task.updated_at).getTime(),
     owner: task => task.created_by_name,
@@ -449,6 +473,16 @@ export function ReportsContent({ taskBasePath = "/etms/tasks", ownTasksOnly = fa
 
         <TaskFeedback />
         {!loading && !error && (
+          <div className="etm-filter-bar" style={{ marginBottom: 0 }}>
+            <div className="etm-filter-search">
+              <Search size={15} />
+              <input value={taskSearch} onChange={event => setTaskSearch(event.target.value)} placeholder="Search completed tasks…" aria-label="Search completed tasks" />
+              {taskSearch && <button type="button" className="etm-icon-button" aria-label="Clear search" onClick={() => setTaskSearch("")}><X size={13} /></button>}
+            </div>
+            {selectedCompleted.length > 0 && <span className="etm-report-drag-hint active" style={{ margin: 0 }}>{selectedCompleted.length} ticked — drag any ticked task onto a group to add them all at once.</span>}
+          </div>
+        )}
+        {!loading && !error && (
           <section className="etm-panel etm-table-wrap">
             <table className="etm-tasks-table etm-report-table">
               <thead><tr>
@@ -465,13 +499,22 @@ export function ReportsContent({ taskBasePath = "/etms/tasks", ownTasksOnly = fa
                     title="Drag onto a group below to add it there"
                     onDragStart={event => {
                       if (touchDragActive.current) { event.preventDefault(); return; }
+                      dragIdsRef.current = idsForDrag(task.id);
                       event.dataTransfer.setData(DRAG_TASK_TYPE, String(task.id));
                       event.dataTransfer.setData("text/plain", String(task.id));
                       event.dataTransfer.effectAllowed = "copy";
+                      if (dragIdsRef.current.length > 1) {
+                        const badge = document.createElement("div");
+                        badge.textContent = `${dragIdsRef.current.length} tasks`;
+                        badge.style.cssText = "position:fixed;top:-100px;padding:8px 12px;border-radius:10px;background:#17b3ac;color:#fff;font:600 13px sans-serif";
+                        document.body.appendChild(badge);
+                        event.dataTransfer.setDragImage(badge, 10, 10);
+                        window.setTimeout(() => badge.remove(), 0);
+                      }
                       setDragTaskId(task.id);
                     }}
                     onDragEnd={() => { lastDragEnd.current = Date.now(); setDragTaskId(null); }}
-                    className={`etm-report-row-clickable ${dragTaskId === task.id ? "etm-report-row-dragging" : ""}`}
+                    className={`etm-report-row-clickable ${dragTaskId !== null && (dragTaskId === task.id || dragIdsRef.current.includes(task.id)) ? "etm-report-row-dragging" : ""}`}
                     tabIndex={0}
                     onClick={event => {
                       if ((event.target as HTMLElement).closest("input, button, a")) return;
@@ -486,7 +529,7 @@ export function ReportsContent({ taskBasePath = "/etms/tasks", ownTasksOnly = fa
                     <td className="etm-tasks-table-details-col">{detailsToText(task.details) ? <span title={detailsToText(task.details)}>{detailsToText(task.details)}</span> : <span className="etm-tasks-table-unassigned">No details</span>}</td>
                     {showOwner && <td>{task.created_by_name || <span className="etm-tasks-table-unassigned">Unknown</span>}</td>}
                   </tr>
-                )) : <tr><td colSpan={showOwner ? 5 : 4} className="etm-empty-row">No completed tasks are available yet.</td></tr>}
+                )) : <tr><td colSpan={showOwner ? 5 : 4} className="etm-empty-row">{completedTasks.length ? "No completed tasks match your search." : "No completed tasks are available yet."}</td></tr>}
               </tbody>
             </table>
           </section>

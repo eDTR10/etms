@@ -6,7 +6,7 @@ import "../Etm/etm-app.css";
 
 export default function AdminTemplates() {
   return (
-    <AdminLayout title="Task Sub-Task Templates" subtitle="Every saved template from every user.">
+    <AdminLayout title="Task Template" subtitle="Every saved template from every user.">
       <TaskProvider>
         <TemplatesContent />
       </TaskProvider>

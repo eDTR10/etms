@@ -31,7 +31,7 @@ const NAV_GROUPS: { title?: string; items: { label: string; icon: React.ReactNod
       { label: "Add Task", icon: <Plus className="w-4 h-4" />, to: "/etms/tasks/new" },
       { label: "All Tasks", icon: <ListChecks className="w-4 h-4" />, to: "/etms/tasks" },
       { label: "Calendar", icon: <Calendar className="w-4 h-4" />, to: "/etms/calendar" },
-      { label: "Task Sub-Task Templates", icon: <Bookmark className="w-4 h-4" />, to: "/etms/templates" },
+      { label: "Task Template", icon: <Bookmark className="w-4 h-4" />, to: "/etms/templates" },
     ],
   },
   {
@@ -95,11 +95,11 @@ const UserLayout = ({ title, subtitle, children }: UserLayoutProps) => {
         <div className="flex items-center gap-3 px-5 py-5 border-b border-border">
 
           <div className="flex  items-end  justify-end">
-             <img src={etmsLogo} alt="TMS logo" className="w-5 h-5 object-contain mb-[6px]" />
-          <span className="text-foreground  font-extrabold text-3xl tracking-wide">TMS</span>
+            <img src={etmsLogo} alt="TMS logo" className="w-5 h-5 object-contain mb-[6px]" />
+            <span className="text-foreground  font-extrabold text-3xl tracking-wide">TMS</span>
           </div>
-         
-          
+
+
         </div>
         {/* Nav links */}
         <nav className="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto">

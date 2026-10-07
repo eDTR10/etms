@@ -73,7 +73,6 @@ export function TemplatesContent() {
       <section className="etm-report-heading">
         <div>
           <p className="etm-report-eyebrow"><Bookmark size={15} /> Reusable blueprints</p>
-          <h2>Task Sub-Task Templates</h2>
           <p>Save the details you retype every time, then start a new task from a template in one click.</p>
         </div>
         <div className="etm-report-section-title-actions">
@@ -103,8 +102,8 @@ export function TemplatesContent() {
                   <td className="etm-report-group-actions">
                     <button type="button" className="etm-icon-button" aria-label={`Export ${template.name}`} title="Download as JSON" onClick={() => exportTemplate(template)}><Download size={15} /></button>
                     {template.can_manage ? <>
-                    <button type="button" className="etm-icon-button" aria-label={`Edit ${template.name}`} onClick={() => openEdit(template)}><Pencil size={15} /></button>
-                    <button type="button" className="etm-icon-button danger" aria-label={`Delete ${template.name}`} onClick={() => void confirmDelete(template)}><Trash2 size={15} /></button>
+                      <button type="button" className="etm-icon-button" aria-label={`Edit ${template.name}`} onClick={() => openEdit(template)}><Pencil size={15} /></button>
+                      <button type="button" className="etm-icon-button danger" aria-label={`Delete ${template.name}`} onClick={() => void confirmDelete(template)}><Trash2 size={15} /></button>
                     </> : <span className="etm-tasks-table-unassigned">Shared</span>}
                   </td>
                 </tr>
@@ -133,7 +132,7 @@ export function TemplatesContent() {
 
 export default function Templates() {
   return (
-    <UserLayout title="Task Sub-Task Templates" subtitle="Reuse task details instead of retyping them.">
+    <UserLayout title="Task Template" subtitle="Reuse task details instead of retyping them.">
       <TaskProvider>
         <TemplatesContent />
       </TaskProvider>

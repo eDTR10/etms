@@ -27,7 +27,7 @@ const NAV_ITEMS = [
   { label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, to: "/etms/admin/dashboard" },
   { label: "Tasks", icon: <ListChecks className="w-4 h-4" />, to: "/etms/admin/tasks" },
   { label: "Calendar", icon: <Calendar className="w-4 h-4" />, to: "/etms/admin/calendar" },
-  { label: "Task Sub-Task Templates", icon: <Bookmark className="w-4 h-4" />, to: "/etms/admin/templates" },
+  { label: "Task Template", icon: <Bookmark className="w-4 h-4" />, to: "/etms/admin/templates" },
   { label: "Task Grouping", icon: <BarChart3 className="w-4 h-4" />, to: "/etms/admin/task-grouping" },
   { label: "Users", icon: <Users className="w-4 h-4" />, to: "/etms/admin/users" },
   { label: "Quick Links", icon: <Link2 className="w-4 h-4" />, to: "/etms/admin/quick-links" },
@@ -79,10 +79,10 @@ const AdminLayout = ({ title, subtitle, children }: AdminLayoutProps) => {
         <div className="flex items-center gap-3 px-5 py-5 border-b border-border">
 
           <div className="flex  items-end  justify-end">
-             <img src={etmsLogo} alt="TMS logo" className="w-5 h-5 object-contain mb-[6px]" />
-          <span className="text-foreground  font-extrabold text-3xl tracking-wide">TMS</span>
+            <img src={etmsLogo} alt="TMS logo" className="w-5 h-5 object-contain mb-[6px]" />
+            <span className="text-foreground  font-extrabold text-3xl tracking-wide">TMS</span>
           </div>
-         
+
           <span className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#0d8a92]/10 text-[#0d8a92] dark:bg-[#17b3ac]/15 dark:text-[#17b3ac] text-[10px] font-bold uppercase tracking-wide">
             <ShieldCheck className="w-3 h-3" />Admin
           </span>
