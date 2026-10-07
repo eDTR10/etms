@@ -1,1 +1,0 @@
-import{d as o}from"./index-BsUROS1L.js";const n=o("ChevronDown",[["path",{d:"m6 9 6 6 6-6",key:"qrunsl"}]]),a=o("Flag",[["path",{d:"M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z",key:"i9b6wo"}],["line",{x1:"4",x2:"4",y1:"22",y2:"15",key:"1cm3nv"}]]);export{n as C,a as F};
