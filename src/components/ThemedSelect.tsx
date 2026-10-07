@@ -39,6 +39,8 @@ function buildStyles<Option, IsMulti extends boolean>(size: Size): StylesConfig<
     clearIndicator: base => ({ ...base, color: "var(--etm-muted)" }),
     menuPortal: base => ({ ...base, zIndex: 9999 }),
     menu: base => ({ ...base, backgroundColor: "var(--etm-surface)", border: "1px solid var(--etm-border)", borderRadius: 8, overflow: "hidden", zIndex: 20 }),
+    // Used when the menu is portalled to <body> (see the "mini" toolbar selects below).
+    menuPortal: base => ({ ...base, zIndex: 9999 }),
     menuList: base => ({ ...base, padding: 4, maxHeight: 240 }),
     option: (base, state) => ({
       ...base,
@@ -77,6 +79,10 @@ export default function ThemedSelect<Option, IsMulti extends boolean = false>({ 
   const base = props.isMulti ? multiStylesBySize[size] : stylesBySize[size];
   return (
     <Select<Option, IsMulti, GroupBase<Option>>
+      // The compact toolbar selects live inside a horizontally scrolling bar, which clips an
+      // ordinary dropdown menu to a sliver — render their menus on <body> so they open fully.
+      menuPortalTarget={size === "mini" && typeof document !== "undefined" ? document.body : undefined}
+      menuPosition={size === "mini" ? "fixed" : "absolute"}
       styles={styles ? { ...(base as StylesConfig<Option, IsMulti>), ...styles } : (base as StylesConfig<Option, IsMulti>)}
       {...(portal ? { menuPortalTarget: document.body, menuPosition: "fixed" as const } : {})}
       {...props}

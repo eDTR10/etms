@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -13,6 +14,7 @@ import {
   FileSpreadsheet,
   ArrowLeftRight,
 } from "lucide-react";
+import { isIPCRComingSoon } from "../../features/ipcr/IPCRComingSoon";
 import { ModeToggle } from "../../components/mode-toggle";
 import { useAuth } from "../Auth/AuthContext";
 import { isAdmin } from "../Auth/roles";
@@ -29,7 +31,7 @@ const NAV_GROUPS: { title?: string; items: { label: string; icon: React.ReactNod
       { label: "Add Task", icon: <Plus className="w-4 h-4" />, to: "/etms/tasks/new" },
       { label: "All Tasks", icon: <ListChecks className="w-4 h-4" />, to: "/etms/tasks" },
       { label: "Calendar", icon: <Calendar className="w-4 h-4" />, to: "/etms/calendar" },
-      { label: "Templates", icon: <Bookmark className="w-4 h-4" />, to: "/etms/templates" },
+      { label: "Task Sub-Task Templates", icon: <Bookmark className="w-4 h-4" />, to: "/etms/templates" },
     ],
   },
   {
@@ -59,6 +61,16 @@ const UserLayout = ({ title, subtitle, children }: UserLayoutProps) => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const unseenAssignedCount = useUnseenAssignedCount();
+  // Mobile: the sidebar becomes an off-canvas drawer opened by the header hamburger.
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => { setMenuOpen(false); }, [pathname]);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setMenuOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
 
   const handleLogout = async () => {
     await logout();
@@ -68,8 +80,18 @@ const UserLayout = ({ title, subtitle, children }: UserLayoutProps) => {
   return (
     <div className="min-h-screen w-full bg-background flex">
 
-    {/* ── Sidebar (desktop only) ─────────────────────────────────────── */}
-      <aside className="w-60 h-screen sticky top-0 self-start shrink-0 overflow-hidden bg-card border-r border-border flex flex-col md:hidden">
+      {/* ── Drawer backdrop (mobile only) ───────────────────────────────── */}
+      <div
+        onClick={() => setMenuOpen(false)}
+        aria-hidden="true"
+        className={`hidden md:block fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px] transition-opacity duration-300 ${menuOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+      />
+
+      {/* ── Sidebar (docked on desktop, slide-in drawer on mobile) ──────── */}
+      <aside
+        id="user-sidebar"
+        className={`w-60 h-screen sticky top-0 self-start shrink-0 overflow-hidden bg-card border-r border-border flex flex-col md:fixed md:inset-y-0 md:left-0 md:z-50 md:h-[100dvh] md:transition-transform md:duration-300 md:ease-out md:shadow-2xl ${menuOpen ? "md:translate-x-0" : "md:-translate-x-full md:shadow-none"}`}
+      >
         <div className="flex items-center gap-3 px-5 py-5 border-b border-border">
 
           <div className="flex  items-end  justify-end">
@@ -89,11 +111,22 @@ const UserLayout = ({ title, subtitle, children }: UserLayoutProps) => {
               <div className="flex flex-col gap-1">
                 {group.items.map((item) => {
                   const isActive = pathname === item.to;
+                  if (isIPCRComingSoon(item.to)) {
+                    return (
+                      <div key={item.label} aria-disabled="true" title="Coming soon" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground/60 cursor-not-allowed select-none">
+                        {item.icon}
+                        <span className="flex-1 min-w-0">{item.label}</span>
+                        <span className="ml-auto px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 text-[9px] font-bold uppercase tracking-wide whitespace-nowrap">Coming soon</span>
+                      </div>
+                    );
+                  }
+                  const order = NAV_GROUPS.slice(0, groupIndex).reduce((sum, g) => sum + g.items.length, 0) + group.items.indexOf(item);
                   return (
                     <Link
                       key={item.label}
                       to={item.to}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive
+                      style={{ transitionDelay: menuOpen ? `${80 + order * 35}ms` : "0ms" }}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-[colors,opacity,transform] duration-300 ${menuOpen ? "md:opacity-100 md:translate-x-0" : "md:opacity-0 md:-translate-x-3"} ${isActive
                         ? "bg-[#0d8a92] text-white dark:bg-[#17b3ac]"
                         : "text-muted-foreground hover:bg-[#0d8a92] hover:text-white dark:hover:bg-[#17b3ac]"
                         }`}
@@ -158,11 +191,25 @@ const UserLayout = ({ title, subtitle, children }: UserLayoutProps) => {
 
         {/* Top bar */}
         <header className="sticky top-0 z-20 bg-background border-b border-border px-6 py-4 flex items-center justify-between slg:px-4 sm:px-3">
-          <div>
-            <h1 className="text-lg font-bold text-foreground">{title}</h1>
-            {subtitle && (
-              <p className="text-xs text-muted-foreground sm:hidden">{subtitle}</p>
-            )}
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              type="button"
+              onClick={() => setMenuOpen(open => !open)}
+              aria-label={menuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={menuOpen}
+              aria-controls="user-sidebar"
+              className="hidden md:inline-flex flex-col items-center justify-center gap-[5px] w-9 h-9 shrink-0 rounded-lg border border-border text-foreground transition-colors hover:bg-accent active:scale-95"
+            >
+              <span className={`block h-0.5 w-4 rounded bg-current transition-transform duration-300 ${menuOpen ? "translate-y-[7px] rotate-45" : ""}`} />
+              <span className={`block h-0.5 w-4 rounded bg-current transition-all duration-300 ${menuOpen ? "opacity-0 scale-x-0" : ""}`} />
+              <span className={`block h-0.5 w-4 rounded bg-current transition-transform duration-300 ${menuOpen ? "-translate-y-[7px] -rotate-45" : ""}`} />
+            </button>
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold text-foreground">{title}</h1>
+              {subtitle && (
+                <p className="text-xs text-muted-foreground sm:hidden">{subtitle}</p>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -186,54 +233,10 @@ const UserLayout = ({ title, subtitle, children }: UserLayoutProps) => {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 px-6 py-6 slg:px-4 sm:px-3 md:pb-24 overflow-auto">
+        <main className="flex-1 px-6 py-6 slg:px-4 sm:px-3 overflow-y-auto overflow-x-hidden min-w-0">
           {children}
         </main>
       </div>
-
-      {/* ── Bottom navigation (mobile only) ──────────────────────────────── */}
-      <nav className="hidden md:flex fixed bottom-0 left-0 right-0 z-30 items-stretch bg-card border-t border-border" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-        <Link
-          to="/etms/dashboard"
-          className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 text-[10px] font-semibold ${pathname === "/etms/dashboard" ? "text-[#0d8a92] dark:text-[#17b3ac]" : "text-muted-foreground"}`}
-        >
-          <LayoutDashboard className="w-5 h-5" />
-          Dashboard
-        </Link>
-        <Link
-          to="/etms/calendar"
-          className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 text-[10px] font-semibold ${pathname === "/etms/calendar" ? "text-[#0d8a92] dark:text-[#17b3ac]" : "text-muted-foreground"}`}
-        >
-          <Calendar className="w-5 h-5" />
-          Calendar
-        </Link>
-        <Link to="/etms/tasks/new" className="flex-1 flex flex-col items-center justify-center" aria-label="Add task">
-          <span className="flex items-center justify-center w-11 h-11 -mt-5 rounded-full bg-[#0d8a92] text-white shadow-lg dark:bg-[#17b3ac]">
-            <Plus className="w-6 h-6" />
-          </span>
-        </Link>
-        <Link
-          to="/etms/tasks"
-          className={`relative flex-1 flex flex-col items-center justify-center gap-1 py-2.5 text-[10px] font-semibold ${pathname === "/etms/tasks" ? "text-[#0d8a92] dark:text-[#17b3ac]" : "text-muted-foreground"}`}
-        >
-          <span className="relative">
-            <ListChecks className="w-5 h-5" />
-            {unseenAssignedCount > 0 && (
-              <span className="absolute -top-1 -right-2 min-w-[14px] h-[14px] px-0.5 rounded-full bg-[#e0453c] text-white text-[8px] font-bold flex items-center justify-center">
-                {unseenAssignedCount > 9 ? "9+" : unseenAssignedCount}
-              </span>
-            )}
-          </span>
-          All Tasks
-        </Link>
-        <Link
-          to="/etms/reports"
-          className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 text-[10px] font-semibold ${pathname === "/etms/reports" ? "text-[#0d8a92] dark:text-[#17b3ac]" : "text-muted-foreground"}`}
-        >
-          <BarChart3 className="w-5 h-5" />
-          Task Grouping
-        </Link>
-      </nav>
 
     </div>
   );

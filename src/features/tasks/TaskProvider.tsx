@@ -1,18 +1,43 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { TaskContext } from "./taskContext";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { TaskContext, type OfficeScope } from "./taskContext";
 import { withBlockingLoader } from "./blockingLoader";
 import { taskError, taskService } from "./taskService";
 import { flattenSubtasks, type Member, type Project, type Task, type TaskInput, type TaskStatus, type TaskTemplate, type TaskTemplateInput } from "./types";
 import { dtmsDocumentService } from "../dtmsDocument/dtmsDocumentService";
 import type { DtmsDocumentTemplate } from "../dtmsDocument/dtmsDocumentTypes";
+import { secureStorage } from "../../lib/secureStorage";
+
+// Every screen mounts its own TaskProvider, so navigating dashboard → task → back used to
+// refetch everything. This module-level snapshot (per auth token, so a different login never
+// sees someone else's data) lets a freshly mounted provider start from the last loaded data and
+// skip the network while it is still fresh. Mutations update provider state, which re-saves it.
+const CACHE_TTL_MS = 5 * 60 * 1000;
+interface TaskSnapshot {
+  token: string | null;
+  at: number;
+  tasks: Task[];
+  officeScope: OfficeScope;
+  members: Member[];
+  projects: Project[];
+  templates: TaskTemplate[];
+  dtmsDocumentTemplates: DtmsDocumentTemplate[];
+}
+let taskCache: TaskSnapshot | null = null;
+const currentToken = () => secureStorage.getItem<string>("auth_token") ?? null;
+function freshCache(): TaskSnapshot | null {
+  return taskCache && taskCache.token === currentToken() && Date.now() - taskCache.at < CACHE_TTL_MS ? taskCache : null;
+}
 
 export default function TaskProvider({ children }: { children: ReactNode }) {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [members, setMembers] = useState<Member[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [templates, setTemplates] = useState<TaskTemplate[]>([]);
-  const [dtmsDocumentTemplates, setDtmsDocumentTemplates] = useState<DtmsDocumentTemplate[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [cached] = useState(freshCache);
+  const [tasks, setTasks] = useState<Task[]>(cached?.tasks ?? []);
+  const [officeScope, setOfficeScope] = useState<OfficeScope>(cached?.officeScope ?? { enabled: false, office_name: null, members: [], tasks: [] });
+  const [members, setMembers] = useState<Member[]>(cached?.members ?? []);
+  const [projects, setProjects] = useState<Project[]>(cached?.projects ?? []);
+  const [templates, setTemplates] = useState<TaskTemplate[]>(cached?.templates ?? []);
+  const [dtmsDocumentTemplates, setDtmsDocumentTemplates] = useState<DtmsDocumentTemplate[]>(cached?.dtmsDocumentTemplates ?? []);
+  const fetchedAt = useRef(cached?.at ?? 0);
+  const [loading, setLoading] = useState(!cached);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -26,7 +51,14 @@ export default function TaskProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       setError(taskError(err));
     } finally {
+      fetchedAt.current = Date.now();
       setLoading(false);
+    }
+    // Office-wide view for access-level-2 users; best-effort like the lists below.
+    try {
+      setOfficeScope(await taskService.officeScope());
+    } catch {
+      setOfficeScope({ enabled: false, office_name: null, members: [], tasks: [] });
     }
     // Kept out of the Promise.all above and failing silently: templates are an enhancement
     // on top of task creation, not something the rest of the app (dashboard, task list, add
@@ -45,10 +77,18 @@ export default function TaskProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Keep the snapshot in step with provider state (keeps the original fetch time so the TTL
+  // still counts from the last real request, not from a local edit).
   useEffect(() => {
+    if (loading || error) return;
+    taskCache = { token: currentToken(), at: fetchedAt.current, tasks, officeScope, members, projects, templates, dtmsDocumentTemplates };
+  }, [loading, error, tasks, officeScope, members, projects, templates, dtmsDocumentTemplates]);
+
+  useEffect(() => {
+    if (cached) return;
     const timer = window.setTimeout(() => { void refresh(); }, 0);
     return () => window.clearTimeout(timer);
-  }, [refresh]);
+  }, [refresh, cached]);
 
   const listArchivedTasks = async () => taskService.listArchived();
   const addMember = async (input: { first_name: string; last_name: string; email: string; position?: string }) => {
@@ -143,6 +183,12 @@ export default function TaskProvider({ children }: { children: ReactNode }) {
   const completeTask = async (id: number) => withBlockingLoader("Completing task…", async () => {
     replace(await taskService.completeTask(id));
   });
+  const turnoverTask = async (id: number, userId: number, note: string) => withBlockingLoader("Turning over task…", async () => {
+    replace(await taskService.turnoverTask(id, userId, note));
+  });
+  const revertTurnover = async (id: number) => withBlockingLoader("Returning task…", async () => {
+    replace(await taskService.revertTurnover(id));
+  });
   const assignSubtask = async (id: number, subtaskId: number, userId: number | null) => withBlockingLoader("Assigning subtask…", async () => {
     replace(await taskService.assignSubtask(id, subtaskId, userId));
   });
@@ -195,5 +241,5 @@ export default function TaskProvider({ children }: { children: ReactNode }) {
     setTemplates(current => current.filter(item => item.id !== id));
   });
 
-  return <TaskContext.Provider value={{ tasks, members, projects, templates, dtmsDocumentTemplates, loading, error, refresh, listArchivedTasks, addMember, createTask, createTemplate, updateTemplate, deleteTemplate, updateTask, deleteTask, duplicateTask, toggleOccurrence, addProgress, editProgress, deleteProgress, addRemark, editRemark, deleteRemark, reactToRemark, addRemarkReply, addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, reorderSubtasks, assignSubtask, linkSubtaskDocument, unlinkSubtaskDocument, completeTask, bulkArchive, bulkDelete, addRemarkAttachment, deleteRemarkAttachment, addSubtaskRemarkAttachment, deleteSubtaskRemarkAttachment, markCompletionSeen, markViewed }}>{children}</TaskContext.Provider>;
+  return <TaskContext.Provider value={{ tasks, officeScope, members, projects, templates, dtmsDocumentTemplates, loading, error, refresh, listArchivedTasks, addMember, createTask, createTemplate, updateTemplate, deleteTemplate, updateTask, deleteTask, duplicateTask, toggleOccurrence, addProgress, editProgress, deleteProgress, addRemark, editRemark, deleteRemark, reactToRemark, addRemarkReply, addSubtaskRemark, editSubtaskRemark, deleteSubtaskRemark, reactToSubtaskRemark, addSubtaskRemarkReply, setSubtaskStatus, addSubtask, editSubtask, deleteSubtask, setSubtaskCompletion, reorderSubtasks, assignSubtask, linkSubtaskDocument, unlinkSubtaskDocument, completeTask, turnoverTask, revertTurnover, bulkArchive, bulkDelete, addRemarkAttachment, deleteRemarkAttachment, addSubtaskRemarkAttachment, deleteSubtaskRemarkAttachment, markCompletionSeen, markViewed }}>{children}</TaskContext.Provider>;
 }

@@ -1,14 +1,17 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { useAuth } from "../../screens/Auth/AuthContext";
+import IPCRRichTextField from "../ipcr/IPCRRichTextField";
+import { cleanDetails, detailsToHtml, detailsToText, RichDetails } from "./richDetails";
 import { Link } from "react-router-dom";
 import { isAxiosError } from "axios";
-import { AlertTriangle, Bookmark, CalendarDays, Check, CheckCheck, ChevronDown, ClipboardList, Clock3, FileText, Flag, Folder, Link2, Loader2, MapPin, Plus, Repeat, Search, Trash2, User, UserPlus, Users, X } from "lucide-react";
+import { AlertTriangle, Bookmark, CalendarDays, Check, CheckCheck, ChevronDown, ClipboardList, Clock3, FileText, Flag, Folder, Link2, Loader2, Plus, Repeat, Search, Trash2, User, UserPlus, Users, X } from "lucide-react";
 import ThemedSelect, { type SelectOption } from "../../components/ThemedSelect";
 import { useTasks } from "./taskContext";
 import { taskError } from "./taskService";
-import { ASSIGNMENT_ROLES, formatDate, memberName, PRIORITIES, RECURRENCE_LABELS, RECURRENCES, STATUSES, type AssignmentInput, type AssignmentRole, type Member, type Priority, type Project, type TaskLinkInput, type Recurrence, type SubTask, type Task, type TaskInput, type TaskStatus, type TaskTemplate, type TemplateSubtask } from "./types";
+import { ASSIGNMENT_ROLES, roleLabel, EODB_COMPLIANCE, type EodbCompliance, formatDate, memberName, PRIORITIES, RECURRENCE_LABELS, RECURRENCES, STATUSES, type AssignmentInput, type AssignmentRole, type Member, type Priority, type Project, type TaskLinkInput, type Recurrence, type SubTask, type Task, type TaskInput, type TaskStatus, type TaskTemplate, type TemplateSubtask } from "./types";
 import { describeRecurrence, WEEKDAYS } from "./recurrence";
 import TaskLinksField from "./TaskLinksField";
-import { REGION_X_BARANGAYS, REGION_X_CITIES, REGION_X_PROVINCES } from "./regionXLocations";
+// import { REGION_X_BARANGAYS, REGION_X_CITIES, REGION_X_PROVINCES } from "./regionXLocations";  // only used by the hidden Location field
 import { addChildToSubtaskTree, flattenTree, mapSubtaskTree, removeFromSubtaskTree } from "./subtaskTree";
 import type { DtmsDocumentTemplate } from "../dtmsDocument/dtmsDocumentTypes";
 import "./forms.css";
@@ -73,19 +76,23 @@ function initialValues(task?: Task): FormValues {
     title: task?.title ?? "",
     isPersonal: task ? !task.project : false,
     project: task?.project?.name ?? "",
-    details: task?.details ?? "",
+    details: detailsToHtml(task?.details),
     requestor: task?.requestor ?? "",
     location_province: task?.location_province ?? "",
     location_city: task?.location_city ?? "",
     location_barangay: task?.location_barangay ?? "",
     priority: task?.priority ?? "Medium",
     deadline: task?.deadline?.slice(0, 10) ?? "",
+    eodb_compliance: task?.eodb_compliance ?? "",
+    allow_late_submission: task?.allow_late_submission ?? true,
     recurrence: task?.recurrence ?? "None",
     recurrence_weekdays: task?.recurrence_weekdays ?? "",
     recurrence_dates: task?.recurrence_dates ?? [],
     status: task?.is_completed ? "Completed" : task?.status ?? "Pending",
     is_completed: task?.is_completed ?? task?.status === "Completed",
-    assignments: (task?.assignments ?? []).map(person => ({ user: person.id, role: person.role })),
+    // People added only because of a subtask ("Assignee") are managed from the subtask, not from this list —
+    // leaving them out here is what keeps saving the form from touching them.
+    assignments: (task?.assignments ?? []).filter(person => person.role !== "Assignee").map(person => ({ user: person.id, role: person.role as AssignmentRole })),
     subtasks: toEditableSubtasks(task?.subtasks ?? [], "existing"),
     links: (task?.links ?? []).map(({ title, url, quick_link }) => ({ title, url, quick_link: quick_link ?? null })),
     progress_message: "",
@@ -107,7 +114,9 @@ function saveError(error: unknown): string {
   return "Your task couldn’t be saved. Your changes are still here; please try again.";
 }
 
-function SubtaskEditorRow({ subtask, index, depth, fieldId, errors, docTemplates, onUpdate, onRemove, onAddChild }: {
+function SubtaskEditorRow({ subtask, index, depth, fieldId, errors, docTemplates, canComplete, onUpdate, onRemove, onAddChild }: {
+  // Completion only makes sense on a task that already exists; a brand-new one has nothing done yet.
+  canComplete: boolean;
   subtask: EditableSubtask; index: number; depth: number; fieldId: string; errors: FormErrors; docTemplates: DtmsDocumentTemplate[];
   onUpdate: (localKey: string, change: Partial<Pick<SubTask, "title" | "description" | "status" | "is_completed" | "default_document_template">>) => void;
   onRemove: (localKey: string) => void;
@@ -119,9 +128,9 @@ function SubtaskEditorRow({ subtask, index, depth, fieldId, errors, docTemplates
   ];
   return (
     <div className="etm-subtask-editor-item">
-      <div className={`etm-subtask-input-row ${subtask.is_completed ? "completed" : ""}`}>
+      <div className={`etm-subtask-input-row ${canComplete && subtask.is_completed ? "completed" : ""}`}>
         <span className="etm-subtask-index" aria-hidden="true">{index + 1}</span>
-        <input type="checkbox" checked={subtask.is_completed} onChange={event => onUpdate(subtask.localKey, { is_completed: event.target.checked })} aria-label={`Mark subtask ${index + 1} complete`} />
+        {canComplete && <input type="checkbox" checked={subtask.is_completed} onChange={event => onUpdate(subtask.localKey, { is_completed: event.target.checked })} aria-label={`Mark subtask ${index + 1} complete`} />}
         <input type="text" data-subtask-key={subtask.localKey} value={subtask.title} onChange={event => onUpdate(subtask.localKey, { title: event.target.value })} placeholder={`Subtask ${index + 1}`} aria-label={`Subtask ${index + 1} title`} maxLength={255} aria-invalid={!!errors[subtask.localKey]} aria-describedby={errors[subtask.localKey] ? `${fieldId}-${subtask.localKey}-error` : undefined} />
         <button className="etm-icon-button" type="button" aria-label={`Add a subtask under "${subtask.title || `subtask ${index + 1}`}"`} title="Add subtask" onClick={() => onAddChild(subtask.localKey)}><Plus size={16} /></button>
         <button className="etm-icon-button" type="button" aria-label={`Remove subtask ${index + 1}`} onClick={() => onRemove(subtask.localKey)}><Trash2 size={16} /></button>
@@ -147,7 +156,7 @@ function SubtaskEditorRow({ subtask, index, depth, fieldId, errors, docTemplates
       {subtask.subtasks.length > 0 && (
         <div className="etm-subtask-children">
           {subtask.subtasks.map((child, childIndex) => (
-            <SubtaskEditorRow key={child.localKey} subtask={child} index={childIndex} depth={depth + 1} fieldId={fieldId} errors={errors} docTemplates={docTemplates} onUpdate={onUpdate} onRemove={onRemove} onAddChild={onAddChild} />
+            <SubtaskEditorRow key={child.localKey} subtask={child} index={childIndex} depth={depth + 1} fieldId={fieldId} errors={errors} docTemplates={docTemplates} canComplete={canComplete} onUpdate={onUpdate} onRemove={onRemove} onAddChild={onAddChild} />
           ))}
         </div>
       )}
@@ -159,17 +168,19 @@ function TaskLivePreview({ values, members }: { values: FormValues; members: Mem
   const assignedMembers = values.assignments.map(assignment => members.find(member => member.id === assignment.user)).filter((member): member is Member => !!member);
   const allSubtasks = flattenTree(values.subtasks);
   const completeSubtasks = allSubtasks.filter(subtask => subtask.is_completed).length;
-  const location = [values.location_barangay, values.location_city, values.location_province].filter(Boolean).join(", ");
+  // const location = [values.location_barangay, values.location_city, values.location_province].filter(Boolean).join(", ");
 
   return <section className="etm-panel etm-task-preview" aria-live="polite" aria-label="Task preview">
     <div className="etm-task-preview-heading"><span className="etm-form-section-icon"><ClipboardList size={19} /></span><div><span>LIVE PREVIEW</span><h2>{values.title.trim() || "New task"}</h2></div></div>
-    <p className={`etm-task-preview-details ${values.details.trim() ? "" : "empty"}`}>{values.details.trim() || "Your task details will appear here."}</p>
+    {detailsToText(values.details) ? <RichDetails className="etm-task-preview-details" value={values.details} /> : <p className="etm-task-preview-details empty">Your task details will appear here.</p>}
     <dl className="etm-task-preview-meta">
       <div><dt><Folder size={14} />Project / Office</dt><dd>{values.isPersonal ? "Personal task" : values.project.trim() || "Not selected"}</dd></div>
       <div><dt><CalendarDays size={14} />Deadline</dt><dd>{formatDate(values.deadline)}</dd></div>
       <div><dt><Flag size={14} />Priority</dt><dd className={values.priority.toLowerCase()}>{values.priority}</dd></div>
+      {/* Requestor and Location are hidden for now (kept in the data, not asked for):
       <div><dt><User size={14} />Requestor</dt><dd>{values.requestor.trim() || "Not specified"}</dd></div>
       {location && <div><dt><MapPin size={14} />Location</dt><dd>{location}</dd></div>}
+      */}
       {values.recurrence !== "None" && <div><dt><Repeat size={14} />Repeats</dt><dd>{describeRecurrence(values)}</dd></div>}
     </dl>
     <div className="etm-task-preview-group"><div><Users size={14} /><strong>Assigned persons</strong><span>{assignedMembers.length}</span></div>{assignedMembers.length ? <ul>{assignedMembers.slice(0, 3).map(member => <li key={member.id}><span>{member.first_name.charAt(0)}{member.last_name.charAt(0)}</span>{memberName(member)}</li>)}{assignedMembers.length > 3 && <li className="more">+{assignedMembers.length - 3} more</li>}</ul> : <p>No one assigned yet.</p>}</div>
@@ -178,6 +189,7 @@ function TaskLivePreview({ values, members }: { values: FormValues; members: Mem
 }
 
 function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskFormProps) {
+  const { user: currentUser } = useAuth();
   const fieldId = useId();
   const formRef = useRef<HTMLFormElement>(null);
   const projectPickerRef = useRef<HTMLDivElement>(null);
@@ -188,6 +200,12 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
   const [errors, setErrors] = useState<FormErrors>({});
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [memberSearch, setMemberSearch] = useState("");
+  // Only the first few chosen people are listed; the rest are behind a toggle so the form stays short.
+  const [showAllAssigned, setShowAllAssigned] = useState(false);
+  const ASSIGNED_PREVIEW = 2;
+  // Narrow the people list to one office and / or one project.
+  const [memberOffice, setMemberOffice] = useState<number | null>(null);
+  const [memberProject, setMemberProject] = useState<number | null>(null);
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -198,7 +216,18 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
   const canManageAssignments = !task || task.can_manage_assignments;
   const roster = [...new Map([...members, ...(task?.assignments ?? [])].map(member => [member.id, member])).values()];
   const projectOptions = [...new Map([...projects, ...(task?.project ? [task.project] : [])].map(project => [project.id, project])).values()].sort((a, b) => a.name.localeCompare(b.name));
-  const filteredMembers = roster.filter(member => `${memberName(member)} ${member.position ?? ""}`.toLowerCase().includes(memberSearch.trim().toLowerCase()));
+  const directory = new Map(members.map(member => [member.id, member]));
+  const filteredMembers = roster.filter(member => {
+    const known = directory.get(member.id);
+    if (memberOffice !== null && known?.office !== memberOffice) return false;
+    if (memberProject !== null && !known?.projects?.includes(memberProject)) return false;
+    return `${memberName(member)} ${member.position ?? ""}`.toLowerCase().includes(memberSearch.trim().toLowerCase());
+  });
+  // Only offer offices / projects somebody actually belongs to, so a choice never leads to an empty list.
+  const memberOfficeIds = new Set(members.map(member => member.office).filter((id): id is number => typeof id === "number"));
+  const memberProjectIds = new Set(members.flatMap(member => member.projects ?? []));
+  const memberOfficeOptions: SelectOption<number | null>[] = [{ value: null, label: "All offices" }, ...projects.filter(project => memberOfficeIds.has(project.id)).map(project => ({ value: project.id, label: project.name }))];
+  const memberProjectOptions: SelectOption<number | null>[] = [{ value: null, label: "All projects" }, ...projects.filter(project => memberProjectIds.has(project.id)).map(project => ({ value: project.id, label: project.name }))];
   const filteredProjects = projectOptions.filter(project => project.name.toLocaleLowerCase().includes(values.project.trim().toLocaleLowerCase()));
   const allSubtasks = flattenTree(values.subtasks);
   const completedSubtasks = allSubtasks.filter(subtask => subtask.is_completed).length;
@@ -230,6 +259,27 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
         ? current.assignments.filter(assignment => assignment.user !== id)
         : [...current.assignments, { user: id, role: "Viewer" as AssignmentRole }],
     }));
+  }
+
+  // Puts the signed-in user on the task's assignees (as an editor, so it counts toward their own workload).
+  function assignToMyself() {
+    if (!currentUser) return;
+    setValues(current => current.assignments.some(assignment => assignment.user === currentUser.id)
+      ? current
+      : { ...current, assignments: [...current.assignments, { user: currentUser.id, role: "Editor" as AssignmentRole }] });
+  }
+
+  // Selects everyone currently listed (after the office / project / search filters), or clears exactly those people.
+  const allFilteredSelected = filteredMembers.length > 0 && filteredMembers.every(member => values.assignments.some(assignment => assignment.user === member.id));
+  function toggleSelectAll() {
+    setValues(current => {
+      const listed = new Set(filteredMembers.map(member => member.id));
+      if (filteredMembers.every(member => current.assignments.some(assignment => assignment.user === member.id))) {
+        return { ...current, assignments: current.assignments.filter(assignment => !listed.has(assignment.user)) };
+      }
+      const missing = filteredMembers.filter(member => !current.assignments.some(assignment => assignment.user === member.id));
+      return { ...current, assignments: [...current.assignments, ...missing.map(member => ({ user: member.id, role: "Viewer" as AssignmentRole }))] };
+    });
   }
 
   function updateAssignmentRole(id: number, role: AssignmentRole) {
@@ -303,7 +353,7 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
       title: template.title || current.title,
       isPersonal: template.is_personal,
       project: template.is_personal ? "" : template.project,
-      details: template.details,
+      details: detailsToHtml(template.details),
       requestor: template.requestor,
       location_province: template.location_province,
       location_city: template.location_city,
@@ -349,8 +399,8 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
     const nextErrors: FormErrors = {};
     if (!values.title.trim()) nextErrors.title = "Give this task a title.";
     if (!values.isPersonal && !values.project.trim()) nextErrors.project = "Enter or select a project, or mark this as a personal task.";
-    if (!values.deadline) nextErrors.deadline = "Choose a deadline for this task.";
-    else {
+    // The deadline is optional (a repeating task has its own schedule); when given it must be a real date.
+    if (values.deadline) {
       const deadline = new Date(`${values.deadline}T00:00:00Z`);
       if (Number.isNaN(deadline.getTime()) || deadline.toISOString().slice(0, 10) !== values.deadline) nextErrors.deadline = "Enter a valid deadline.";
     }
@@ -373,9 +423,10 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
       const { isPersonal, project, ...rest } = values;
       await onSave({
         ...rest,
+        deadline: values.deadline || null,
         title: values.title.trim(),
         project: isPersonal ? null : project.trim(),
-        details: values.details.trim(),
+        details: cleanDetails(values.details),
         requestor: values.requestor.trim(),
         location_province: values.location_province.trim(),
         location_city: values.location_city.trim(),
@@ -402,11 +453,6 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
                 <span className="etm-form-required-note">* Required</span>
               </div>
               <div className="etm-form-section-body">
-                <div className="etm-field">
-                  <label htmlFor={`${fieldId}-title`}>Task title <span aria-hidden="true">*</span></label>
-                  <input data-howto="task-title" id={`${fieldId}-title`} value={values.title} onChange={event => update("title", event.target.value)} placeholder="What needs to get done?" maxLength={255} required aria-invalid={!!errors.title} aria-describedby={errors.title ? `${fieldId}-title-error` : undefined} />
-                  {errors.title && <p className="etm-field-error" id={`${fieldId}-title-error`}>{errors.title}</p>}
-                </div>
                 <fieldset className="etm-tasktype-field">
                   <legend>Task type</legend>
                   <div className="etm-tasktype-options">
@@ -420,6 +466,15 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
                     </label>
                   </div>
                 </fieldset>
+                <div className="etm-field">
+                  <label htmlFor={`${fieldId}-title`}>Task title <span aria-hidden="true">*</span></label>
+                  <input data-howto="task-title" id={`${fieldId}-title`} value={values.title} onChange={event => update("title", event.target.value)} placeholder="What needs to get done?" maxLength={255} required aria-invalid={!!errors.title} aria-describedby={errors.title ? `${fieldId}-title-error` : undefined} />
+                  {errors.title && <p className="etm-field-error" id={`${fieldId}-title-error`}>{errors.title}</p>}
+                </div>
+                <div className="etm-field">
+                  <label htmlFor={`${fieldId}-details`}>Details</label>
+                  <IPCRRichTextField value={values.details} onChange={html => update("details", html)} placeholder="Add context, deliverables, or anything the team should know…" />
+                </div>
                 <div className="etm-form-grid">
                   {values.isPersonal ? (
                     <div className="etm-field">
@@ -438,162 +493,51 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
                       {errors.project && <p className="etm-field-error" id={`${fieldId}-project-error`}>{errors.project}</p>}
                     </div>
                   )}
-                  <div className="etm-field">
-                    <label htmlFor={`${fieldId}-date`}>Date created</label>
-                    <div className="etm-form-static-field" id={`${fieldId}-date`}><CalendarDays size={16} /><span>{formatDate(task?.created_at ?? new Date().toISOString(), true)}</span><span className="etm-form-auto-label">Automatic</span></div>
-                  </div>
-                </div>
                 <div className="etm-field">
-                  <label htmlFor={`${fieldId}-details`}>Details</label>
-                  <textarea id={`${fieldId}-details`} value={values.details} onChange={event => update("details", event.target.value)} placeholder="Add context, deliverables, or anything the team should know…" rows={4} maxLength={10000} />
-                </div>
-                {!task && (
-                  <div className="etm-field etm-template-picker">
-                    <label htmlFor={`${fieldId}-template`}><Bookmark size={15} /> Start from a template <span className="etm-form-optional">(optional)</span></label>
-                    <ThemedSelect<SelectOption<string>>
-                      inputId={`${fieldId}-template`}
-                      classNamePrefix="etm-task-template-select"
-                      isSearchable
-                      isDisabled={templates.length === 0}
-                      placeholder={templates.length ? "Add task manually — start from scratch" : "No templates saved yet"}
-                      options={templates.map(template => ({ value: String(template.id), label: template.name }))}
-                      value={templates.map(template => ({ value: String(template.id), label: template.name })).find(option => option.value === selectedTemplateId) ?? null}
-                      onChange={option => handleTemplateChange(option?.value ?? "")}
-                    />
-                    <p className="etm-form-helper">Choosing a template fills in the details, subtasks, and assignees below — you can still edit anything before saving. <Link to="/etms/templates">Manage templates</Link></p>
-                  </div>
-                )}
-                <fieldset className="etm-priority-field">
-                  <legend>Priority</legend>
-                  <div className="etm-priority-options">{PRIORITIES.map(priority => <label key={priority} data-howto={`priority-${priority.toLowerCase()}`} className={`etm-priority-option ${priority.toLowerCase()} ${values.priority === priority ? "selected" : ""}`}>
-                    <input type="radio" name={`${fieldId}-priority`} value={priority} checked={values.priority === priority} onChange={() => update("priority", priority)} />
-                    <span className="etm-priority-option-top"><Flag size={15} /><span>{priority}</span>{values.priority === priority && <Check size={14} className="etm-priority-check" />}</span>
-                    <small className="etm-priority-note">{PRIORITY_NOTES[priority]}</small>
-                  </label>)}</div>
-                </fieldset>
-              </div>
-            </section>
-
-            <section className="etm-panel etm-form-section" aria-labelledby={`${fieldId}-people-heading`}>
-              <div className="etm-form-section-heading"><span className="etm-form-section-icon"><Users size={19} /></span><div><h2 id={`${fieldId}-people-heading`}>People & ownership</h2><p>{values.isPersonal ? "Personal tasks are just for you." : canManageAssignments ? "Bring the right people into the task." : "Only the owner can change who's assigned."}</p></div></div>
-              <div className="etm-form-section-body">
-                <div className="etm-field">
-                  <label htmlFor={`${fieldId}-requestor`}>Requestor <span className="etm-form-optional">(optional)</span></label>
-                  <input data-howto="requestor" id={`${fieldId}-requestor`} value={values.requestor} onChange={event => update("requestor", event.target.value)} placeholder="Who requested this task?" maxLength={255} />
-                </div>
-                <fieldset className="etm-location-field">
-                  <legend><MapPin size={15} /> Location <span className="etm-form-optional">(optional)</span></legend>
-                  <p className="etm-form-helper">Choose Region X suggestions, or type a city or barangay that is not listed.</p>
-                  <div className="etm-location-grid">
-                    <label htmlFor={`${fieldId}-province`}>Province
-                      <ThemedSelect<SelectOption<string>>
-                        inputId={`${fieldId}-province`}
-                        classNamePrefix="etm-province-select"
-                        isSearchable
-                        isClearable
-                        placeholder="Select a Region X province"
-                        options={REGION_X_PROVINCES.map(province => ({ value: province, label: province }))}
-                        value={values.location_province ? { value: values.location_province, label: values.location_province } : null}
-                        onChange={option => setValues(current => ({ ...current, location_province: option?.value ?? "", location_city: "", location_barangay: "" }))}
-                      />
-                    </label>
-                    <label htmlFor={`${fieldId}-city`}>City / Municipality
-                      <input id={`${fieldId}-city`} list={`${fieldId}-city-options`} value={values.location_city} onChange={event => update("location_city", event.target.value)} placeholder={values.location_province ? "Search or type a city" : "Select a province first"} disabled={!values.location_province} maxLength={100} />
-                      <datalist id={`${fieldId}-city-options`}>{(REGION_X_CITIES[values.location_province] ?? []).map(city => <option key={city} value={city} />)}</datalist>
-                    </label>
-                    <label htmlFor={`${fieldId}-barangay`}>Barangay
-                      <input id={`${fieldId}-barangay`} list={`${fieldId}-barangay-options`} value={values.location_barangay} onChange={event => update("location_barangay", event.target.value)} placeholder="Search or type a barangay" maxLength={100} />
-                      <datalist id={`${fieldId}-barangay-options`}>{(REGION_X_BARANGAYS[values.location_city] ?? []).map(barangay => <option key={barangay} value={barangay} />)}</datalist>
-                    </label>
-                  </div>
-                </fieldset>
-                {values.isPersonal ? (
-                  <div className="etm-field">
-                    <label>Assigned persons</label>
-                    <div className="etm-form-static-field"><User size={16} /><span>Personal task — assigned to you only</span></div>
-                  </div>
-                ) : (
-                  <fieldset className="etm-member-field">
-                    <legend>Assigned persons <span className="etm-form-count">{values.assignments.length} selected</span></legend>
-                    <p className="etm-form-helper" id={`${fieldId}-people-help`}>{canManageAssignments ? "Select one or more members and give each a role. Leave empty to decide later." : "Assignment roles are managed by the task owner."}</p>
-                    {values.assignments.length > 0 && <div className="etm-selected-members">{values.assignments.map(assignment => {
-                      const person = roster.find(member => member.id === assignment.user);
-                      const name = person ? memberName(person) : `Member #${assignment.user}`;
-                      return <div className="etm-assignment-chip" key={assignment.user}>
-                        <span className="etm-assignment-chip-name">{name}</span>
-                        {canManageAssignments ? (
-                          <div className="etm-role-toggle" role="radiogroup" aria-label={`Role for ${name}`}>
-                            {ASSIGNMENT_ROLES.map(role => <button type="button" key={role} className={`etm-role-toggle-option ${assignment.role === role ? "selected" : ""}`} onClick={() => updateAssignmentRole(assignment.user, role)}>{role}</button>)}
-                          </div>
-                        ) : <span className="etm-badge">{assignment.role}</span>}
-                        {canManageAssignments && <button type="button" onClick={() => toggleAssignment(assignment.user)} aria-label={`Remove ${name}`}><X size={13} /></button>}
-                      </div>;
-                    })}</div>}
-                    {canManageAssignments && <div className="etm-member-picker">
-                      <div className="etm-member-search"><Search size={16} /><input aria-label="Search members to assign" placeholder="Search team members…" value={memberSearch} onChange={event => setMemberSearch(event.target.value)} aria-describedby={`${fieldId}-people-help`} /></div>
-                      <div className="etm-member-options">
-                        {filteredMembers.map(member => <label key={member.id} className={`etm-member-option ${values.assignments.some(a => a.user === member.id) ? "selected" : ""}`}>
-                          <input type="checkbox" checked={values.assignments.some(a => a.user === member.id)} onChange={() => toggleAssignment(member.id)} />
-                          <span className="etm-member-initials" aria-hidden="true">{member.first_name?.charAt(0)}{member.last_name?.charAt(0)}</span>
-                          <span className="etm-member-option-name">{memberName(member)}{member.position && <small>{member.position}</small>}</span>
-                        </label>)}
-                        {!filteredMembers.length && <p className="etm-member-empty">{memberSearch ? "No members match your search." : "No team members available. You can assign this task later."}</p>}
-                      </div>
-                      {!addingMember ? (
-                        <button type="button" className="etm-inline-link-button etm-add-member-trigger" onClick={openAddMember}><UserPlus size={13} />Not in the list? Add a new user</button>
-                      ) : (
-                        <div className="etm-add-member-form">
-                          <div className="etm-add-member-form-heading"><UserPlus size={14} />Add a new user<button type="button" className="etm-icon-button" aria-label="Cancel adding user" onClick={() => { setAddingMember(false); setMemberError(""); }}><X size={14} /></button></div>
-                          <div className="etm-add-member-form-grid">
-                            <input value={newMember.first_name} onChange={event => setNewMember(current => ({ ...current, first_name: event.target.value }))} placeholder="First name" maxLength={255} aria-label="New user first name" disabled={memberSaving} />
-                            <input value={newMember.last_name} onChange={event => setNewMember(current => ({ ...current, last_name: event.target.value }))} placeholder="Last name" maxLength={255} aria-label="New user last name" disabled={memberSaving} />
-                            <input type="email" value={newMember.email} onChange={event => setNewMember(current => ({ ...current, email: event.target.value }))} placeholder="Email address" maxLength={255} aria-label="New user email" disabled={memberSaving} />
-                            <input value={newMember.position} onChange={event => setNewMember(current => ({ ...current, position: event.target.value }))} placeholder="Position (optional)" maxLength={255} aria-label="New user position" disabled={memberSaving} />
-                          </div>
-                          {memberError && <p className="etm-field-error" role="alert">{memberError}</p>}
-                          <button type="button" className="etm-button primary small" disabled={memberSaving} onClick={() => void handleAddMember()}>{memberSaving ? <Loader2 size={13} className="etm-form-spinner" /> : <UserPlus size={13} />}Create & assign</button>
-                        </div>
-                      )}
-                    </div>}
-                  </fieldset>
-                )}
-              </div>
-            </section>
-
-            <section className="etm-panel etm-form-section" aria-labelledby={`${fieldId}-subtasks-heading`}>
-              <div className="etm-form-section-heading"><span className="etm-form-section-icon"><CheckCheck size={19} /></span><div><h2 id={`${fieldId}-subtasks-heading`}>Subtasks <span className="etm-form-optional">(optional)</span> <span className="etm-form-count">{allSubtasks.length}</span></h2><p>Add them now, or let the creator or assignees add them later. Subtasks can have their own subtasks too.</p></div>{allSubtasks.length > 0 && <span className="etm-subtask-summary">{completedSubtasks}/{allSubtasks.length} done</span>}</div>
-              <div className="etm-form-section-body">
-                {allSubtasks.length === 0 && <div className="etm-subtask-empty"><CheckCheck size={23} /><span>No subtasks yet. Add the first step below.</span></div>}
-                <div className="etm-subtask-editor">{values.subtasks.map((subtask, index) => (
-                  <SubtaskEditorRow key={subtask.localKey} subtask={subtask} index={index} depth={0} fieldId={fieldId} errors={errors} docTemplates={docTemplates} onUpdate={updateSubtask} onRemove={removeSubtask} onAddChild={addSubtask} />
-                ))}</div>
-                <button type="button" className="etm-add-subtask" onClick={() => addSubtask(null)}><Plus size={16} /> Add subtask</button>
-              </div>
-            </section>
-            <section className="etm-panel etm-form-section" aria-labelledby={`${fieldId}-links-heading`}>
-              <div className="etm-form-section-heading"><span className="etm-form-section-icon"><Link2 size={19} /></span><div><h2 id={`${fieldId}-links-heading`}>Links &amp; attachments <span className="etm-form-optional">(optional)</span></h2><p>Add a URL, or tag a quick link that already exists.</p></div></div>
-              <div className="etm-form-section-body">
-                <TaskLinksField idPrefix={fieldId} value={values.links} onChange={links => setValues(current => ({ ...current, links }))} />
-              </div>
-            </section>
-          </div>
-
-          <aside className="etm-form-aside">
-            <section className="etm-panel etm-form-section mt-2" aria-labelledby={`${fieldId}-planning-heading`}>
-              <div className="etm-form-section-heading"><span className="etm-form-section-icon"><CalendarDays size={19} /></span><div><h2 id={`${fieldId}-planning-heading`}>Schedule & status</h2><p>Keep the work on track.</p></div></div>
-              <div className="etm-form-section-body">
-                <div className="etm-field">
-                  <label htmlFor={`${fieldId}-deadline`}>Deadline <span aria-hidden="true">*</span></label>
-                  <input data-howto="deadline" type="date" id={`${fieldId}-deadline`} value={values.deadline ?? ""} onChange={event => update("deadline", event.target.value)} required aria-invalid={!!errors.deadline} aria-describedby={errors.deadline ? `${fieldId}-deadline-error` : undefined} />
+                  <label htmlFor={`${fieldId}-deadline`}>Deadline <span className="etm-form-optional">(optional)</span></label>
+                  <input data-howto="deadline" type="date" id={`${fieldId}-deadline`} value={values.deadline ?? ""} onChange={event => update("deadline", event.target.value)} aria-invalid={!!errors.deadline} aria-describedby={errors.deadline ? `${fieldId}-deadline-error` : undefined} />
                   {errors.deadline && <p className="etm-field-error" id={`${fieldId}-deadline-error`}>{errors.deadline}</p>}
                 </div>
+                <label className={`etm-completion-control ${values.allow_late_submission ? "checked" : ""}`}>
+                  <input type="checkbox" checked={!!values.allow_late_submission} onChange={event => update("allow_late_submission", event.target.checked)} />
+                  <span><strong>Allow late submission?</strong><small>{values.allow_late_submission ? "The task can still be completed after its deadline." : "After the deadline only you (the owner) can complete it."}</small></span>
+                </label>
                 <div className="etm-field">
-                  <label htmlFor={`${fieldId}-recurrence`}>Repeat</label>
+                  <label htmlFor={`${fieldId}-eodb`}>EODB Compliance</label>
+                  <ThemedSelect<SelectOption<EodbCompliance>>
+                    inputId={`${fieldId}-eodb`}
+                    classNamePrefix="etm-eodb-select"
+                    isSearchable={false}
+                    isClearable
+                    placeholder="Select a compliance class…"
+                    aria-label="EODB compliance"
+                    options={EODB_COMPLIANCE.map(item => ({ value: item.value, label: `${item.value} — ${item.days} days` }))}
+                    value={EODB_COMPLIANCE.filter(item => item.value === values.eodb_compliance).map(item => ({ value: item.value, label: `${item.value} — ${item.days} days` }))[0] ?? null}
+                    onChange={option => {
+                      update("eodb_compliance", option?.value ?? "");
+                      const days = EODB_COMPLIANCE.find(item => item.value === option?.value)?.days;
+                      if (days) {
+                        const due = new Date();
+                        due.setDate(due.getDate() + days);
+                        update("deadline", `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, "0")}-${String(due.getDate()).padStart(2, "0")}`);
+                      }
+                    }}
+                  />
+                  <p className="etm-form-helper">Simple: 3 days · Complex: 7 days · Highly Technical: 30 days. Choosing one sets the deadline counted from today; you can still change the date.</p>
+                </div>
+                </div>
+                <div className="etm-field">
+                  <label className={`etm-completion-control ${values.recurrence !== "None" ? "checked" : ""}`}>
+                    <input type="checkbox" checked={values.recurrence !== "None"} onChange={event => update("recurrence", event.target.checked ? "Daily" : "None")} />
+                    <span><strong>Will this task be repeated?</strong><small>Tick this if it comes back on a schedule.</small></span>
+                  </label>
+                  {values.recurrence !== "None" && <>
                   <ThemedSelect<SelectOption<Recurrence>>
                     inputId={`${fieldId}-recurrence`}
                     classNamePrefix="etm-recurrence-select"
                     isSearchable={false}
-                    options={RECURRENCES.map(item => ({ value: item, label: RECURRENCE_LABELS[item] }))}
+                    aria-label="How often it repeats"
+                    options={RECURRENCES.filter(item => item !== "None").map(item => ({ value: item, label: RECURRENCE_LABELS[item] }))}
                     value={{ value: values.recurrence, label: RECURRENCE_LABELS[values.recurrence] }}
                     onChange={option => update("recurrence", option?.value ?? values.recurrence)}
                   />
@@ -645,7 +589,166 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
                     </div>
                   )}
                   <p className="etm-form-helper">{RECURRENCE_HELPER[values.recurrence]}</p>
+                  </>}
                 </div>
+                {!task && (
+                  <div className="etm-field etm-template-picker">
+                    <label htmlFor={`${fieldId}-template`}><Bookmark size={15} /> Start from a template <span className="etm-form-optional">(optional)</span></label>
+                    <ThemedSelect<SelectOption<string>>
+                      inputId={`${fieldId}-template`}
+                      classNamePrefix="etm-task-template-select"
+                      isSearchable
+                      isDisabled={templates.length === 0}
+                      placeholder={templates.length ? "Add task manually — start from scratch" : "No templates saved yet"}
+                      options={templates.map(template => ({ value: String(template.id), label: template.name }))}
+                      value={templates.map(template => ({ value: String(template.id), label: template.name })).find(option => option.value === selectedTemplateId) ?? null}
+                      onChange={option => handleTemplateChange(option?.value ?? "")}
+                    />
+                    <p className="etm-form-helper">Choosing a template fills in the details, subtasks, and assignees below — you can still edit anything before saving. <Link to="/etms/templates">Manage templates</Link></p>
+                  </div>
+                )}
+                <fieldset className="etm-priority-field">
+                  <legend>Priority</legend>
+                  <div className="etm-priority-options">{PRIORITIES.map(priority => <label key={priority} data-howto={`priority-${priority.toLowerCase()}`} className={`etm-priority-option ${priority.toLowerCase()} ${values.priority === priority ? "selected" : ""}`}>
+                    <input type="radio" name={`${fieldId}-priority`} value={priority} checked={values.priority === priority} onChange={() => update("priority", priority)} />
+                    <span className="etm-priority-option-top"><Flag size={15} /><span>{priority}</span>{values.priority === priority && <Check size={14} className="etm-priority-check" />}</span>
+                    <small className="etm-priority-note">{PRIORITY_NOTES[priority]}</small>
+                  </label>)}</div>
+                </fieldset>
+              </div>
+            </section>
+
+            <section className="etm-panel etm-form-section" aria-labelledby={`${fieldId}-people-heading`}>
+              <div className="etm-form-section-heading"><span className="etm-form-section-icon"><Users size={19} /></span><div><h2 id={`${fieldId}-people-heading`}>People & ownership</h2><p>{values.isPersonal ? "Personal tasks are just for you." : canManageAssignments ? "Bring the right people into the task." : "Only the owner can change who's assigned."}</p></div></div>
+              <div className="etm-form-section-body">
+                {/* Requestor and Location are hidden for now (kept in the data, not asked for):
+                <div className="etm-field">
+                  <label htmlFor={`${fieldId}-requestor`}>Requestor <span className="etm-form-optional">(optional)</span></label>
+                  <input data-howto="requestor" id={`${fieldId}-requestor`} value={values.requestor} onChange={event => update("requestor", event.target.value)} placeholder="Who requested this task?" maxLength={255} />
+                </div>
+                <fieldset className="etm-location-field">
+                  <legend><MapPin size={15} /> Location <span className="etm-form-optional">(optional)</span></legend>
+                  <p className="etm-form-helper">Choose Region X suggestions, or type a city or barangay that is not listed.</p>
+                  <div className="etm-location-grid">
+                    <label htmlFor={`${fieldId}-province`}>Province
+                      <ThemedSelect<SelectOption<string>>
+                        inputId={`${fieldId}-province`}
+                        classNamePrefix="etm-province-select"
+                        isSearchable
+                        isClearable
+                        placeholder="Select a Region X province"
+                        options={REGION_X_PROVINCES.map(province => ({ value: province, label: province }))}
+                        value={values.location_province ? { value: values.location_province, label: values.location_province } : null}
+                        onChange={option => setValues(current => ({ ...current, location_province: option?.value ?? "", location_city: "", location_barangay: "" }))}
+                      />
+                    </label>
+                    <label htmlFor={`${fieldId}-city`}>City / Municipality
+                      <input id={`${fieldId}-city`} list={`${fieldId}-city-options`} value={values.location_city} onChange={event => update("location_city", event.target.value)} placeholder={values.location_province ? "Search or type a city" : "Select a province first"} disabled={!values.location_province} maxLength={100} />
+                      <datalist id={`${fieldId}-city-options`}>{(REGION_X_CITIES[values.location_province] ?? []).map(city => <option key={city} value={city} />)}</datalist>
+                    </label>
+                    <label htmlFor={`${fieldId}-barangay`}>Barangay
+                      <input id={`${fieldId}-barangay`} list={`${fieldId}-barangay-options`} value={values.location_barangay} onChange={event => update("location_barangay", event.target.value)} placeholder="Search or type a barangay" maxLength={100} />
+                      <datalist id={`${fieldId}-barangay-options`}>{(REGION_X_BARANGAYS[values.location_city] ?? []).map(barangay => <option key={barangay} value={barangay} />)}</datalist>
+                    </label>
+                  </div>
+                </fieldset>
+                */}
+                {values.isPersonal ? (
+                  <div className="etm-field">
+                    <label>Assigned persons</label>
+                    <div className="etm-form-static-field"><User size={16} /><span>Personal task — assigned to you only</span></div>
+                  </div>
+                ) : (
+                  <fieldset className="etm-member-field">
+                    <legend>Assigned persons <span className="etm-form-count">{values.assignments.length} selected</span></legend>
+                    <p className="etm-form-helper" id={`${fieldId}-people-help`}>{canManageAssignments ? "Select one or more members and give each a role. Leave empty to decide later." : "Assignment roles are managed by the task owner."}</p>
+                    {values.assignments.length > 0 && <div className="etm-selected-members" style={showAllAssigned && values.assignments.length > ASSIGNED_PREVIEW ? { maxHeight: 280, overflowY: "auto", paddingRight: 4 } : undefined}>{(showAllAssigned ? values.assignments : values.assignments.slice(0, ASSIGNED_PREVIEW)).map(assignment => {
+                      const person = roster.find(member => member.id === assignment.user);
+                      const name = person ? memberName(person) : `Member #${assignment.user}`;
+                      return <div className="etm-assignment-chip" key={assignment.user}>
+                        <span className="etm-assignment-chip-name">{name}</span>
+                        {canManageAssignments ? (
+                          <div className="etm-role-toggle" role="radiogroup" aria-label={`Role for ${name}`}>
+                            {ASSIGNMENT_ROLES.map(role => <button type="button" key={role} className={`etm-role-toggle-option ${assignment.role === role ? "selected" : ""}`} onClick={() => updateAssignmentRole(assignment.user, role)}>{roleLabel(role)}</button>)}
+                          </div>
+                        ) : <span className="etm-badge">{roleLabel(assignment.role)}</span>}
+                        {canManageAssignments && <button type="button" onClick={() => toggleAssignment(assignment.user)} aria-label={`Remove ${name}`}><X size={13} /></button>}
+                      </div>;
+                    })}</div>}
+                    {values.assignments.length > ASSIGNED_PREVIEW && (
+                      <button type="button" className="etm-inline-link-button" style={{ marginTop: 8 }} aria-expanded={showAllAssigned} onClick={() => setShowAllAssigned(open => !open)}>
+                        <ChevronDown size={13} style={{ transform: showAllAssigned ? "rotate(180deg)" : undefined, transition: "transform .15s" }} /> {showAllAssigned ? "Show less" : `Show all ${values.assignments.length} assigned persons (+${values.assignments.length - ASSIGNED_PREVIEW} more)`}
+                      </button>
+                    )}
+                    {canManageAssignments && (
+                      <div className="etm-member-toolbar" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                        {currentUser && !values.assignments.some(assignment => assignment.user === currentUser.id) && (
+                          <button type="button" className="etm-button ghost small etm-assign-myself" onClick={assignToMyself}><User size={14} />Assign to myself</button>
+                        )}
+                        <button type="button" className="etm-button ghost small" disabled={!filteredMembers.length} onClick={toggleSelectAll}>
+                          <Users size={14} />{allFilteredSelected ? "Deselect all" : "Select all"}{filteredMembers.length ? ` (${filteredMembers.length})` : ""}
+                        </button>
+                        <div style={{ flex: "1 1 180px", minWidth: 160 }}>
+                          <ThemedSelect<SelectOption<number | null>> size="small" aria-label="Show members of an office" classNamePrefix="etm-member-office-select" options={memberOfficeOptions} value={memberOfficeOptions.find(option => option.value === memberOffice) ?? memberOfficeOptions[0]} onChange={option => setMemberOffice(option ? option.value : null)} isSearchable />
+                        </div>
+                        <div style={{ flex: "1 1 180px", minWidth: 160 }}>
+                          <ThemedSelect<SelectOption<number | null>> size="small" aria-label="Show members of a project" classNamePrefix="etm-member-project-select" options={memberProjectOptions} value={memberProjectOptions.find(option => option.value === memberProject) ?? memberProjectOptions[0]} onChange={option => setMemberProject(option ? option.value : null)} isSearchable />
+                        </div>
+                      </div>
+                    )}
+                    {canManageAssignments && <div className="etm-member-picker">
+                      <div className="etm-member-search"><Search size={16} /><input aria-label="Search members to assign" placeholder="Search team members…" value={memberSearch} onChange={event => setMemberSearch(event.target.value)} aria-describedby={`${fieldId}-people-help`} /></div>
+                      <div className="etm-member-options">
+                        {filteredMembers.map(member => <label key={member.id} className={`etm-member-option ${values.assignments.some(a => a.user === member.id) ? "selected" : ""}`}>
+                          <input type="checkbox" checked={values.assignments.some(a => a.user === member.id)} onChange={() => toggleAssignment(member.id)} />
+                          <span className="etm-member-initials" aria-hidden="true">{member.first_name?.charAt(0)}{member.last_name?.charAt(0)}</span>
+                          <span className="etm-member-option-name">{memberName(member)}{member.position && <small>{member.position}</small>}</span>
+                        </label>)}
+                        {!filteredMembers.length && <p className="etm-member-empty">{memberSearch || memberOffice !== null || memberProject !== null ? "No members match your search or filters." : "No team members available. You can assign this task later."}</p>}
+                      </div>
+                      {!addingMember ? (
+                        <button type="button" className="etm-inline-link-button etm-add-member-trigger" onClick={openAddMember}><UserPlus size={13} />Not in the list? Add a new user</button>
+                      ) : (
+                        <div className="etm-add-member-form">
+                          <div className="etm-add-member-form-heading"><UserPlus size={14} />Add a new user<button type="button" className="etm-icon-button" aria-label="Cancel adding user" onClick={() => { setAddingMember(false); setMemberError(""); }}><X size={14} /></button></div>
+                          <div className="etm-add-member-form-grid">
+                            <input value={newMember.first_name} onChange={event => setNewMember(current => ({ ...current, first_name: event.target.value }))} placeholder="First name" maxLength={255} aria-label="New user first name" disabled={memberSaving} />
+                            <input value={newMember.last_name} onChange={event => setNewMember(current => ({ ...current, last_name: event.target.value }))} placeholder="Last name" maxLength={255} aria-label="New user last name" disabled={memberSaving} />
+                            <input type="email" value={newMember.email} onChange={event => setNewMember(current => ({ ...current, email: event.target.value }))} placeholder="Email address" maxLength={255} aria-label="New user email" disabled={memberSaving} />
+                            <input value={newMember.position} onChange={event => setNewMember(current => ({ ...current, position: event.target.value }))} placeholder="Position (optional)" maxLength={255} aria-label="New user position" disabled={memberSaving} />
+                          </div>
+                          {memberError && <p className="etm-field-error" role="alert">{memberError}</p>}
+                          <button type="button" className="etm-button primary small" disabled={memberSaving} onClick={() => void handleAddMember()}>{memberSaving ? <Loader2 size={13} className="etm-form-spinner" /> : <UserPlus size={13} />}Create & assign</button>
+                        </div>
+                      )}
+                    </div>}
+                  </fieldset>
+                )}
+              </div>
+            </section>
+
+            <section className="etm-panel etm-form-section" aria-labelledby={`${fieldId}-subtasks-heading`}>
+              <div className="etm-form-section-heading"><span className="etm-form-section-icon"><CheckCheck size={19} /></span><div><h2 id={`${fieldId}-subtasks-heading`}>Subtasks <span className="etm-form-optional">(optional)</span> <span className="etm-form-count">{allSubtasks.length}</span></h2><p>Add them now, or let the creator or assignees add them later. Subtasks can have their own subtasks too.</p></div>{task && allSubtasks.length > 0 && <span className="etm-subtask-summary">{completedSubtasks}/{allSubtasks.length} done</span>}</div>
+              <div className="etm-form-section-body">
+                {allSubtasks.length === 0 && <div className="etm-subtask-empty"><CheckCheck size={23} /><span>No subtasks yet. Add the first step below.</span></div>}
+                <div className="etm-subtask-editor">{values.subtasks.map((subtask, index) => (
+                  <SubtaskEditorRow key={subtask.localKey} subtask={subtask} index={index} depth={0} fieldId={fieldId} errors={errors} docTemplates={docTemplates} canComplete={!!task} onUpdate={updateSubtask} onRemove={removeSubtask} onAddChild={addSubtask} />
+                ))}</div>
+                <button type="button" className="etm-add-subtask" onClick={() => addSubtask(null)}><Plus size={16} /> Add subtask</button>
+              </div>
+            </section>
+            <section className="etm-panel etm-form-section" aria-labelledby={`${fieldId}-links-heading`}>
+              <div className="etm-form-section-heading"><span className="etm-form-section-icon"><Link2 size={19} /></span><div><h2 id={`${fieldId}-links-heading`}>Links &amp; attachments <span className="etm-form-optional">(optional)</span></h2><p>Add a URL, or tag a quick link that already exists.</p></div></div>
+              <div className="etm-form-section-body">
+                <TaskLinksField idPrefix={fieldId} value={values.links} onChange={links => setValues(current => ({ ...current, links }))} />
+              </div>
+            </section>
+          </div>
+
+          <aside className="etm-form-aside">
+            <section className="etm-panel etm-form-section mt-2" aria-labelledby={`${fieldId}-planning-heading`}>
+              <div className="etm-form-section-heading"><span className="etm-form-section-icon"><CalendarDays size={19} /></span><div><h2 id={`${fieldId}-planning-heading`}>Status</h2><p>Keep the work on track.</p></div></div>
+              <div className="etm-form-section-body">
                 {task ? (
                   <>
                     <div className="etm-field">
@@ -676,12 +779,14 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
                 </div>
               </div>
             </section>}
-            <TaskLivePreview values={values} members={roster} />
+            <div className="etm-form-aside-sticky">
+              <TaskLivePreview values={values} members={roster} />
+              <div className="etm-form-aside-actions"><button className="etm-button ghost" type="button" disabled={saving} onClick={onCancel}>Cancel</button><button data-howto="submit-button" className="etm-button primary" type="submit" disabled={saving}>{saving ? <Loader2 size={17} className="etm-form-spinner" /> : <Check size={17} />}{saving ? "Saving task…" : task ? "Save changes" : "Create task"}</button></div>
+            </div>
           </aside>
         </div>
       </fieldset>
       {error && <div className="etm-form-error-banner" role="alert">{error}</div>}
-      <div className="etm-form-footer"><span>Your team’s next step starts here.</span><div><button className="etm-button ghost" type="button" disabled={saving} onClick={onCancel}>Cancel</button><button data-howto="submit-button" className="etm-button primary" type="submit" disabled={saving}>{saving ? <Loader2 size={17} className="etm-form-spinner" /> : <Check size={17} />}{saving ? "Saving task…" : task ? "Save changes" : "Create task"}</button></div></div>
     </form>
   );
 }

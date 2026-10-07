@@ -1,4 +1,4 @@
-import { adjectivalRating, tokenKey, type IPCRField, type IPCRFieldValue, type IPCRGridData, type IPCRRichTextRun } from "./types";
+import { adjectivalRating, MONTH_NAMES, type IPCRField, type IPCRFieldValue, type IPCRGridData, type IPCRRichTextRun } from "./types";
 import type { GroupedTask } from "../tasks/types";
 
 export function composeGroupedTasksHtml(groupIds: number[], groups: GroupedTask[]): string {
@@ -29,6 +29,16 @@ export function cellCoords(name: string): { col: number; row: number } {
   let col = 0;
   for (const char of match[1]) col = col * 26 + (char.charCodeAt(0) - 64);
   return { col: col - 1, row: Number(match[2]) - 1 };
+}
+
+// The grid reads styles back from the browser (element.style), which rewrites every colour as
+// "rgb(r, g, b)" — but the PDF/.xlsx builders only understand hex. Without this, any fill or text
+// colour that was set in the designer came out black in the PDF and was dropped from the .xlsx.
+export function normalizeCssColors(value: string): string {
+  return value.replace(/rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)(?:[\s,/]+([\d.]+%?))?\s*\)/gi, (_match, red: string, green: string, blue: string, alpha?: string) => {
+    if (alpha !== undefined && parseFloat(alpha) === 0) return "transparent";
+    return `#${[red, green, blue].map(part => Math.min(255, Number(part)).toString(16).padStart(2, "0")).join("")}`;
+  });
 }
 
 export interface ParsedCellStyle {
@@ -72,7 +82,7 @@ export function parseCellStyle(style: string | undefined): ParsedCellStyle {
     const [rawKey, rawValue] = rule.split(":");
     if (!rawKey || !rawValue) continue;
     const key = rawKey.trim().toLowerCase();
-    const value = rawValue.trim();
+    const value = normalizeCssColors(rawValue.trim());
     if (key === "font-weight" && (value === "bold" || Number(value) >= 600)) parsed.bold = true;
     else if (key === "font-style" && value === "italic") parsed.italic = true;
     else if (key === "text-decoration" && value.includes("underline")) parsed.underline = true;
@@ -177,22 +187,93 @@ export function runsToHtml(runs: IPCRRichTextRun[]): string {
     if (run.bold) html = `<b>${html}</b>`;
     if (run.italic) html = `<i>${html}</i>`;
     if (run.underline) html = `<u>${html}</u>`;
+    if (run.link) html = `<a href="${escapeHtml(run.link).replace(/"/g, "&quot;")}" target="_blank" rel="noreferrer">${html}</a>`;
     return html;
   }).join("");
 }
 
+// Same as runsToHtml, but for seeding the formatting EDITOR: lines that start with a "• " bullet come back as a real
+// bulleted list (indented, continues on Enter), because that is what they were typed as and what the bullet shortcut makes.
+export function runsToEditorHtml(runs: IPCRRichTextRun[]): string {
+  const lines: IPCRRichTextRun[][] = [[]];
+  runs.forEach(run => {
+    run.text.split("\n").forEach((part, index) => {
+      if (index > 0) lines.push([]);
+      if (part) lines[lines.length - 1].push({ ...run, text: part });
+    });
+  });
+  const isBullet = (line: IPCRRichTextRun[] | undefined) => !!line && !!line[0] && line[0].text.startsWith("\u2022 ");
+  let html = "";
+  let inList = false;
+  lines.forEach((line, index) => {
+    if (isBullet(line)) {
+      if (!inList) { html += "<ul>"; inList = true; }
+      const content = [{ ...line[0], text: line[0].text.slice(2) }, ...line.slice(1)].filter(run => run.text);
+      // A bullet with nothing after it is a leftover, not an item worth showing.
+      if (!content.length) return;
+      html += `<li>${runsToHtml(content)}</li>`;
+      return;
+    }
+    if (inList) { html += "</ul>"; inList = false; }
+    html += runsToHtml(line);
+    // A plain line only needs a <br> when the next line is plain too (a list is a block of its own).
+    if (index < lines.length - 1 && !isBullet(lines[index + 1])) html += "<br>";
+  });
+  if (inList) html += "</ul>";
+  return html;
+}
+
+// A grouped task's heading carries a "(done/total)" count — "eGov Booth(2/2)" — that follows the bullets under it.
+// Recounts the "• " lines and rewrites the count on the first line; text without such a count is left alone.
+export function syncTaskCount(runs: IPCRRichTextRun[]): IPCRRichTextRun[] {
+  const text = flattenRuns(runs);
+  const lines = text.split("\n");
+  const match = lines[0].match(/\(\d+\/\d+\)\s*$/);
+  if (!match || match.index === undefined) return runs;
+  const total = lines.slice(1).filter(line => line.startsWith("• ") && line.slice(2).trim()).length;
+  return replaceRunsRange(runs, match.index, match.index + match[0].length, `(${total}/${total})`);
+}
+
+// http(s):// and www. addresses typed or pasted into plain text become links without any extra step.
+const URL_PATTERN = /\b(?:https?:\/\/|www\.)[^\s<>"']+/gi;
+
+function autoLink(runs: IPCRRichTextRun[]): IPCRRichTextRun[] {
+  const out: IPCRRichTextRun[] = [];
+  runs.forEach(run => {
+    if (run.link || !URL_PATTERN.test(run.text)) { out.push(run); return; }
+    URL_PATTERN.lastIndex = 0;
+    let last = 0;
+    for (const match of run.text.matchAll(URL_PATTERN)) {
+      // Trailing punctuation belongs to the sentence, not the address.
+      const url = match[0].replace(/[.,;:!?)\]]+$/, "");
+      const start = match.index ?? 0;
+      if (start > last) out.push({ ...run, text: run.text.slice(last, start) });
+      out.push({ ...run, text: url, link: /^www\./i.test(url) ? `https://${url}` : url });
+      last = start + url.length;
+    }
+    if (last < run.text.length) out.push({ ...run, text: run.text.slice(last) });
+  });
+  return out;
+}
+
 // Inverse of runsToHtml — walks IPCRRichTextField's HTML output back into runs. Handles the
-// tags document.execCommand actually produces (b/strong, i/em, u, br) plus block elements
-// (div/p/li) as line breaks, since a pasted/typed cell can still contain paragraph breaks.
+// tags document.execCommand actually produces (b/strong, i/em, u, a, br, ul/ol/li) plus block
+// elements (div/p) as line breaks. A block always STARTS on a new line: pressing Enter in the
+// editor makes a <div> after a plain text line, and without the break its text ran on straight
+// after the previous line's last word.
 export function htmlToRuns(html: string): IPCRRichTextRun[] {
   const container = document.createElement("div");
   container.innerHTML = html;
   const runs: IPCRRichTextRun[] = [];
 
-  function walk(node: ChildNode, bold: boolean, italic: boolean, underline: boolean) {
+  const startLine = () => {
+    if (runs.length && !runs[runs.length - 1].text.endsWith("\n")) runs.push({ text: "\n" });
+  };
+
+  function walk(node: ChildNode, bold: boolean, italic: boolean, underline: boolean, link?: string) {
     if (node.nodeType === Node.TEXT_NODE) {
-      const text = node.textContent ?? "";
-      if (text) runs.push({ text, bold: bold || undefined, italic: italic || undefined, underline: underline || undefined });
+      const text = (node.textContent ?? "").replace(/\u00a0/g, " ");
+      if (text) runs.push({ text, bold: bold || undefined, italic: italic || undefined, underline: underline || undefined, link });
       return;
     }
     if (node.nodeType !== Node.ELEMENT_NODE) return;
@@ -202,12 +283,34 @@ export function htmlToRuns(html: string): IPCRRichTextRun[] {
     const nextBold = bold || tag === "b" || tag === "strong" || element.style.fontWeight === "bold" || Number(element.style.fontWeight) >= 600;
     const nextItalic = italic || tag === "i" || tag === "em";
     const nextUnderline = underline || tag === "u" || element.style.textDecoration.includes("underline");
-    element.childNodes.forEach(child => walk(child, nextBold, nextItalic, nextUnderline));
-    if (tag === "div" || tag === "p" || tag === "li") runs.push({ text: "\n" });
+    const nextLink = tag === "a" ? (element.getAttribute("href") ?? link) : link;
+    if (tag === "ul" || tag === "ol") {
+      startLine();
+      let number = 0;
+      element.childNodes.forEach(child => {
+        // Pressing Enter to leave a list leaves an empty <li><br></li> behind: that is a blank line, not a bullet.
+        if ((child as HTMLElement).tagName?.toLowerCase() === "li" && !(child.textContent ?? "").replace(/\u00a0/g, " ").trim()) return;
+        if ((child as HTMLElement).tagName?.toLowerCase() === "li") {
+          number++;
+          startLine();
+          runs.push({ text: tag === "ul" ? "\u2022 " : `${number}. ` });
+          child.childNodes.forEach(grandChild => walk(grandChild, nextBold, nextItalic, nextUnderline, nextLink));
+          runs.push({ text: "\n" });
+        } else {
+          walk(child, nextBold, nextItalic, nextUnderline, nextLink);
+        }
+      });
+      return;
+    }
+    const isBlock = tag === "div" || tag === "p" || tag === "li";
+    if (isBlock) startLine();
+    element.childNodes.forEach(child => walk(child, nextBold, nextItalic, nextUnderline, nextLink));
+    if (isBlock) runs.push({ text: "\n" });
   }
   container.childNodes.forEach(node => walk(node, false, false, false));
   while (runs.length && runs[runs.length - 1].text === "\n") runs.pop();
-  return runs.filter(run => run.text !== "");
+  // Several newlines in a row from nested blocks collapse to the ones that were really typed.
+  return autoLink(runs.filter(run => run.text !== ""));
 }
 
 // A run set is only worth keeping as rich text — and rendering via the (fragile, DOM-measured)
@@ -220,7 +323,7 @@ export function htmlToRuns(html: string): IPCRRichTextRun[] {
 export function runsNeedRichText(runs: IPCRRichTextRun[]): boolean {
   if (runs.length <= 1) return false;
   const first = runs[0];
-  return runs.some(run => !!run.bold !== !!first.bold || !!run.italic !== !!first.italic || !!run.underline !== !!first.underline);
+  return runs.some(run => !!run.bold !== !!first.bold || !!run.italic !== !!first.italic || !!run.underline !== !!first.underline || run.link !== first.link);
 }
 
 function formatFieldValue(field: IPCRField, value: IPCRFieldValue): string {
@@ -229,6 +332,8 @@ function formatFieldValue(field: IPCRField, value: IPCRFieldValue): string {
     const date = new Date(`${value}T00:00:00`);
     return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
   }
+  if (field.type === "month") return MONTH_NAMES[Number(value) - 1] ?? String(value);
+  if (field.type === "year") return String(value);
   if (field.type === "rating") return `${value} — ${adjectivalRating(Number(value))}`;
   if (field.type === "textarea" || field.type === "grouped_tasks") return richTextToPlainText(String(value));
   return String(value);
@@ -237,23 +342,54 @@ function formatFieldValue(field: IPCRField, value: IPCRFieldValue): string {
 // Replaces every "{{key}}" token in the grid's data with its filled-in value (formatted per
 // field type), keeping style/merge/column widths untouched — used for both the live preview
 // and the xlsx/pdf export, so what you see is what gets exported.
+const TOKEN_TEST = /\{\{[a-z][a-z0-9_]*\}\}/;
+const TOKEN_EVERYWHERE = /\{\{([a-z][a-z0-9_]*)\}\}/g;
+
+// Replaces the text between `start` and `end` (positions in the runs' combined text) with `replacement`,
+// which takes the formatting of the run it lands in — so a field made from a bold word stays bold.
+export function replaceRunsRange(runs: IPCRRichTextRun[], start: number, end: number, replacement: string): IPCRRichTextRun[] {
+  const clamp = (value: number, length: number) => Math.max(0, Math.min(length, value));
+  const total = runs.reduce((sum, run) => sum + run.text.length, 0);
+  const insertAt = Math.min(start, total);
+  let position = 0;
+  let inserted = false;
+  const out = runs.map((run, index) => {
+    const runStart = position;
+    const runEnd = position + run.text.length;
+    position = runEnd;
+    const before = run.text.slice(0, clamp(start - runStart, run.text.length));
+    const after = run.text.slice(clamp(end - runStart, run.text.length));
+    const holdsInsertion = !inserted && ((insertAt >= runStart && insertAt < runEnd) || (index === runs.length - 1));
+    if (holdsInsertion) inserted = true;
+    return { ...run, text: holdsInsertion ? before + replacement + after : before + after };
+  });
+  return out.filter(run => run.text.length > 0);
+}
+
+// Fills every {{field}} token in the sheet — a token can be a cell's whole content or sit in the middle
+// of a sentence (a field made from highlighted text). Mixed-formatting cells are filled run by run, so
+// the surrounding formatting survives.
 export function fillGrid(grid: IPCRGridData, fields: IPCRField[], values: Record<string, IPCRFieldValue>): IPCRGridData {
   const byKey = new Map(fields.map(field => [field.key, field]));
-  const filledCells = new Set<string>();
-  const data = grid.data.map((row, rowIndex) => row.map((cell, colIndex) => {
-    const key = tokenKey(cell);
-    if (!key) return cell;
+  const fill = (text: string) => text.replace(TOKEN_EVERYWHERE, (match, key: string) => {
     const field = byKey.get(key);
-    if (!field) return cell;
-    filledCells.add(cellName(colIndex, rowIndex));
-    return formatFieldValue(field, values[key] ?? null);
+    return field ? formatFieldValue(field, values[key] ?? null) : match;
+  });
+  const richText = grid.richText ? { ...grid.richText } : undefined;
+  const data = grid.data.map((row, rowIndex) => row.map((cell, colIndex) => {
+    if (typeof cell !== "string") return cell;
+    const name = cellName(colIndex, rowIndex);
+    const runs = richText?.[name];
+    if (runs && runs.some(run => TOKEN_TEST.test(run.text))) {
+      const filledRuns = runs.map(run => ({ ...run, text: fill(run.text) }));
+      richText![name] = filledRuns;
+      return filledRuns.map(run => run.text).join("");
+    }
+    if (!TOKEN_TEST.test(cell)) return cell;
+    // A rich-text entry that doesn't hold the token would be stale next to the freshly filled text.
+    if (richText && name in richText) delete richText[name];
+    return fill(cell);
   }));
-  // A token cell isn't also a richText cell in practice, but if grid.richText somehow still had
-  // a stale entry for one, dropping it here keeps the overlay from showing old formatted text
-  // over the freshly filled-in value.
-  const richText = grid.richText && filledCells.size
-    ? Object.fromEntries(Object.entries(grid.richText).filter(([cell]) => !filledCells.has(cell)))
-    : grid.richText;
   return { ...grid, data, richText };
 }
 

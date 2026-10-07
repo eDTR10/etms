@@ -1,13 +1,18 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { detailsToText } from "../../features/tasks/richDetails";
+import { useNavigate } from "react-router-dom";
 import { Check, CheckCircle2, ChevronDown, ChevronRight, FolderKanban, GripVertical, Layers, Pencil, Plus, Target, Trash2, X } from "lucide-react";
 import Swal from "sweetalert2";
 import Modal from "../../components/ui/modal";
 import ThemedSelect, { type SelectOption } from "../../components/ThemedSelect";
 import UserLayout from "./UserLayout";
 import TaskProvider from "../../features/tasks/TaskProvider";
+import { useAuth } from "../Auth/AuthContext";
 import TaskFeedback from "../../features/tasks/TaskFeedback";
 import { useTasks } from "../../features/tasks/taskContext";
 import { taskError, taskService } from "../../features/tasks/taskService";
+import { SortTh, useTableSort } from "../../features/tasks/useTableSort";
+import TaskPreviewModal from "../../features/tasks/TaskPreviewModal";
 import { formatDate, type GroupedTask, type GroupedTaskInput } from "../../features/tasks/types";
 import "../../features/tasks/etm-base.css";
 import "../Etm/etm-app.css";
@@ -34,11 +39,24 @@ function escapeHtml(value: string): string {
   return div.innerHTML;
 }
 
-function ReportsContent() {
+interface ReportsContentProps {
+  // Where "Open full task" in the preview goes — differs between the user and admin areas.
+  taskBasePath?: string;
+  // An admin's task list holds everyone's tasks; grouping is for your own IPCR, so only the tasks
+  // you created or are assigned to are offered.
+  ownTasksOnly?: boolean;
+  // Add a "Created by" column — for the admin view, where the list holds everyone's tasks.
+  showOwner?: boolean;
+}
+
+export function ReportsContent({ taskBasePath = "/etms/tasks", ownTasksOnly = false, showOwner = false }: ReportsContentProps) {
   const { tasks, projects, loading, error, updateTask } = useTasks();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const completedTasks = useMemo(
-    () => tasks.filter(task => task.is_completed || task.status === "Completed"),
-    [tasks],
+    () => tasks.filter(task => (task.is_completed || task.status === "Completed")
+      && (!ownTasksOnly || task.is_creator || task.assignments.some(person => person.id === user?.id))),
+    [tasks, ownTasksOnly, user?.id],
   );
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   // Snapshot of which tasks the dialog will submit — seeded from the outer Completed
@@ -49,7 +67,15 @@ function ReportsContent() {
   const [renameValue, setRenameValue] = useState("");
   const [renaming, setRenaming] = useState(false);
   const [dragTaskId, setDragTaskId] = useState<number | null>(null);
+  const [previewTaskId, setPreviewTaskId] = useState<number | null>(null);
+  // A drag ends with a click on some browsers; that click shouldn't open the preview.
+  const lastDragEnd = useRef(0);
   const [dragOverGroupId, setDragOverGroupId] = useState<number | null>(null);
+  // Touch screens never fire HTML5 drag events, so a press-and-hold on a row runs its own drag.
+  const touchDragActive = useRef(false);
+  const isTouchDevice = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
+  const groupsRef = useRef<GroupedTask[]>([]);
+  const addByDragRef = useRef<(group: GroupedTask, taskId: number) => Promise<void>>(async () => {});
   const [groups, setGroups] = useState<GroupedTask[]>([]);
   const [groupsLoading, setGroupsLoading] = useState(true);
   const [groupsError, setGroupsError] = useState<string | null>(null);
@@ -270,6 +296,97 @@ function ReportsContent() {
     }
   };
 
+  groupsRef.current = groups;
+  addByDragRef.current = addTaskToGroupByDrag;
+
+  const startTouchDrag = (event: React.TouchEvent<HTMLElement>, task: { id: number; title: string }) => {
+    if ((event.target as HTMLElement).closest("input, button, a")) return;
+    const startTouch = event.touches[0];
+    const row = event.currentTarget;
+    let active = false;
+    let ghost: HTMLDivElement | null = null;
+    let overGroupId: number | null = null;
+    let scrollTimer: number | null = null;
+    let scrollStep = 0;
+    let lastX = startTouch.clientX;
+    let lastY = startTouch.clientY;
+
+    const scroller = (() => {
+      for (let node: HTMLElement | null = row.parentElement; node; node = node.parentElement) {
+        const overflowY = getComputedStyle(node).overflowY;
+        if ((overflowY === "auto" || overflowY === "scroll") && node.scrollHeight > node.clientHeight) return node;
+      }
+      return null;
+    })();
+
+    const moveGhost = () => { if (ghost) ghost.style.transform = `translate(${lastX - 20}px, ${lastY - 24}px)`; };
+    const updateTarget = () => {
+      const hit = document.elementFromPoint(lastX, lastY)?.closest<HTMLElement>("[data-group-id]");
+      overGroupId = hit ? Number(hit.dataset.groupId) : null;
+      setDragOverGroupId(overGroupId);
+    };
+
+    const begin = () => {
+      active = true;
+      touchDragActive.current = true;
+      setDragTaskId(task.id);
+      navigator.vibrate?.(30);
+      ghost = document.createElement("div");
+      ghost.textContent = task.title;
+      ghost.style.cssText = "position:fixed;left:0;top:0;z-index:9999;max-width:240px;padding:8px 12px;border-radius:10px;background:var(--etm-primary,#17b3ac);color:#fff;font:600 13px sans-serif;box-shadow:0 8px 24px #0006;pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.95";
+      document.body.appendChild(ghost);
+      moveGhost();
+      scrollTimer = window.setInterval(() => {
+        if (scroller && scrollStep) { scroller.scrollTop += scrollStep; updateTarget(); }
+      }, 16);
+    };
+
+    let holdTimer: number | null = window.setTimeout(begin, 250);
+
+    const cleanup = () => {
+      if (holdTimer !== null) window.clearTimeout(holdTimer);
+      if (scrollTimer !== null) window.clearInterval(scrollTimer);
+      holdTimer = null;
+      ghost?.remove();
+      document.removeEventListener("touchmove", onMove);
+      document.removeEventListener("touchend", onEnd);
+      document.removeEventListener("touchcancel", onCancel);
+      setDragTaskId(null);
+      setDragOverGroupId(null);
+      // Let the click that follows touchend pass before the row is treated as idle again.
+      lastDragEnd.current = Date.now();
+      window.setTimeout(() => { touchDragActive.current = false; }, 0);
+    };
+    function onMove(moveEvent: TouchEvent) {
+      const touch = moveEvent.touches[0];
+      lastX = touch.clientX;
+      lastY = touch.clientY;
+      if (!active) {
+        // Moved before the hold finished: the user is scrolling, not dragging.
+        if (Math.hypot(lastX - startTouch.clientX, lastY - startTouch.clientY) > 10) cleanup();
+        return;
+      }
+      moveEvent.preventDefault();
+      moveGhost();
+      updateTarget();
+      if (scroller) {
+        const bounds = scroller.getBoundingClientRect();
+        scrollStep = lastY < bounds.top + 70 ? -10 : lastY > bounds.bottom - 70 ? 10 : 0;
+      }
+    }
+    function onEnd() {
+      const groupId = active ? overGroupId : null;
+      cleanup();
+      const group = groupsRef.current.find(item => item.id === groupId);
+      if (group) void addByDragRef.current(group, task.id);
+    }
+    function onCancel() { cleanup(); }
+
+    document.addEventListener("touchmove", onMove, { passive: false });
+    document.addEventListener("touchend", onEnd);
+    document.addEventListener("touchcancel", onCancel);
+  };
+
   const confirmDeleteGroup = async (group: GroupedTask) => {
     const taskListHtml = group.tasks.length
       ? `<ul class="etm-report-delete-task-list">${group.tasks.map(task => `<li>${escapeHtml(task.title)}</li>`).join("")}</ul>`
@@ -302,8 +419,21 @@ function ReportsContent() {
     return `${total}/${group.target_value ?? total}`;
   };
 
+  const { sorted: sortedCompleted, sort: completedSort, toggle: toggleCompletedSort } = useTableSort(completedTasks, {
+    title: task => task.title,
+    finished: task => new Date(task.updated_at).getTime(),
+    owner: task => task.created_by_name,
+    details: task => detailsToText(task.details),
+  });
+  const { sorted: sortedGroups, sort: groupSort, toggle: toggleGroupSort } = useTableSort(groups, {
+    name: group => group.name,
+    project: group => group.project_name || "Personal",
+    created: group => new Date(group.created_at).getTime(),
+  });
+
   return (
     <div className="etm-reports">
+      <TaskPreviewModal task={completedTasks.find(task => task.id === previewTaskId) ?? null} onClose={() => setPreviewTaskId(null)} onOpenFull={task => { setPreviewTaskId(null); navigate(`${taskBasePath}/${task.id}`); }} />
       <div className="etm-report-split">
       <div className="etm-report-column">
         <section className="etm-report-heading">
@@ -323,29 +453,40 @@ function ReportsContent() {
             <table className="etm-tasks-table etm-report-table">
               <thead><tr>
                 <th className="etm-report-check"><input type="checkbox" aria-label="Select all completed tasks" checked={allSelected} onChange={toggleAll} /></th>
-                <th>Task Title</th><th>Date and Time Finished</th><th>Description</th>
+                <SortTh sortKey="title" sort={completedSort} onSort={toggleCompletedSort}>Task Title</SortTh><SortTh sortKey="finished" sort={completedSort} onSort={toggleCompletedSort}>Date and Time Finished</SortTh><SortTh sortKey="details" sort={completedSort} onSort={toggleCompletedSort}>Description</SortTh>{showOwner && <SortTh sortKey="owner" sort={completedSort} onSort={toggleCompletedSort}>Created by</SortTh>}
               </tr></thead>
               <tbody>
-                {completedTasks.length ? completedTasks.map(task => (
+                {sortedCompleted.length ? sortedCompleted.map(task => (
                   <tr
                     key={task.id}
-                    draggable
+                    draggable={!isTouchDevice}
+                    data-touch-drag={isTouchDevice ? "" : undefined}
+                    onTouchStart={event => startTouchDrag(event, task)}
                     title="Drag onto a group below to add it there"
                     onDragStart={event => {
+                      if (touchDragActive.current) { event.preventDefault(); return; }
                       event.dataTransfer.setData(DRAG_TASK_TYPE, String(task.id));
                       event.dataTransfer.setData("text/plain", String(task.id));
                       event.dataTransfer.effectAllowed = "copy";
                       setDragTaskId(task.id);
                     }}
-                    onDragEnd={() => setDragTaskId(null)}
-                    className={dragTaskId === task.id ? "etm-report-row-dragging" : undefined}
+                    onDragEnd={() => { lastDragEnd.current = Date.now(); setDragTaskId(null); }}
+                    className={`etm-report-row-clickable ${dragTaskId === task.id ? "etm-report-row-dragging" : ""}`}
+                    tabIndex={0}
+                    onClick={event => {
+                      if ((event.target as HTMLElement).closest("input, button, a")) return;
+                      if (touchDragActive.current || Date.now() - lastDragEnd.current < 400) return;
+                      setPreviewTaskId(task.id);
+                    }}
+                    onKeyDown={event => { if (event.key === "Enter" && event.target === event.currentTarget) setPreviewTaskId(task.id); }}
                   >
                     <td className="etm-report-check"><input type="checkbox" aria-label={`Select ${task.title}`} checked={selectedIds.has(task.id)} onChange={() => toggleTask(task.id)} /></td>
                     <td className="etm-report-task-title"><GripVertical size={13} className="etm-report-drag-handle" aria-hidden="true" />{task.title}</td>
                     <td>{formatDate(task.updated_at, true)}</td>
-                    <td className="etm-tasks-table-details-col">{task.details ? <span title={task.details}>{task.details}</span> : <span className="etm-tasks-table-unassigned">No details</span>}</td>
+                    <td className="etm-tasks-table-details-col">{detailsToText(task.details) ? <span title={detailsToText(task.details)}>{detailsToText(task.details)}</span> : <span className="etm-tasks-table-unassigned">No details</span>}</td>
+                    {showOwner && <td>{task.created_by_name || <span className="etm-tasks-table-unassigned">Unknown</span>}</td>}
                   </tr>
-                )) : <tr><td colSpan={4} className="etm-empty-row">No completed tasks are available yet.</td></tr>}
+                )) : <tr><td colSpan={showOwner ? 5 : 4} className="etm-empty-row">No completed tasks are available yet.</td></tr>}
               </tbody>
             </table>
           </section>
@@ -361,11 +502,12 @@ function ReportsContent() {
           {groupsLoading ? <p className="etm-empty-row">Loading grouped tasks…</p> : (
             <div className="etm-panel etm-table-wrap etm-report-groups">
               <table className="etm-tasks-table etm-report-groups-table">
-                <thead><tr><th>Grouped Task</th><th>Project</th><th>Created</th><th className="etm-tasks-table-actions-col">Action Buttons</th></tr></thead>
-                <tbody>{groups.length ? groups.map(group => {
+                <thead><tr><SortTh sortKey="name" sort={groupSort} onSort={toggleGroupSort}>Grouped Task</SortTh><SortTh sortKey="project" sort={groupSort} onSort={toggleGroupSort}>Project</SortTh><SortTh sortKey="created" sort={groupSort} onSort={toggleGroupSort}>Created</SortTh><th className="etm-tasks-table-actions-col">Action Buttons</th></tr></thead>
+                <tbody>{sortedGroups.length ? sortedGroups.map(group => {
                   const expanded = expandedGroupId === group.id;
                   return <Fragment key={group.id}>
                     <tr
+                      data-group-id={group.id}
                       onDragOver={event => {
                         if (dragTaskId === null) return;
                         event.preventDefault();

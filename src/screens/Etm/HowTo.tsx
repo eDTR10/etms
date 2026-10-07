@@ -112,14 +112,14 @@ const GUIDES: Guide[] = [
   },
   {
     key: "reports",
-    label: "Reports",
+    label: "Task Grouping",
     icon: <BarChart3 size={15} />,
     title: "Grouping completed tasks into a report",
     intro: "Turn finished work into a reusable activity report you can reopen anytime.",
     items: [
       {
-        text: <>Go to <strong>Reports</strong> in the sidebar.</>,
-        short: "Open Reports",
+        text: <>Go to <strong>Task Grouping</strong> in the sidebar.</>,
+        short: "Open Task Grouping",
         demo: { selector: '[data-howto="report-checkbox-0"]', action: "focus" },
       },
       {

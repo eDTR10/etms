@@ -1,6 +1,6 @@
 import { AlertTriangle, Search, UserX, X } from "lucide-react";
 import ThemedSelect, { type SelectOption } from "../../components/ThemedSelect";
-import { PRIORITIES, type Priority, type Project } from "./types";
+import { PRIORITIES, type Member, type Priority, type Project } from "./types";
 import type { AssignedFilterValue, PriorityFilterValue, ProjectFilterValue, QuickDeadlineFilterValue } from "./useTaskFilters";
 
 const QUICK_DEADLINE_FILTERS: { value: QuickDeadlineFilterValue; label: string }[] = [
@@ -28,6 +28,8 @@ interface TaskFilterBarProps {
   onAssignedFilterChange: (value: AssignedFilterValue) => void;
   overdueOnly: boolean;
   onOverdueOnlyChange: (value: boolean) => void;
+  // Optional: filter by the office / project of the people the tasks are assigned to.
+  people?: { members: Member[]; office: number | null; onOfficeChange: (value: number | null) => void; project: number | null; onProjectChange: (value: number | null) => void };
   hasActiveFilters: boolean;
   onClear: () => void;
 }
@@ -41,6 +43,7 @@ export default function TaskFilterBar({
   projects,
   assignedFilter, onAssignedFilterChange,
   overdueOnly, onOverdueOnlyChange,
+  people,
   hasActiveFilters, onClear,
 }: TaskFilterBarProps) {
   const priorityOptions: PriorityOption[] = [
@@ -54,13 +57,18 @@ export default function TaskFilterBar({
     ...projects.map(project => ({ value: project.id, label: project.name })),
   ];
   const selectedProjectOption = projectOptions.find(option => option.value === projectFilter) ?? projectOptions[0];
+  // The office / project lists only offer entries somebody actually belongs to, so no option leads to an empty result.
+  const officeIds = new Set((people?.members ?? []).map(member => member.office).filter((id): id is number => typeof id === "number"));
+  const projectIds = new Set((people?.members ?? []).flatMap(member => member.projects ?? []));
+  const officeOptions: SelectOption<number | null>[] = [{ value: null, label: "All offices" }, ...projects.filter(project => officeIds.has(project.id)).map(project => ({ value: project.id, label: project.name }))];
+  const personProjectOptions: SelectOption<number | null>[] = [{ value: null, label: "All employee projects" }, ...projects.filter(project => projectIds.has(project.id)).map(project => ({ value: project.id, label: project.name }))];
   return (
     <div className="etm-filter-bar">
       <div className="etm-filter-search">
         <Search size={15} />
         <input value={search} onChange={event => onSearchChange(event.target.value)} placeholder="Search by task or assignee…" aria-label="Search tasks by title or assignee" />
       </div>
-      <div style={{ flex: "1 1 160px", minWidth: 140 }}>
+      <div className="etm-filter-field" style={{ flexBasis: 160, minWidth: 140 }}>
         <ThemedSelect<PriorityOption>
           aria-label="Filter by priority"
           classNamePrefix="etm-priority-select"
@@ -69,7 +77,7 @@ export default function TaskFilterBar({
           onChange={option => onPriorityChange(option ? option.value : "all")}
         />
       </div>
-      <div style={{ flex: "1 1 200px", minWidth: 160 }}>
+      <div className="etm-filter-field" style={{ flexBasis: 200, minWidth: 160 }}>
         <ThemedSelect<ProjectOption>
           aria-label="Filter by project"
           classNamePrefix="etm-project-select"
@@ -79,6 +87,28 @@ export default function TaskFilterBar({
           isSearchable
         />
       </div>
+      {people && <>
+        <div className="etm-filter-field" style={{ flexBasis: 200, minWidth: 160 }}>
+          <ThemedSelect<SelectOption<number | null>>
+            aria-label="Filter assigned persons by office"
+            classNamePrefix="etm-person-office-select"
+            options={officeOptions}
+            value={officeOptions.find(option => option.value === people.office) ?? officeOptions[0]}
+            onChange={option => people.onOfficeChange(option ? option.value : null)}
+            isSearchable
+          />
+        </div>
+        <div className="etm-filter-field" style={{ flexBasis: 220, minWidth: 170 }}>
+          <ThemedSelect<SelectOption<number | null>>
+            aria-label="Filter assigned persons by project"
+            classNamePrefix="etm-person-project-select"
+            options={personProjectOptions}
+            value={personProjectOptions.find(option => option.value === people.project) ?? personProjectOptions[0]}
+            onChange={option => people.onProjectChange(option ? option.value : null)}
+            isSearchable
+          />
+        </div>
+      </>}
       <div className="etm-filter-dates">
         <label className="etm-filter-date-field">
           <span>Deadline date</span>

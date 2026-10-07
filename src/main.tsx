@@ -13,6 +13,18 @@ import AdminRoute from './screens/Auth/AdminRoute.tsx';
 import GuestRoute from './screens/Auth/GuestRoute.tsx';
 import { getHomePath } from './screens/Auth/roles.ts';
 import { ThemeProvider } from './components/theme-provider.tsx';
+import { installTableDragScroll } from './dragScroll.ts';
+
+installTableDragScroll();
+
+// A long press on touch also fires "contextmenu" (the browser's right-click menu), which would pop
+// up over the row being dragged. Suppress it for touch input on touch-draggable elements only, so mouse
+// right-click keeps working.
+let lastPointerType = '';
+window.addEventListener('pointerdown', event => { lastPointerType = event.pointerType; }, true);
+window.addEventListener('contextmenu', event => {
+  if (lastPointerType === 'touch' && (event.target as Element | null)?.closest?.('[data-touch-drag]')) event.preventDefault();
+}, true);
 
 const Page1 = lazy(() =>
   wait(1300).then(() => import("./screens/page1.tsx"))
@@ -38,6 +50,7 @@ const UserProfile    = lazy(() => import("./screens/User/Profile.tsx"));
 const UserTemplates  = lazy(() => import("./screens/User/Templates.tsx"));
 const UserQuickLinks = lazy(() => import("./screens/User/QuickLinks.tsx"));
 const UserGenerateIPCR = lazy(() => import("./screens/User/GenerateIPCR.tsx"));
+const UserIPCREditor = lazy(() => import("./screens/User/IPCREditor.tsx"));
 
 // ── Admin pages (eTM) ────────────────────────────────────────────────────
 const AdminDashboard   = lazy(() => import("./screens/Admin/Dashboard.tsx"));
@@ -49,6 +62,8 @@ const AdminCalendar    = lazy(() => import("./screens/Admin/Calendar.tsx"));
 const AdminQuickLinks  = lazy(() => import("./screens/Admin/QuickLinks.tsx"));
 const AdminIPCRTemplates = lazy(() => import("./screens/Admin/IPCRTemplates.tsx"));
 const AdminProfile     = lazy(() => import("./screens/Admin/Profile.tsx"));
+const AdminUsers       = lazy(() => import("./screens/Admin/Users.tsx"));
+const AdminTaskGrouping = lazy(() => import("./screens/Admin/TaskGrouping.tsx"));
 
 // Sends "/" to the right place: dashboard if logged in, login otherwise.
 const Home = () => {
@@ -119,6 +134,10 @@ const router = createBrowserRouter([
     element: <ProtectedRoute><Suspense fallback={<Loader />}><UserGenerateIPCR /></Suspense></ProtectedRoute>,
   },
   {
+    path: "/etms/ipcr/:id",
+    element: <ProtectedRoute><Suspense fallback={<Loader />}><UserIPCREditor /></Suspense></ProtectedRoute>,
+  },
+  {
     path: "/etms/how-to",
     element: <ProtectedRoute><Suspense fallback={<Loader />}><UserHowTo /></Suspense></ProtectedRoute>,
   },
@@ -171,6 +190,14 @@ const router = createBrowserRouter([
   {
     path: "/etms/admin/quick-links",
     element: <AdminRoute><Suspense fallback={<Loader />}><AdminQuickLinks /></Suspense></AdminRoute>,
+  },
+  {
+    path: "/etms/admin/task-grouping",
+    element: <AdminRoute><Suspense fallback={<Loader />}><AdminTaskGrouping /></Suspense></AdminRoute>,
+  },
+  {
+    path: "/etms/admin/users",
+    element: <AdminRoute><Suspense fallback={<Loader />}><AdminUsers /></Suspense></AdminRoute>,
   },
   {
     path: "/etms/admin/profile",

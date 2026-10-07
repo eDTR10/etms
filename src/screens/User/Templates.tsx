@@ -1,5 +1,7 @@
-import { useRef, useState, type ChangeEvent } from "react";
-import { Bookmark, CheckCheck, Download, Pencil, Plus, Trash2, Upload } from "lucide-react";
+import { SortTh, useTableSort } from "../../features/tasks/useTableSort";
+import { useState } from "react";
+// Needed again if Import Template is turned back on: useRef, type ChangeEvent (react), Upload (lucide-react), readTemplateImportFile (templateShare).
+import { Bookmark, CheckCheck, Download, Pencil, Plus, Trash2 } from "lucide-react";
 import Swal from "sweetalert2";
 import UserLayout from "./UserLayout";
 import TaskProvider from "../../features/tasks/TaskProvider";
@@ -7,7 +9,7 @@ import TaskFeedback from "../../features/tasks/TaskFeedback";
 import TemplateFormDialog from "../../features/tasks/TemplateFormDialog";
 import { useTasks } from "../../features/tasks/taskContext";
 import { taskError } from "../../features/tasks/taskService";
-import { exportTemplate, readTemplateImportFile } from "../../features/tasks/templateShare";
+import { exportTemplate } from "../../features/tasks/templateShare";
 import { flattenTemplateSubtasks, type TaskTemplate, type TaskTemplateInput } from "../../features/tasks/types";
 import "../../features/tasks/etm-base.css";
 import "../Etm/etm-app.css";
@@ -17,25 +19,26 @@ export function TemplatesContent() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<TaskTemplate | undefined>(undefined);
   const [importDraft, setImportDraft] = useState<TaskTemplateInput | undefined>(undefined);
-  const importInputRef = useRef<HTMLInputElement>(null);
+  // const importInputRef = useRef<HTMLInputElement>(null);
 
   const openCreate = () => { setEditingTemplate(undefined); setImportDraft(undefined); setDialogOpen(true); };
   const openEdit = (template: TaskTemplate) => { setEditingTemplate(template); setImportDraft(undefined); setDialogOpen(true); };
   const closeDialog = () => { setDialogOpen(false); setImportDraft(undefined); };
 
-  const handleImportFile = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-    try {
-      const draft = await readTemplateImportFile(file);
-      setEditingTemplate(undefined);
-      setImportDraft(draft);
-      setDialogOpen(true);
-    } catch (err) {
-      void Swal.fire({ title: "Couldn't import that file", text: err instanceof Error ? err.message : "Make sure it's a template exported from here.", icon: "error" });
-    }
-  };
+  // Import Template hidden for now:
+  // const handleImportFile = async (event: ChangeEvent<HTMLInputElement>) => {
+  //   const file = event.target.files?.[0];
+  //   event.target.value = "";
+  //   if (!file) return;
+  //   try {
+  //     const draft = await readTemplateImportFile(file);
+  //     setEditingTemplate(undefined);
+  //     setImportDraft(draft);
+  //     setDialogOpen(true);
+  //   } catch (err) {
+  //     void Swal.fire({ title: "Couldn't import that file", text: err instanceof Error ? err.message : "Make sure it's a template exported from here.", icon: "error" });
+  //   }
+  // };
 
   const confirmDelete = async (template: TaskTemplate) => {
     const result = await Swal.fire({
@@ -57,17 +60,27 @@ export function TemplatesContent() {
     }
   };
 
+  const { sorted: sortedTemplates, sort, toggle: toggleSort } = useTableSort(templates, {
+    name: template => template.name,
+    title: template => template.title,
+    project: template => template.is_personal ? "Personal" : template.project,
+    priority: template => ({ Low: 1, Medium: 2, High: 3 } as Record<string, number>)[template.priority],
+    subtasks: template => flattenTemplateSubtasks(template.subtasks).length,
+  });
+
   return (
     <div className="etm-reports">
       <section className="etm-report-heading">
         <div>
           <p className="etm-report-eyebrow"><Bookmark size={15} /> Reusable blueprints</p>
-          <h2>Task Templates</h2>
+          <h2>Task Sub-Task Templates</h2>
           <p>Save the details you retype every time, then start a new task from a template in one click.</p>
         </div>
         <div className="etm-report-section-title-actions">
+          {/* Import Template hidden for now:
           <input ref={importInputRef} type="file" accept=".json,application/json" hidden onChange={event => void handleImportFile(event)} />
           <button type="button" className="etm-button ghost" onClick={() => importInputRef.current?.click()}><Upload size={16} /> Import Template</button>
+          */}
           <button type="button" className="etm-button" onClick={openCreate}><Plus size={16} /> New Template</button>
         </div>
       </section>
@@ -77,16 +90,16 @@ export function TemplatesContent() {
         <section className="etm-panel etm-table-wrap">
           <table className="etm-tasks-table etm-report-table">
             <thead><tr>
-              <th>Template Name</th><th>Default Title</th><th>Project</th><th>Priority</th><th>Subtasks</th><th className="etm-tasks-table-actions-col">Action Buttons</th>
+              <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Template Name</SortTh><SortTh sortKey="title" sort={sort} onSort={toggleSort}>Default Title</SortTh><SortTh sortKey="project" sort={sort} onSort={toggleSort}>Project</SortTh><SortTh sortKey="priority" sort={sort} onSort={toggleSort}>Priority</SortTh><SortTh sortKey="subtasks" sort={sort} onSort={toggleSort}>Subtasks</SortTh><th className="etm-tasks-table-actions-col">Action Buttons</th>
             </tr></thead>
             <tbody>
-              {templates.length ? templates.map(template => (
+              {sortedTemplates.length ? sortedTemplates.map(template => (
                 <tr key={template.id}>
                   <td className="etm-tasks-table-details-col">{template.name}</td>
                   <td>{template.title || <span className="etm-tasks-table-unassigned">Not set</span>}</td>
                   <td>{template.is_personal ? "Personal" : template.project || <span className="etm-tasks-table-unassigned">Not set</span>}</td>
                   <td className={template.priority.toLowerCase()}>{template.priority}</td>
-                  <td>{template.subtasks.length ? <span><CheckCheck size={13} style={{ verticalAlign: "-2px", marginRight: 5 }} />{flattenTemplateSubtasks(template.subtasks).length}</span> : <span className="etm-tasks-table-unassigned">None</span>}</td>
+                  <td>{template.subtasks.length ? <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><CheckCheck size={13} />{flattenTemplateSubtasks(template.subtasks).length}</span> : <span className="etm-tasks-table-unassigned">None</span>}</td>
                   <td className="etm-report-group-actions">
                     <button type="button" className="etm-icon-button" aria-label={`Export ${template.name}`} title="Download as JSON" onClick={() => exportTemplate(template)}><Download size={15} /></button>
                     {template.can_manage ? <>
@@ -120,7 +133,7 @@ export function TemplatesContent() {
 
 export default function Templates() {
   return (
-    <UserLayout title="Task Templates" subtitle="Reuse task details instead of retyping them.">
+    <UserLayout title="Task Sub-Task Templates" subtitle="Reuse task details instead of retyping them.">
       <TaskProvider>
         <TemplatesContent />
       </TaskProvider>

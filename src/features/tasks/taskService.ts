@@ -71,6 +71,12 @@ export const taskService = {
     (await api.post<Task>(`etm/tasks/${id}/subtasks/${subtaskId}/completion/`, { is_completed })).data,
   reorderSubtasks: async (id: number, parentId: number | null, order: number[]) =>
     (await api.post<Task>(`etm/tasks/${id}/subtasks/reorder/`, { parent: parentId, order })).data,
+  officeScope: async () =>
+    (await api.get<{ enabled: boolean; office_name: string | null; members: Member[]; tasks: Task[] }>("etm/tasks/office/")).data,
+  revertTurnover: async (id: number) =>
+    (await api.post<Task>(`etm/tasks/${id}/revert-turnover/`)).data,
+  turnoverTask: async (id: number, userId: number, note: string) =>
+    (await api.post<Task>(`etm/tasks/${id}/turnover/`, { user: userId, note })).data,
   completeTask: async (id: number) => (await api.post<Task>(`etm/tasks/${id}/complete/`)).data,
   assignSubtask: async (id: number, subtaskId: number, userId: number | null) =>
     (await api.post<Task>(`etm/tasks/${id}/subtasks/${subtaskId}/assign/`, { user: userId })).data,

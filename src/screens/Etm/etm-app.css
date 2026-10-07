@@ -37,7 +37,7 @@
 .etm-status-chip-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 16px; height: 16px; margin-left: 6px; padding: 0 4px; border-radius: 20px; background: #c85f5a; color: #fff; font-size: 10px; font-weight: 700; line-height: 1; vertical-align: middle; }
 .etm-status-chip.active .etm-status-chip-badge { background: #fff; color: #c85f5a; }
 
-.etm-section { margin-bottom: 22px; }
+.etm-section { margin-bottom: 22px; min-width: 0; max-width: 100%; }
 .etm-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
 .etm-section-heading h2 { margin: 0; color: var(--etm-ink); font-size: 15px; font-weight: 700; }
 .etm-section-heading p { margin: 2px 0 0; color: var(--etm-muted); font-size: 12px; }
@@ -74,7 +74,7 @@
 .etm-donut-row-caption { display: block; margin-top: 4px; color: var(--etm-muted); font-size: 11px; }
 
 @media (max-width: 767px) {
-  .etm-charts-grid { grid-template-columns: 1fr; }
+  .etm-charts-grid { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 619px) {
   .etm-vbar-chart-frame { min-height: 130px; }
@@ -137,7 +137,9 @@
 .etm-accordion-empty { padding: 4px 0; color: var(--etm-muted); font-size: 12px; }
 
 /* Tasks table (All Tasks page) */
-.etm-table-wrap { overflow-x: auto; overflow-y: hidden; }
+.etm-table-wrap { overflow-x: auto; overflow-y: hidden; max-width: 100%; }
+.etm-table-wrap.etm-dragging, .etm-table-wrap.etm-dragging * { cursor: grabbing !important; user-select: none; }
+.etm-table-wrap.etm-draggable { cursor: grab; }
 .etm-tasks-table { width: 100%; min-width: 1720px; border-collapse: collapse; }
 .etm-tasks-table.compact { min-width: 1600px; }
 .etm-tasks-table-dashboard { min-width: 980px; }
@@ -263,6 +265,21 @@
   .etm-kpi-grid { grid-template-columns: repeat(4, 1fr); }
 }
 
+/* Dashboard KPIs: up to 4 per row, and a short last row stretches its cards to fill the width. */
+.etm-kpi-grid-six { display: flex; flex-wrap: wrap; }
+.etm-kpi-grid-six > .etm-kpi-card { flex: 1 1 calc(50% - 7px); width: auto; min-width: 0; }
+@media (min-width: 720px) {
+  .etm-kpi-grid-six > .etm-kpi-card { flex-basis: calc(25% - 10px); }
+}
+
+/* Deadline is 0-2 days away: red pulsing pill / card so it's hard to miss. */
+.etm-due-soon-badge { flex-shrink: 0; padding: 2px 8px; border-radius: 20px; background: #c0392b; color: #fff; font-size: 11px; font-weight: 700; white-space: nowrap; animation: etm-due-soon-blink 1.2s ease-in-out infinite; }
+.etm-due-soon-text { color: #c0392b; }
+.etm-kpi-card.due-soon:not(.selected) { border-color: #c0392b; animation: etm-due-soon-ring 1.2s ease-in-out infinite; }
+@keyframes etm-due-soon-blink { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@keyframes etm-due-soon-ring { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 50% { box-shadow: 0 0 0 3px #c0392b55; } }
+@media (prefers-reduced-motion: reduce) { .etm-due-soon-badge, .etm-kpi-card.due-soon { animation: none; } }
+
 /* ── Dark mode ─────────────────────────────────────────────────────────── */
 :root.dark .etm-kpi-icon { background: #163639; }
 :root.dark .etm-kpi-card.warn .etm-kpi-icon { background: #3a2f16; color: #e6c179; }
@@ -357,3 +374,22 @@
 .etm-reports-page-note { margin: 2px 0 0; color: var(--etm-muted); font-size: 12.5px; font-style: italic; }
 
 .etm-tab-alert-badge { display: inline-flex; align-items: center; margin-left: 6px; padding: 1px 7px; border-radius: 20px; background: #e0453c; color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .2px; text-transform: uppercase; vertical-align: middle; }
+
+.etm-workload-dialog-pager { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; color: var(--etm-muted); font-size: 12px; }
+.etm-workload-dialog-pager button { padding: 6px 12px; border: 1px solid var(--etm-border); border-radius: 8px; background: var(--etm-surface-alt); color: var(--etm-ink); font: inherit; font-size: 12px; cursor: pointer; }
+.etm-workload-dialog-pager button:disabled { opacity: .45; cursor: not-allowed; }
+
+.etm-member-row-name .etm-assigned-by-note { color: var(--etm-primary); font-weight: 600; }
+
+.etm-table-pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; color: var(--etm-muted); font-size: 12px; font-weight: 600; }
+.etm-table-pagination-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.etm-table-pagination select { margin-left: 6px; padding: 5px 8px; border: 1px solid var(--etm-border); border-radius: 8px; background: var(--etm-surface-alt); color: var(--etm-ink); font: inherit; }
+
+.etm-tasks-table-assignee-more { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 26px; padding: 0 6px; border-radius: 999px; background: color-mix(in srgb, var(--etm-primary) 18%, var(--etm-surface-alt)); color: var(--etm-primary); font-size: 11px; font-weight: 700; cursor: default; }
+
+/* Task title is a real link (right-click → open in new tab); its ::after stretches the link over
+   the whole row, while checkboxes and action buttons stay above it and clickable. */
+.etm-tasks-table-row-clickable { position: relative; }
+.etm-task-title-anchor { text-decoration: none; color: inherit; font: inherit; }
+.etm-task-title-anchor::after { content: ""; position: absolute; inset: 0; z-index: 0; }
+.etm-tasks-table-row-clickable td:last-child > *, .etm-task-title-controls { position: relative; z-index: 1; }

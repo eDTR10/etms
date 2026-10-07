@@ -6,7 +6,7 @@ import "../Etm/etm-app.css";
 
 export default function AdminQuickLinks() {
   return (
-    <AdminLayout title="Quick Links" subtitle="Every saved quick link from every user.">
+    <AdminLayout title="Quick Links" subtitle="Links you add here are shown to everyone.">
       <QuickLinksProvider>
         <QuickLinksContent />
       </QuickLinksProvider>

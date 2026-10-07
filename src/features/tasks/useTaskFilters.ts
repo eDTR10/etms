@@ -1,20 +1,36 @@
-import { useMemo, useState } from "react";
-import { isOverdue, memberName, type Priority, type Task, type TaskStatus } from "./types";
+import { useEffect, useMemo, useState } from "react";
+import { isDueSoon, isOverdue, memberName, type Member, type Priority, type Task, type TaskStatus } from "./types";
 
 export type StatusFilterValue = "all" | TaskStatus;
 export type PriorityFilterValue = "all" | Priority;
 export type ProjectFilterValue = "all" | "personal" | number;
 export type QuickDeadlineFilterValue = "" | "day" | "week" | "month";
 export type AssignedFilterValue = "all" | "unassigned";
+// "mine" = tasks I created; "assigned" = tasks someone else created that I was assigned to.
+export type OwnershipFilterValue = "all" | "mine" | "assigned";
 
 export interface TaskFilterOptions {
   initialStatus?: StatusFilterValue;
   initialAssignedFilter?: AssignedFilterValue;
   initialOverdueOnly?: boolean;
+  // Needed for the ownership filter to tell which assignments are the current user's.
+  userId?: number;
   // Completed tasks are hidden under the "All" chip and only appear via the Completed filter,
   // except where the whole list is already archived tasks.
   showCompletedInAll?: boolean;
+  // Needed for the "assigned persons" office / project filters: who belongs to which.
+  members?: Member[];
+  // When set, the filter state survives leaving and re-entering the screen (e.g. open a task,
+  // press Back) — kept in memory per key, so a page reload still starts fresh.
+  persistKey?: string;
 }
+
+interface SavedFilters {
+  search: string; deadlineDate: string; quickFilter: QuickDeadlineFilterValue; status: StatusFilterValue; priority: PriorityFilterValue;
+  projectFilter: ProjectFilterValue; assignedFilter: AssignedFilterValue; overdueOnly: boolean; dueSoonOnly: boolean; ownership: OwnershipFilterValue;
+  personOffice: number | null; personProject: number | null;
+}
+const savedFilters = new Map<string, SavedFilters>();
 
 function toDateStr(date: Date): string {
   const year = date.getFullYear();
@@ -43,14 +59,24 @@ function quickFilterRange(value: QuickDeadlineFilterValue): { from: string; to: 
 }
 
 export function useTaskFilters(tasks: Task[], options?: TaskFilterOptions) {
-  const [search, setSearch] = useState("");
-  const [deadlineDate, setDeadlineDateState] = useState("");
-  const [quickFilter, setQuickFilterState] = useState<QuickDeadlineFilterValue>("");
-  const [status, setStatus] = useState<StatusFilterValue>(options?.initialStatus ?? "all");
-  const [priority, setPriority] = useState<PriorityFilterValue>("all");
-  const [projectFilter, setProjectFilter] = useState<ProjectFilterValue>("all");
-  const [assignedFilter, setAssignedFilter] = useState<AssignedFilterValue>(options?.initialAssignedFilter ?? "all");
-  const [overdueOnly, setOverdueOnly] = useState(options?.initialOverdueOnly ?? false);
+  const [saved] = useState(() => options?.persistKey ? savedFilters.get(options.persistKey) : undefined);
+  const [search, setSearch] = useState(saved?.search ?? "");
+  const [deadlineDate, setDeadlineDateState] = useState(saved?.deadlineDate ?? "");
+  const [quickFilter, setQuickFilterState] = useState<QuickDeadlineFilterValue>(saved?.quickFilter ?? "");
+  const [status, setStatus] = useState<StatusFilterValue>(saved?.status ?? options?.initialStatus ?? "all");
+  const [priority, setPriority] = useState<PriorityFilterValue>(saved?.priority ?? "all");
+  const [projectFilter, setProjectFilter] = useState<ProjectFilterValue>(saved?.projectFilter ?? "all");
+  const [assignedFilter, setAssignedFilter] = useState<AssignedFilterValue>(saved?.assignedFilter ?? options?.initialAssignedFilter ?? "all");
+  const [overdueOnly, setOverdueOnly] = useState(saved?.overdueOnly ?? options?.initialOverdueOnly ?? false);
+  const [dueSoonOnly, setDueSoonOnly] = useState(saved?.dueSoonOnly ?? false);
+  const [ownership, setOwnership] = useState<OwnershipFilterValue>(saved?.ownership ?? "all");
+  // Only tasks with someone assigned who is in this office / this project (null = no filter).
+  const [personOffice, setPersonOffice] = useState<number | null>(saved?.personOffice ?? null);
+  const [personProject, setPersonProject] = useState<number | null>(saved?.personProject ?? null);
+  const persistKey = options?.persistKey;
+  useEffect(() => {
+    if (persistKey) savedFilters.set(persistKey, { search, deadlineDate, quickFilter, status, priority, projectFilter, assignedFilter, overdueOnly, dueSoonOnly, ownership, personOffice, personProject });
+  }, [persistKey, search, deadlineDate, quickFilter, status, priority, projectFilter, assignedFilter, overdueOnly, dueSoonOnly, ownership, personOffice, personProject]);
 
   const setDeadlineDate = (value: string) => {
     setDeadlineDateState(value);
@@ -79,7 +105,8 @@ export function useTaskFilters(tasks: Task[], options?: TaskFilterOptions) {
         if (task.deadline < deadlineRange.from || task.deadline > deadlineRange.to) return false;
       }
       if (status !== "all" && task.status !== status) return false;
-      if (status === "all" && task.is_completed && !options?.showCompletedInAll) return false;
+      // Under "My Total Tasks" / "Task Assigned" the count includes finished work, so show it too.
+      if (status === "all" && task.is_completed && !options?.showCompletedInAll && ownership === "all") return false;
       if (priority !== "all" && task.priority !== priority) return false;
       if (projectFilter === "personal") {
         if (task.project) return false;
@@ -87,14 +114,23 @@ export function useTaskFilters(tasks: Task[], options?: TaskFilterOptions) {
         if (!task.project || task.project.id !== projectFilter) return false;
       }
       if (assignedFilter === "unassigned" && task.assignments.length > 0) return false;
+      if (personOffice !== null || personProject !== null) {
+        const people = task.assignments.map(person => options?.members?.find(member => member.id === person.id));
+        if (personOffice !== null && !people.some(member => member?.office === personOffice)) return false;
+        if (personProject !== null && !people.some(member => member?.projects?.includes(personProject))) return false;
+      }
       if (overdueOnly && !isOverdue(task)) return false;
+      if (dueSoonOnly && !isDueSoon(task)) return false;
+      if (ownership === "mine" && !task.is_creator) return false;
+      // Tasks sent to you as Task Lead are for review, not work assigned to you.
+      if (ownership === "assigned" && !task.assignments.some(person => person.id === options?.userId && person.role !== "Lead")) return false;
       return true;
     });
-  }, [tasks, search, deadlineRange, status, priority, projectFilter, assignedFilter, overdueOnly, options?.showCompletedInAll]);
+  }, [tasks, search, deadlineRange, status, priority, projectFilter, assignedFilter, overdueOnly, dueSoonOnly, ownership, personOffice, personProject, options?.members, options?.userId, options?.showCompletedInAll]);
 
-  const hasActiveFilters = !!search.trim() || !!deadlineDate || !!quickFilter || status !== "all" || priority !== "all" || projectFilter !== "all" || assignedFilter !== "all" || overdueOnly;
+  const hasActiveFilters = !!search.trim() || !!deadlineDate || !!quickFilter || status !== "all" || priority !== "all" || projectFilter !== "all" || personOffice !== null || personProject !== null || assignedFilter !== "all" || overdueOnly || dueSoonOnly || ownership !== "all";
   const clearFilters = () => {
-    setSearch(""); setDeadlineDateState(""); setQuickFilterState(""); setStatus("all"); setPriority("all"); setProjectFilter("all"); setAssignedFilter("all"); setOverdueOnly(false);
+    setSearch(""); setDeadlineDateState(""); setQuickFilterState(""); setStatus("all"); setPriority("all"); setProjectFilter("all"); setPersonOffice(null); setPersonProject(null); setAssignedFilter("all"); setOverdueOnly(false); setDueSoonOnly(false); setOwnership("all");
   };
 
   return {
@@ -107,6 +143,10 @@ export function useTaskFilters(tasks: Task[], options?: TaskFilterOptions) {
     projectFilter, setProjectFilter,
     assignedFilter, setAssignedFilter,
     overdueOnly, setOverdueOnly,
+    dueSoonOnly, setDueSoonOnly,
+    ownership, setOwnership,
+    personOffice, setPersonOffice,
+    personProject, setPersonProject,
     hasActiveFilters, clearFilters,
   };
 }

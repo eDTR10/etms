@@ -21,6 +21,7 @@ export async function withBlockingLoader<T>(title: string, action: () => Promise
     showConfirmButton: false,
     showCancelButton: true,
     cancelButtonText: "Cancel",
+    customClass: { popup: "etm-blocking-popup" },
     didOpen: () => {
       Swal.showLoading();
       // Open Radix dialogs disable pointer events outside themselves and treat outside

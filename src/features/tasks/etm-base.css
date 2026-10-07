@@ -202,6 +202,7 @@
 
 /* Task search + date filters */
 .etm-filter-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin-bottom: 16px; padding: 12px; background: var(--etm-surface); border: 1px solid var(--etm-border); border-radius: 12px; }
+.etm-filter-field { flex-grow: 1; flex-shrink: 1; }
 .etm-filter-search { display: flex; align-items: center; gap: 8px; flex: 1 1 220px; min-width: 0; min-height: 39px; padding: 0 12px; border: 1px solid var(--etm-border); border-radius: 8px; background: var(--etm-surface-alt); color: var(--etm-muted); }
 .etm-filter-search input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--etm-ink); outline: none; font-family: inherit; font-size: 14px; height: 37px; }
 .etm-filter-search input::placeholder { color: var(--etm-muted); }
@@ -217,6 +218,7 @@
 @media (max-width: 619px) {
   .etm-filter-bar { flex-direction: column; align-items: stretch; }
   .etm-filter-search { flex: none; width: 100%; }
+  .etm-filter-field { flex: none !important; width: 100%; min-width: 0 !important; }
   .etm-filter-select { width: 100%; }
   .etm-filter-dates { flex-direction: column; align-items: stretch; }
   .etm-filter-date-field { flex: 1; }
@@ -243,12 +245,12 @@
 
 /* ── Quick Links ───────────────────────────────────────────────────────── */
 .etm-quicklinks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
-.etm-quicklink-card { display: flex; align-items: flex-start; gap: 8px; padding: 14px; }
+.etm-quicklink-card { display: flex; align-items: flex-start; gap: 8px; padding: 16px 14px; min-height: 150px; }
 .etm-quicklink-card-open { display: flex; align-items: flex-start; gap: 12px; flex: 1; min-width: 0; text-decoration: none; }
 .etm-quicklink-card-icon { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; flex: 0 0 36px; border-radius: 10px; background: #eaf5f5; color: var(--etm-primary); }
 .etm-quicklink-card-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .etm-quicklink-card-body strong { color: var(--etm-ink); font-size: 14px; font-weight: 650; overflow-wrap: anywhere; }
-.etm-quicklink-card-body small { color: var(--etm-muted); font-size: 12.5px; line-height: 1.5; overflow-wrap: anywhere; }
+.etm-quicklink-card-body small { color: var(--etm-muted); font-size: 12.5px; line-height: 1.5; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; }
 .etm-quicklink-card-url { display: inline-flex; align-items: center; gap: 4px; margin-top: 2px; color: #8a97a1; font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .etm-quicklink-card:hover .etm-quicklink-card-body strong { color: var(--etm-primary-dark); }
 .etm-quicklink-card-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
@@ -258,3 +260,15 @@
 .etm-quicklink-icon-option:hover { color: var(--etm-primary); border-color: var(--etm-primary); }
 .etm-quicklink-icon-option.selected { border-color: var(--etm-primary); background: color-mix(in srgb, var(--etm-primary) 14%, var(--etm-surface-alt)); color: var(--etm-primary); }
 :root.dark .etm-quicklink-card-icon { background: #163639; }
+
+/* Dark mode: native <select> lists, date/month pickers and scrollbars follow the page theme, and the dialogs'
+   (SweetAlert2) inputs and option lists use the app's colours instead of the browser's white-on-white defaults. */
+:root.dark select, :root.dark input, :root.dark textarea { color-scheme: dark; }
+.swal2-select, .swal2-input, .swal2-textarea { background-color: var(--etm-surface-alt); color: var(--etm-ink); border: 1px solid var(--etm-border); }
+.swal2-select option { background-color: var(--etm-surface); color: var(--etm-ink); }
+.swal2-select option:disabled { color: var(--etm-muted); }
+select option { background-color: var(--etm-surface, #fff); color: var(--etm-ink, #111); }
+
+/* The "Creating task…" style blocking dialog: spinner centred, Cancel underneath it. */
+.etm-blocking-popup .swal2-actions { flex-direction: column; align-items: center; justify-content: center; gap: 14px; margin-top: 18px; }
+.etm-blocking-popup .swal2-loader { margin: 0; }
