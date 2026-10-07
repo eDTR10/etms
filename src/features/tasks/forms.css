@@ -654,3 +654,28 @@ a.etm-task-links-text:hover strong { color: var(--etm-primary); text-decoration:
 .etm-subtask-date { min-height: 33px; padding: 4px 9px; border: 1px solid var(--etm-border); border-radius: 7px; background: var(--etm-surface); color: var(--etm-ink); font: inherit; font-size: 13px; }
 .etm-subtask-date:focus { outline: none; border-color: var(--etm-primary); box-shadow: 0 0 0 3px #087e8b12; }
 .etm-subtask-meta-item.has-value .etm-subtask-date { border-color: color-mix(in srgb, var(--etm-primary) 45%, var(--etm-border)); color: var(--etm-primary); font-weight: 600; }
+
+/* Details header: status row, completion banner and Task Info divider */
+.etm-details-badges { gap: 10px; margin-top: 14px; }
+.etm-details-badges .etm-badge { padding: 7px 14px; font-size: 13.5px; font-weight: 600; border-radius: 999px; gap: 8px; }
+.etm-details-badges .etm-details-status-dot { width: 8px; height: 8px; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 20%, transparent); }
+.etm-details-badges .etm-details-priority { padding: 6px 13px; font-size: 13.5px; font-weight: 600; border-radius: 999px; gap: 7px; border: 1px solid color-mix(in srgb, currentColor 30%, transparent); background: color-mix(in srgb, currentColor 9%, transparent); }
+.etm-details-completed-note { align-items: center; gap: 14px; margin-top: 16px; padding: 14px 18px; font-size: 14.5px; border-radius: 14px; border-color: color-mix(in srgb, #3e9276 40%, transparent); background: linear-gradient(135deg, color-mix(in srgb, #3e9276 18%, transparent), color-mix(in srgb, #3e9276 6%, transparent)); }
+.etm-details-completed-note > svg { box-sizing: content-box; width: 18px; height: 18px; margin: 0; padding: 9px; border-radius: 50%; background: #3e9276; color: #fff; }
+.etm-details-completed-note p + p { margin-top: 4px; color: var(--etm-muted); }
+.etm-task-info-toggle { gap: 16px; padding: 8px 0; font-size: 13.5px; }
+.etm-task-info-toggle-label { padding: 8px 16px; border: 1px solid var(--etm-border); border-radius: 999px; background: var(--etm-surface-alt); transition: border-color .15s; }
+.etm-task-info-toggle:hover .etm-task-info-toggle-label { border-color: var(--etm-primary); }
+.etm-task-info-hint { font-size: 12.5px; }
+.etm-details-complete-actions { display: flex; align-items: center; gap: 10px; }
+@media (max-width: 720px) { .etm-details-complete-actions { position: static; margin: 0 0 10px; flex-wrap: wrap; } }
+
+/* Cancel / Save sit under the live preview instead of a footer bar */
+.etm-form-aside-sticky { display: grid; gap: 14px; align-content: start; min-width: 0; }
+.etm-form-aside-actions { display: flex; gap: 10px; }
+.etm-form-aside-actions .etm-button { flex: 1; justify-content: center; min-height: 44px; }
+.etm-form-aside-actions .etm-button.primary { flex: 1.6; }
+@media (min-width: 1100px) {
+  .etm-form-aside-sticky { position: sticky; top: 18px; }
+  .etm-form-aside-sticky .etm-task-preview { position: static; }
+}
