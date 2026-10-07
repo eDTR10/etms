@@ -16,7 +16,7 @@ import { useDuplicateTask } from "../../features/tasks/useDuplicateTask";
 import { useBulkTaskActions } from "../../features/tasks/useBulkTaskActions";
 import { useRowSelection } from "../../features/tasks/useRowSelection";
 import { SortTh, useTableSort } from "../../features/tasks/useTableSort";
-import { formatDate, isUnseenAssignment, memberName, RECURRENCE_LABELS, remarkPreview, STATUSES, statusChipLabel, statusSlug, type Task, type TaskStatus } from "../../features/tasks/types";
+import { dueSoonLabel, formatDate, isDueSoon, isOverdue, isUnseenAssignment, memberName, RECURRENCE_LABELS, remarkPreview, STATUSES, statusChipLabel, statusSlug, type Task, type TaskStatus } from "../../features/tasks/types";
 import { useAuth } from "../Auth/AuthContext";
 
 type TaskScope = "assigned" | "personal";
@@ -321,7 +321,7 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
                             <button type="button" className={`etm-accordion-subtask ${subtask.is_completed ? "completed" : ""}`} key={subtask.id ?? index} onClick={() => { setViewingSubtaskId(subtask.id ?? null); setViewingId(task.id); }} aria-label={`Open subtask: ${subtask.title}`}>
                               {subtask.is_completed ? <Check size={13} /> : <Circle size={13} />}
                               <span className="etm-accordion-subtask-text">
-                                <span className="etm-accordion-subtask-title-row"><span>{subtask.title}</span><span className={`etm-badge ${statusSlug(subtask.status)}`}>{subtask.status}</span></span>
+                                <span className="etm-accordion-subtask-title-row"><span>{subtask.title}</span><span className={`etm-badge ${statusSlug(subtask.status)}`}>{subtask.status}</span>{isDueSoon(subtask) && <span className="etm-due-soon-badge">{dueSoonLabel(subtask)}</span>}{isOverdue(subtask) && <span className="etm-due-soon-badge" style={{ animation: "none" }}>Overdue</span>}</span>
                                 {subtask.description && <small>{subtask.description}</small>}
                                 <small>Open updates</small>
                               </span>
