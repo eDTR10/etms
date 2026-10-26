@@ -287,3 +287,48 @@ function applyRowLook(grid: IPCRGridData, from: number, target: number): IPCRGri
   if (richText) Object.keys(richText).forEach(cell => { if (cellCoords(cell).row === target) delete richText[cell]; });
   return { ...grid, data, style, mergeCells, rowHeights, richText };
 }
+
+/**
+ * "Paste a copied row": a duplicate of row `source` — its text, formatting, borders, merged cells, height and fill-in fields (each
+ * gets its own new key, so the copy is filled in separately) — inserted next to row `target`.
+ */
+export function duplicateRowNextTo(grid: IPCRGridData, fields: IPCRField[], source: number, target: number, side: Side): AddResult {
+  const blank = repeatLine(grid, fields, "row", target, side, { blank: true });
+  const at = side === "after" ? target + 1 : target;
+  const from = source >= at ? source + 1 : source;
+  const looked = applyRowLook(blank.grid, from, at);
+  // New keys for the fields living in the copied row.
+  const taken = new Set(blank.fields.map(field => field.key));
+  const keyMap = new Map<string, string>();
+  const clones: IPCRField[] = [];
+  blank.fields.forEach(field => {
+    if (lineOf(field.cell, "row") !== from) return;
+    const { key, n } = freshKey(field.key, taken);
+    taken.add(key);
+    keyMap.set(field.key, key);
+    clones.push({ ...field, key, label: `${field.label.replace(/ \(\d+\)$/, "")} (${n})`, cell: cellAt("row", at, crossOf(field.cell, "row")) });
+  });
+  const retoken = (text: string) => {
+    let out = text;
+    keyMap.forEach((newKey, oldKey) => { out = out.split(`{{${oldKey}}}`).join(`{{${newKey}}}`); });
+    return out;
+  };
+  // A cell under a merged one only repeats its text, so only the cells that show something are copied.
+  const hidden = new Set<number>();
+  Object.entries(blank.grid.mergeCells).forEach(([anchor, [colspan]]) => {
+    const place = cellCoords(anchor);
+    if (place.row === from) for (let col = place.col + 1; col < place.col + colspan; col++) hidden.add(col);
+  });
+  const data = looked.data.map(line => line.slice());
+  const richText = { ...(looked.richText ?? {}) };
+  data[at] = data[at].map((_cell, col) => {
+    const value = blank.grid.data[from][col];
+    if (hidden.has(col) || typeof value !== "string") return hidden.has(col) ? "" : value;
+    return retoken(value);
+  });
+  data[at].forEach((_value, col) => {
+    const runs = blank.grid.richText?.[cellName(col, from)];
+    if (runs && !hidden.has(col)) richText[cellName(col, at)] = runs.map(run => ({ ...run, text: retoken(run.text) }));
+  });
+  return { grid: { ...looked, data, richText }, fields: [...blank.fields, ...clones], addedFields: clones };
+}

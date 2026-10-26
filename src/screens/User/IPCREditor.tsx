@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Download, FileSpreadsheet, FileText, LayoutGrid, Loader2, Eye, Plus, Printer, RefreshCw, Save, Star } from "lucide-react";
+import { ArrowLeft, Copy, Download, FileSpreadsheet, FileText, LayoutGrid, Loader2, Eye, Plus, Printer, RefreshCw, Save, Star } from "lucide-react";
 import Swal from "sweetalert2";
 import IPCRFillForm from "../../features/ipcr/IPCRFillForm";
 import IPCRLivePreview from "../../features/ipcr/IPCRLivePreview";
 import IPCRRichTextField from "../../features/ipcr/IPCRRichTextField";
 import IPCRTemplateForm from "../../features/ipcr/IPCRTemplateForm";
 import { ipcrService } from "../../features/ipcr/ipcrService";
-import { addRepeatedLines, addSection, findSectionRow, type Axis, type Side } from "../../features/ipcr/ipcrExpand";
+import { addRepeatedLines, addSection, duplicateRowNextTo, findSectionRow, type Axis, type Side } from "../../features/ipcr/ipcrExpand";
 import { startingValue } from "../../features/ipcr/ipcrAutofill";
 import { syncWithTemplate } from "../../features/ipcr/ipcrSync";
 import { downloadIPCRWorkbook } from "../../features/ipcr/ipcrExport";
@@ -60,6 +60,7 @@ export default function IPCREditor() {
   const [hoverField, setHoverField] = useState<string | null>(null);
   // The row picked by clicking the preview: rows are added above or below it.
   const [pickedRow, setPickedRow] = useState<number | null>(null);
+  const [pickedCell, setPickedCell] = useState<string | null>(null);
   // Print preview: the real PDF shown in place of the sheet, redrawn as the person edits.
   const [printView, setPrintView] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -163,6 +164,14 @@ export default function IPCREditor() {
     setDirty(true);
   }
 
+  // A copy of the row, with all its styling, right below it.
+  function duplicateRow(row: number) {
+    if (!grid) return;
+    applyAdd(duplicateRowNextTo(grid, fields, row, row, "after"));
+    setPickedRow(row + 1);
+    setPickedCell(null);
+  }
+
   // The right-click menu of the preview: add rows / columns next to the row or column that was clicked, or edit the cell.
   function sheetMenu({ col, row }: { col: number | null; row: number | null }) {
     const items: { title: string; onclick: () => void }[] = [];
@@ -177,6 +186,16 @@ export default function IPCREditor() {
     if (row !== null && row > 0) {
       const hasBreak = (grid.pageBreaks ?? []).includes(row);
       items.push({ title: hasBreak ? "Remove the page break above this row" : "Start a new printed page at this row", onclick: () => setPageBreaks(rows => (hasBreak ? rows.filter(item => item !== row) : [...rows, row])) });
+    }
+    if (row !== null && col !== null) {
+      const here = `${columnName(col)}${row + 1}`;
+      items.push({ title: "Copy this cell", onclick: () => { const text = copyFrom(here); if (text !== null) void navigator.clipboard?.writeText(text).catch(() => undefined); } });
+      items.push({ title: "Paste into this cell", onclick: () => pasteInto(here, null) });
+    }
+    if (row !== null) {
+      items.push({ title: "Duplicate this row", onclick: () => duplicateRow(row) });
+      items.push({ title: "Copy this whole row", onclick: () => { const text = copyFrom(`row:${row}`); if (text !== null) void navigator.clipboard?.writeText(text).catch(() => undefined); } });
+      items.push({ title: "Paste the copied row below this one", onclick: () => pasteInto(`row:${row}`, null) });
     }
     if (row !== null && col !== null) items.push({ title: "Edit this cell…", onclick: () => editCell(`${columnName(col)}${row + 1}`) });
     return items;
@@ -213,6 +232,91 @@ export default function IPCREditor() {
     setLayoutEdited(true);
     setDirty(true);
   }
+
+  // Copy / paste in the sheet: Ctrl+C copies the clicked cell, or the whole row when its row number was clicked; Ctrl+V pastes
+  // it into the clicked cell / row. What was copied here keeps its formatting; text copied from anywhere else (a block from
+  // Excel included) can be pasted too.
+  const clipboardBlock = useRef<{ text: string; cells: { text: string; runs: IPCRRichTextRun[] | null }[][] } | null>(null);
+
+  // The cell or row the keyboard and the right-click menu act on: a clicked row number wins over the cell clicked before it.
+  const copyTarget = pickedCell ?? (pickedRow !== null ? `row:${pickedRow}` : null);
+
+  // A cell hidden under a merged one (it repeats the merged cell's text, or holds nothing worth keeping).
+  const isHidden = (col: number, row: number) => !!grid && Object.entries(grid.mergeCells).some(([anchor, [colspan, rowspan]]) => {
+    const at = cellCoords(anchor);
+    return (at.col !== col || at.row !== row) && col >= at.col && col < at.col + colspan && row >= at.row && row < at.row + rowspan;
+  });
+  // Text that was escaped on its way through the clipboard ("&lt;KEY&gt;") back to what it says.
+  const unescapeText = (value: string) => value.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&amp;/g, "&");
+
+  // The row last copied with "copy row": pasting inserts a duplicate of it (as opposed to pasting text into cells).
+  const copiedRow = useRef<number | null>(null);
+
+  function copyFrom(target: string) {
+    if (!grid) return null;
+    const rowMode = target.startsWith("row:");
+    copiedRow.current = rowMode ? Number(target.slice(4)) : null;
+    const row = rowMode ? Number(target.slice(4)) : cellCoords(target).row;
+    const cols = rowMode ? grid.data[row]?.length ?? 0 : 1;
+    const startCol = rowMode ? 0 : cellCoords(target).col;
+    const cells = [Array.from({ length: cols }, (_, offset) => {
+      const name = `${columnName(startCol + offset)}${row + 1}`;
+      if (isHidden(startCol + offset, row)) return { text: "", runs: null };
+      return { text: String(grid.data[row]?.[startCol + offset] ?? ""), runs: grid.richText?.[name] ?? null };
+    })];
+    const text = cells[0].map(entry => entry.text).join("\t");
+    clipboardBlock.current = { text, cells };
+    return text;
+  }
+
+  function pasteInto(target: string, text: string | null) {
+    const rowMode = target.startsWith("row:");
+    const start = rowMode ? { col: 0, row: Number(target.slice(4)) } : cellCoords(target);
+    const put = (col: number, row: number, value: string, runs: IPCRRichTextRun[] | null) => !isHidden(col, row) && writeCell(`${columnName(col)}${row + 1}`, runs, value, { font: "", size: "" });
+    const copied = clipboardBlock.current;
+    if (grid && copiedRow.current !== null && copied && (text === null || text === copied.text)) {
+      // A copied row is pasted as a duplicate row right below the chosen one — whether a cell of it or its row number was clicked.
+      applyAdd(duplicateRowNextTo(grid, fields, copiedRow.current, start.row, "after"));
+      setPickedRow(start.row + 1);
+      return;
+    }
+    if (copied && (text === null || text === copied.text)) {
+      copied.cells.forEach((line, rowOffset) => line.forEach((entry, colOffset) => put(start.col + colOffset, start.row + rowOffset, entry.text, entry.runs)));
+      return;
+    }
+    if (text === null || text === "") return;
+    text = unescapeText(text);
+    if (text.includes("\t")) {
+      // A block of cells (e.g. from Excel): rows on lines, columns on tabs, starting at the clicked cell / row.
+      text.replace(/\r?\n$/, "").split(/\r?\n/).forEach((line, rowOffset) => line.split("\t").forEach((value, colOffset) => put(start.col + colOffset, start.row + rowOffset, value, null)));
+      return;
+    }
+    put(start.col, start.row, text.replace(/\r\n/g, "\n"), null);
+  }
+
+  useEffect(() => {
+    if (printView || cellEdit || layoutOpen || !copyTarget) return;
+    // Keys typed in a form field or an open dialog keep their own copy / paste.
+    const typing = (target: EventTarget | null) => target instanceof HTMLElement && !!target.closest("input, textarea, select, [contenteditable='true'], .swal2-container");
+    const onCopy = (event: ClipboardEvent) => {
+      if (typing(event.target) || window.getSelection()?.toString()) return;
+      const text = copyFrom(copyTarget);
+      if (text === null) return;
+      event.clipboardData?.setData("text/plain", text);
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+    const onPaste = (event: ClipboardEvent) => {
+      if (typing(event.target) || !submission?.can_manage) return;
+      pasteInto(copyTarget, event.clipboardData?.getData("text/plain") ?? null);
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+    window.addEventListener("copy", onCopy, true);
+    window.addEventListener("paste", onPaste, true);
+    return () => { window.removeEventListener("copy", onCopy, true); window.removeEventListener("paste", onPaste, true); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [printView, cellEdit, layoutOpen, copyTarget, grid, submission]);
 
   // A task or grouped task dragged from the list and dropped on a cell.
   async function dropTask(cell: string, payload: string) {
@@ -396,7 +500,7 @@ export default function IPCREditor() {
   function applyCellEdit() {
     if (!cellEdit) return;
     const { cell, html, font, size } = cellEdit;
-    const runs = htmlToRuns(html);
+    const runs = htmlToRuns(html, { keepBlankLines: true });
     writeCell(cell, runsNeedRichText(runs) ? runs : null, flattenRuns(runs), { font, size });
     setCellEdit(null);
   }
@@ -597,12 +701,13 @@ export default function IPCREditor() {
               <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Add rows</p>
               <div className="etm-ipcr-field-list" style={{ margin: 0, display: "grid", gap: 8, padding: 10, border: "1px solid var(--etm-border)", borderRadius: 8, background: "var(--etm-surface-alt)" }}>
                 {pickedRow === null ? (
-                  <span style={{ fontSize: 12.5, color: "var(--etm-muted)" }}>Click any row in the preview, then choose to add rows above or below it — more items, or a new section.</span>
+                  <span style={{ fontSize: 12.5, color: "var(--etm-muted)" }}>Click any row in the preview, then choose to add rows above or below it — more items, or a new section. Ctrl+C / Ctrl+V copy and paste the clicked cell. Click a row number instead to copy the whole row — pasting adds a duplicate of it below the row you choose (right-click has Copy and Paste too).</span>
                 ) : (
                   <>
                     <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--etm-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pickedRowText}</span>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
                       <button type="button" className="etm-button primary small" onClick={() => void askAddRows(pickedRow)}><Plus size={13} /> Add above or below…</button>
+                      <button type="button" className="etm-button ghost small" style={{ gridColumn: "1 / -1" }} onClick={() => duplicateRow(pickedRow)}><Copy size={13} /> Duplicate this row</button>
                       <button type="button" className="etm-button ghost small" onClick={() => setPickedRow(null)}>Clear</button>
                     </div>
                   </>
@@ -679,7 +784,7 @@ export default function IPCREditor() {
           )}
           <div style={printView ? { position: "absolute", left: -10000, top: 0, width: 1800, pointerEvents: "none" } : undefined} aria-hidden={printView || undefined}>
           <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">{printView ? "Print preview" : "Live preview"}</p>
-          <IPCRLivePreview grid={grid} fields={fields} values={values} refreshKey={previewKey} focusKey={focusField ?? hoverField} onCellDoubleClick={cell => editCell(cell)} onCellClick={cell => setPickedRow(cellCoords(cell).row)} pickedRow={pickedRow} contextItems={sheetMenu} measureRef={measureRef} onDropTask={submission.can_manage ? (cell, payload) => void dropTask(cell, payload) : undefined} />
+          <IPCRLivePreview grid={grid} fields={fields} values={values} refreshKey={previewKey} focusKey={focusField ?? hoverField} onCellDoubleClick={cell => editCell(cell)} onCellClick={cell => { setPickedRow(cellCoords(cell).row); setPickedCell(cell); }} onRowHeaderClick={row => { setPickedRow(row); setPickedCell(null); }} pickedRow={pickedRow} contextItems={sheetMenu} measureRef={measureRef} onDropTask={submission.can_manage ? (cell, payload) => void dropTask(cell, payload) : undefined} />
           </div>
         </main>
       </div>

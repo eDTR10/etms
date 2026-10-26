@@ -248,7 +248,9 @@ function autoLink(runs: IPCRRichTextRun[]): IPCRRichTextRun[] {
 // elements (div/p) as line breaks. A block always STARTS on a new line: pressing Enter in the
 // editor makes a <div> after a plain text line, and without the break its text ran on straight
 // after the previous line's last word.
-export function htmlToRuns(html: string): IPCRRichTextRun[] {
+// `keepBlankLines`: an empty line typed in the editor stays an empty line (also at the end) instead of being dropped.
+export function htmlToRuns(html: string, options: { keepBlankLines?: boolean } = {}): IPCRRichTextRun[] {
+  let endsWithBlankLine = false;
   const container = document.createElement("div");
   container.innerHTML = html;
   const runs: IPCRRichTextRun[] = [];
@@ -290,11 +292,23 @@ export function htmlToRuns(html: string): IPCRRichTextRun[] {
       return;
     }
     const isBlock = tag === "div" || tag === "p" || tag === "li";
+    if (options.keepBlankLines && (tag === "div" || tag === "p") && !(element.textContent ?? "").replace(/\u00a0/g, " ").trim() && !element.querySelector("img")) {
+      // An empty block (just a <br>) is one blank line.
+      startLine();
+      runs.push({ text: "\n" });
+      endsWithBlankLine = true;
+      return;
+    }
     if (isBlock) startLine();
     element.childNodes.forEach(child => walk(child, nextBold, nextItalic, nextUnderline, nextLink));
     if (isBlock) runs.push({ text: "\n" });
   }
-  container.childNodes.forEach(node => walk(node, false, false, false));
+  container.childNodes.forEach(node => { endsWithBlankLine = false; walk(node, false, false, false); });
+  if (options.keepBlankLines) {
+    // The newline that closes the last line is not a blank line; the ones typed after it are.
+    if (!endsWithBlankLine && runs.length && runs[runs.length - 1].text === "\n") runs.pop();
+    return autoLink(runs.filter(run => run.text !== ""));
+  }
   while (runs.length && runs[runs.length - 1].text === "\n") runs.pop();
   // Several newlines in a row from nested blocks collapse to the ones that were really typed.
   return autoLink(runs.filter(run => run.text !== ""));

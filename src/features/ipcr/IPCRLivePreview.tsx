@@ -19,6 +19,8 @@ interface IPCRLivePreviewProps {
   onCellDoubleClick?: (cell: string) => void;
   // A single click on a cell (its text layers included) reports which one; `pickedRow` is tinted to show the choice.
   onCellClick?: (cell: string) => void;
+  // A click on a row number (the grey cell at the left of a row).
+  onRowHeaderClick?: (row: number) => void;
   pickedRow?: number | null;
   // Something dragged from the task list and dropped on a cell: the cell and what was dragged (the drag's payload string).
   onDropTask?: (cell: string, payload: string) => void;
@@ -28,7 +30,7 @@ interface IPCRLivePreviewProps {
   contextItems?: (target: { col: number | null; row: number | null }) => { title: string; onclick: () => void }[];
 }
 
-export default function IPCRLivePreview({ grid, fields, values, refreshKey, focusKey = null, onCellDoubleClick, onCellClick, pickedRow = null, onDropTask, contextItems, measureRef }: IPCRLivePreviewProps) {
+export default function IPCRLivePreview({ grid, fields, values, refreshKey, focusKey = null, onCellDoubleClick, onCellClick, onRowHeaderClick, pickedRow = null, onDropTask, contextItems, measureRef }: IPCRLivePreviewProps) {
   if (measureRef) measureRef.current = () => gridRef.current?.getRenderedRowHeights() ?? {};
   const gridRef = useRef<IPCRGridHandle>(null);
   // Every cell of the (unfilled) sheet that holds this field's {{token}}.
@@ -109,7 +111,12 @@ export default function IPCRLivePreview({ grid, fields, values, refreshKey, focu
         if (cell) onDropTask(cell, payload);
       } : undefined}
       onDoubleClick={onCellDoubleClick ? event => { const cell = cellAt(event); if (cell) onCellDoubleClick(cell); } : undefined}
-      onClick={onCellClick ? event => { const cell = cellAt(event); if (cell) onCellClick(cell); } : undefined}
+      onClick={onCellClick || onRowHeaderClick ? event => {
+        const header = (event.target as HTMLElement).closest<HTMLElement>("td.jss_row[data-y]");
+        if (header && onRowHeaderClick) { onRowHeaderClick(Number(header.dataset.y)); return; }
+        const cell = cellAt(event);
+        if (cell && onCellClick) onCellClick(cell);
+      } : undefined}
     >
       <IPCRGrid key={structureKey} ref={gridRef} value={filled} editable={false} contextItems={contextItems} />
       <IPCRGridImageOverlay images={grid.images} editable={false} />
