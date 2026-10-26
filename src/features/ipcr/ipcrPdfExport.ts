@@ -36,6 +36,8 @@ const DEFAULT_COL_PX = 64;
 // A row with no saved height is as tall as the designer draws an ordinary row (about 24px). Without this the empty
 // rows above a title collapsed to a text line, so the title slid up under the logos.
 const DEFAULT_ROW_PX = 24;
+// A cell with no font size is drawn at the sheet's own default (12.5px) on screen, so it is in the PDF too.
+const DEFAULT_FONT_PX = 12.5;
 const FALLBACK_IMAGE_ORIGIN = { x: 36, y: 12 };
 
 type PdfFont = "Times" | "Helvetica" | "Courier";
@@ -61,13 +63,43 @@ function estimateTextHeight(text: string, fontPt: number, widthPt: number, font:
 
 type Side = "top" | "right" | "bottom" | "left";
 
-export function buildIPCRPdfDocDefinition(
+export function buildIPCRPdfDocDefinition(grid: IPCRGridData, paperSize: IPCRPaperSize = "a3", orientation: IPCROrientation = "landscape") {
+  return layoutIPCRPdf(grid, paperSize, orientation).doc;
+}
+
+// The rows that each printed page after the first starts at: the asked-for page breaks plus where a page runs out of room
+// (estimated from the row heights, so it can be a row off when text wraps).
+export function estimateIPCRPageStarts(grid: IPCRGridData, paperSize: IPCRPaperSize = "a3", orientation: IPCROrientation = "landscape"): number[] {
+  return layoutIPCRPdf(grid, paperSize, orientation).pageStarts;
+}
+
+function layoutIPCRPdf(
   grid: IPCRGridData,
-  paperSize: IPCRPaperSize = "a3",
-  orientation: IPCROrientation = "landscape",
+  paperSize: IPCRPaperSize,
+  orientation: IPCROrientation,
 ) {
   const rowCount = grid.data.length;
-  const colCount = grid.data[0]?.length ?? 0;
+  // Empty columns after the last used one only waste width (they shrink the whole sheet to fit the page), so they are left
+  // out. Empty ROWS stay: they are the blank lines between blocks. A column is used if a cell in it has text, a border or fill,
+  // a merge reaches it, or a picture lies over it.
+  const allCols = grid.data[0]?.length ?? 0;
+  let colCount = 0;
+  grid.data.forEach((line, row) => line.forEach((value, col) => {
+    const style = grid.style[cellName(col, row)] ?? "";
+    if ((value !== "" && value !== null && value !== undefined) || /border|background/i.test(style)) colCount = Math.max(colCount, col + 1);
+  }));
+  Object.entries(grid.mergeCells).forEach(([anchor, [colspan]]) => { colCount = Math.max(colCount, cellCoords(anchor).col + colspan); });
+  Object.keys(grid.richText ?? {}).forEach(cell => { colCount = Math.max(colCount, cellCoords(cell).col + 1); });
+  if (grid.images.length) {
+    const imageOriginX = (grid.imageOrigin ?? FALLBACK_IMAGE_ORIGIN).x;
+    const imageRight = Math.max(...grid.images.map(image => image.x + image.width)) - imageOriginX;
+    let edge = 0;
+    for (let col = 0; col < allCols; col++) {
+      edge += grid.colWidths[col] ?? DEFAULT_COL_PX;
+      if (edge >= imageRight - 1) { colCount = Math.max(colCount, col + 1); break; }
+    }
+  }
+  colCount = Math.min(allCols, Math.max(1, colCount));
 
   // pdfmake needs an explicit `{}` placeholder for every cell a merge covers (besides the
   // anchor, which carries colSpan/rowSpan) — build that coverage map from jspreadsheet's
@@ -175,7 +207,7 @@ export function buildIPCRPdfDocDefinition(
       const span = spans.get(name);
       const runs = grid.richText?.[name];
       const font = pdfFontFor(parsed.fontFamily);
-      const fontPt = (parsed.fontSize ? parsed.fontSize * PX_TO_PT : 8) * scale;
+      const fontPt = (parsed.fontSize ?? DEFAULT_FONT_PX) * PX_TO_PT * scale;
       const text = value === "" || value === null || value === undefined ? "" : String(value);
       const plain = runs && runs.length ? runs.map(run => run.text).join("") : text;
       const edges = cellEdges.get(name)!;
@@ -202,7 +234,9 @@ export function buildIPCRPdfDocDefinition(
 
       // pdfmake can't vertically align a cell, so "middle"/"bottom" is imitated by pushing the text down
       // by the spare height — an estimate (it guesses the line count), but it matches the designer closely.
-      if (parsed.valign === "middle" || parsed.valign === "bottom") {
+      // A cell with no vertical alignment is centred on screen (the browser default for a table cell), so it is here too.
+      const valign = parsed.valign ?? "middle";
+      if (valign === "middle" || valign === "bottom") {
         const spanCols = span ? span[0] : 1;
         const spanRows = span ? span[1] : 1;
         let cellWidth = 0;
@@ -210,7 +244,7 @@ export function buildIPCRPdfDocDefinition(
         let cellHeight = 0;
         for (let r = row; r < row + spanRows; r++) cellHeight += rowFootprint(r);
         const spare = cellHeight - estimateTextHeight(plain, fontPt, cellWidth, font, !!(parsed.bold || runs?.some(run => run.bold))) - 6 * scale;
-        if (spare > 0) cell.margin = [0, parsed.valign === "middle" ? spare / 2 : spare, 0, 0];
+        if (spare > 0) cell.margin = [0, valign === "middle" ? spare / 2 : spare, 0, 0];
       }
       if (span) { cell.colSpan = span[0]; cell.rowSpan = span[1]; }
       line.push(cell);
@@ -221,27 +255,48 @@ export function buildIPCRPdfDocDefinition(
   // Images are positioned in on-screen px from the wrapper around the grid; move that origin onto the
   // table's top-left and apply the same scale as everything else.
   const origin = grid.imageOrigin ?? FALLBACK_IMAGE_ORIGIN;
-  return {
+  // Where the sheet is cut into pages: asked-for breaks, except ones a merged cell runs across.
+  const crossesMerge = (row: number) => Object.entries(grid.mergeCells).some(([anchor, [, rowspan]]) => { const top = cellCoords(anchor).row; return top < row && top + rowspan > row; });
+  const cuts = Array.from(new Set(grid.pageBreaks ?? [])).filter(row => row > 0 && row < rowCount && !crossesMerge(row)).sort((a, b) => a - b);
+  const segments: [number, number][] = [];
+  let from = 0;
+  cuts.forEach(cut => { segments.push([from, cut]); from = cut; });
+  segments.push([from, rowCount]);
+  const pageHeight = orientation === "landscape" ? portraitWidth : portraitHeight;
+  const capacity = pageHeight - PAGE_MARGIN * 2;
+  const pageStarts: number[] = [];
+  segments.forEach(([start, end], index) => {
+    if (index > 0) pageStarts.push(start);
+    let used = 0;
+    for (let row = start; row < end; row++) {
+      const height = rowFootprint(row);
+      if (used > 0 && used + height > capacity) { pageStarts.push(row); used = 0; }
+      used += height;
+    }
+  });
+  const doc = {
     pageSize: PDFMAKE_PAGE_SIZE[paperSize] ?? "A3",
     pageOrientation: orientation,
     pageMargins: [PAGE_MARGIN, PAGE_MARGIN, PAGE_MARGIN, PAGE_MARGIN] as [number, number, number, number],
-    content: [
-      {
-        table: {
-          headerRows: 0,
-          widths,
-          // A row is at least as tall as in the designer (and grows if its text needs more room).
-          heights: (row: number) => rowPt(row),
-          body,
-        },
-        layout: {
-          defaultBorder: false,
-          hLineWidth: (i: number) => hWidth[i] ?? 0,
-          vLineWidth: (i: number) => vWidth[i] ?? 0,
-          paddingLeft: () => padX, paddingRight: () => padX, paddingTop: () => padY, paddingBottom: () => padY,
-        },
+    // One table per printed "chunk": the sheet is cut where the person asked for a new page, and a row is never split
+    // across two pages (it moves whole to the next one).
+    content: segments.map(([start, end], index) => ({
+      ...(index > 0 ? { pageBreak: "before" as const } : {}),
+      table: {
+        headerRows: 0,
+        widths,
+        dontBreakRows: true,
+        // A row is at least as tall as in the designer (and grows if its text needs more room).
+        heights: (row: number) => rowPt(start + row),
+        body: body.slice(start, end),
       },
-    ],
+      layout: {
+        defaultBorder: false,
+        hLineWidth: (i: number) => hWidth[start + i] ?? 0,
+        vLineWidth: (i: number) => vWidth[i] ?? 0,
+        paddingLeft: () => padX, paddingRight: () => padX, paddingTop: () => padY, paddingBottom: () => padY,
+      },
+    })),
     // Pictures are positioned over the top of the sheet, so they go on page 1 as a page background. Placing them
     // in the content (after the table) put them on whichever page the table happened to END on.
     background: (currentPage: number) => currentPage === 1 && grid.images.length
@@ -257,6 +312,29 @@ export function buildIPCRPdfDocDefinition(
       : null,
     defaultStyle: { fontSize: 8 * scale, font: "Helvetica" as PdfFont },
   };
+  return { doc, pageStarts };
+}
+
+// Opens the finished document as a PDF in a new tab, ready to print or save. It deliberately does NOT pop the browser's
+// print dialog by itself: that dialog starts on the computer's default printer, and when that printer is offline or on
+// a network it hangs on "waiting for printer connection". The PDF viewer's own Print / Download buttons are one click away,
+// and the dialog there can be pointed at "Save as PDF" without anything waiting on a printer first.
+export function printIPCRPdf(
+  grid: IPCRGridData,
+  paperSize: IPCRPaperSize = "a3",
+  orientation: IPCROrientation = "landscape",
+) {
+  // Opened straight away, inside the click / keypress, so the browser's pop-up blocker lets it through.
+  const tab = window.open("", "_blank");
+  void pdfMake.createPdf(buildIPCRPdfDocDefinition(grid, paperSize, orientation)).getBlob().then(blob => {
+    const url = URL.createObjectURL(blob);
+    if (tab) tab.location.href = url; else window.open(url, "_blank");
+  });
+}
+
+// The finished PDF as a file in memory (for showing it inside the page instead of opening it).
+export function buildIPCRPdfBlob(grid: IPCRGridData, paperSize: IPCRPaperSize = "a3", orientation: IPCROrientation = "landscape"): Promise<Blob> {
+  return pdfMake.createPdf(buildIPCRPdfDocDefinition(grid, paperSize, orientation)).getBlob();
 }
 
 export function downloadIPCRPdf(

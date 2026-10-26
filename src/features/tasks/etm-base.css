@@ -272,3 +272,10 @@ select option { background-color: var(--etm-surface, #fff); color: var(--etm-ink
 /* The "Creating task…" style blocking dialog: spinner centred, Cancel underneath it. */
 .etm-blocking-popup .swal2-actions { flex-direction: column; align-items: center; justify-content: center; gap: 14px; margin-top: 18px; }
 .etm-blocking-popup .swal2-loader { margin: 0; }
+
+/* Inputs inside SweetAlert dialogs that are built from HTML (a select / textarea), styled like the rest of the app's fields. */
+.swal2-popup .etm-swal-field { display: block; width: 100%; box-sizing: border-box; margin: 0; padding: 10px 12px; border: 1px solid var(--etm-border); border-radius: 9px; background: var(--etm-surface-alt); color: var(--etm-ink); font: inherit; font-size: 14px; line-height: 1.5; text-align: left; box-shadow: none; transition: border-color .15s, box-shadow .15s; }
+.swal2-popup textarea.etm-swal-field { resize: vertical; min-height: 84px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+.swal2-popup select.etm-swal-field { cursor: pointer; }
+.swal2-popup .etm-swal-field:focus { outline: none; border-color: var(--etm-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--etm-primary) 22%, transparent); }
+.swal2-popup .etm-swal-field::placeholder { color: var(--etm-muted); }

@@ -91,7 +91,7 @@ function UserFormModal({ user, offices, isSelf, onClose, onSaved }: { user: Mana
             </select>
           </label>
           <label className={labelClass}>Role
-            <select className={fieldClass} value={form.role} onChange={event => set("role", event.target.value)} disabled={saving || (isSelf && user !== "new" && user.role === "admin")}>
+            <select className={fieldClass} value={form.role} onChange={event => set("role", event.target.value)} disabled={saving || (isSelf && user !== "new" && (user.role === "admin" || user.role === "super_admin"))}>
               {USER_ROLES.map(role => <option key={role.value} value={role.value}>{role.label}</option>)}
             </select>
           </label>

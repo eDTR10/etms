@@ -53,6 +53,21 @@ export interface IPCRGridHandle {
   // text is hidden instead of being covered, so the cell keeps its borders and fill. Each overlay passes its own
   // `owner` so several can mark cells at once.
   markOverlayCells: (owner: string, cells: string[]) => void;
+  // Colours the cells that already hold a fill-in field ("cell" = the whole cell is the field, "inline" = only part of its
+  // text is) so the designer can see at a glance what has been set. A display-only mark: nothing is saved with the sheet.
+  markFieldCells: (marks: { cell: string; kind: "cell" | "inline"; label: string }[]) => void;
+  // Where each {{token}} actually sits in the sheet right now (every cell holding it), whatever the field was first marked on —
+  // so a field follows its text when the cell is cut, pasted or moved.
+  getTokenCells: () => Record<string, string[]>;
+  // Makes the given cells glow (display only), optionally scrolling the first one into view. Passing none clears the glow.
+  glowCells: (cells: string[], scrollIntoView?: boolean) => void;
+  // Tints the whole row (display only) to show which row was picked; null clears it.
+  markPickedRow: (row: number | null) => void;
+  // How tall every row really is on screen right now (rows without a saved height are as tall as their content), so a
+  // print or PDF can use the very same heights as what the person is looking at.
+  getRenderedRowHeights: () => Record<number, number>;
+  // Glows the cell something is being dragged over (display only); null clears it.
+  markDropCell: (cell: string | null) => void;
   // Runs `action` and records the grid edits it makes as ONE step for Ctrl+Z / Ctrl+Y. Returns an id to hand to
   // onPasteHistory's owner so state kept outside the grid can follow the undo/redo, or null if nothing changed.
   runAsOneStep: (action: () => void) => number | null;
@@ -107,6 +122,9 @@ interface IPCRGridProps {
   onPasteHistory?: (pasteId: number, direction: "undo" | "redo") => void;
   // A column or row was resized by dragging its header edge.
   onLayoutChange?: () => void;
+  // For a sheet that is not editable: what its right-click menu offers instead of the built-in Copy / Paste / Save as. Gets the
+  // column and row that were right-clicked (null for a row or column header).
+  contextItems?: (target: { col: number | null; row: number | null }) => { title: string; onclick: () => void }[];
 }
 
 function columnName(index: number): string {
@@ -122,11 +140,17 @@ function columnName(index: number): string {
 // jspreadsheet-ce is an imperative, non-React library that owns its own DOM once mounted —
 // `value` only seeds the initial content. Callers force a remount (fresh grid) by changing
 // this component's `key` (e.g. keying by template id) rather than relying on prop diffing.
-const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ value, editable, minRows = 24, minCols = 10, onSelectionChange, onDimensionsChange, onCellEdited, onEditingChange, onRichTextPasted, onPasteHistory, onLayoutChange }, ref) {
+const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ value, editable, minRows = 24, minCols = 10, onSelectionChange, onDimensionsChange, onCellEdited, onEditingChange, onRichTextPasted, onPasteHistory, onLayoutChange, contextItems }, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const instanceRef = useRef<WorksheetInstance | null>(null);
   const selectedRef = useRef<string | null>(null);
   const selectionRangeRef = useRef<[number, number, number, number] | null>(null);
+  // The range the person dragged out (several rows / columns). A right-click first collapses the selection to the one cell
+  // under the pointer, so this keeps the dragged range until they make a new selection with a normal click.
+  const multiSelectionRef = useRef<[number, number, number, number] | null>(null);
+  const lastRightDown = useRef(0);
+  const contextItemsRef = useRef(contextItems);
+  contextItemsRef.current = contextItems;
   // The mount effect below runs once (see the mount-once note at file scope) — these refs
   // let it always call the LATEST callback prop instead of closing over a stale one.
   const onSelectionChangeRef = useRef(onSelectionChange);
@@ -145,6 +169,10 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
   // own undo entry. Remember which entries belong to which paste so Ctrl+Z / Ctrl+Y move a whole paste.
   const overlayCells = useRef(new Map<string, Set<string>>());
   const marked = useRef<HTMLElement[]>([]);
+  const fieldMarked = useRef<HTMLElement[]>([]);
+  const glowing = useRef<HTMLElement[]>([]);
+  const pickedRowCells = useRef<HTMLElement[]>([]);
+  const dropCellRef = useRef<HTMLElement | null>(null);
   const pasteGroups = useRef<{ id: number; start: number; end: number; first: unknown; last: unknown }[]>([]);
   const nextPasteId = useRef(1);
   const onLayoutChangeRef = useRef(onLayoutChange);
@@ -171,9 +199,34 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
       // The built-in toolbar is intentionally disabled — a custom, explicit toolbar (see
       // IPCRTemplateForm) replaces it, driving the same setStyle()/setMerge() APIs directly.
       toolbar: false,
+      // "Delete selected rows / columns" from the right-click menu should delete ALL the rows / columns that were selected,
+      // not only the one right-clicked (the click itself shrinks the selection to that one).
+      contextMenu: (worksheet, colIndex, rowIndex, _event, items, role) => {
+        if (!editable && contextItemsRef.current) return contextItemsRef.current({ col: colIndex === null || colIndex === undefined ? null : Number(colIndex), row: rowIndex === null || rowIndex === undefined ? null : Number(rowIndex) });
+        const prior = multiSelectionRef.current;
+        if (!prior) return items;
+        const span = (a: number, b: number) => ({ first: Math.min(a, b), last: Math.max(a, b) });
+        if ((role === "row" || role === "cell") && rowIndex !== null) {
+          const row = Number(rowIndex);
+          const rows = span(prior[1], prior[3]);
+          if (rows.last > rows.first && row >= rows.first && row <= rows.last) {
+            return items.map((item: { title: string }) => /delete selected rows?/i.test(item.title) ? { ...item, title: `Delete ${rows.last - rows.first + 1} selected rows`, onclick: () => { worksheet.deleteRow(rows.first, rows.last - rows.first + 1); } } : item);
+          }
+        }
+        if ((role === "header" || role === "cell") && colIndex !== null) {
+          const col = Number(colIndex);
+          const cols = span(prior[0], prior[2]);
+          if (cols.last > cols.first && col >= cols.first && col <= cols.last) {
+            return items.map((item: { title: string }) => /delete selected columns?/i.test(item.title) ? { ...item, title: `Delete ${cols.last - cols.first + 1} selected columns`, onclick: () => { worksheet.deleteColumn(cols.first, cols.last - cols.first + 1); } } : item);
+          }
+        }
+        return items;
+      },
       onselection: (worksheet, x1, y1, x2, y2) => {
         const cell = `${columnName(x1)}${y1 + 1}`;
         selectedRef.current = cell;
+        // A right-click's own re-selection must not replace the range being right-clicked.
+        if (Date.now() - lastRightDown.current > 500) multiSelectionRef.current = x1 !== x2 || y1 !== y2 ? [x1, y1, x2, y2] : null;
         selectionRangeRef.current = [x1, y1, x2, y2];
         const cellStyle = worksheet.getStyle(cell);
         onSelectionChangeRef.current?.({ cell, value: String(worksheet.getValue(cell) ?? ""), style: typeof cellStyle === "string" ? cellStyle : "", range: [x1, y1, x2, y2], rows: worksheet.rows.length, cols: worksheet.cols.length });
@@ -213,6 +266,8 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
       }],
     });
     instanceRef.current = instance;
+    const noteRightDown = (event: MouseEvent) => { if (event.button === 2) lastRightDown.current = Date.now(); };
+    container.addEventListener("mousedown", noteRightDown, true);
     Object.entries(value.colWidths).forEach(([col, width]) => instance.setWidth(Number(col), width));
     Object.entries(value.rowHeights ?? {}).forEach(([row, height]) => instance.setHeight(Number(row), height));
     notifyDimensions(instance);
@@ -223,22 +278,35 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
     // frame, applying top-to-bottom/left-to-right, and isolating each call so one bad merge
     // (e.g. an edge case from a messy Google Sheets export) can't take down the whole grid.
     const mergeFrame = requestAnimationFrame(() => {
+      // A merge that overlaps one already applied would make the sheet pop up its own "conflict with another merged cell"
+      // alert and fail anyway, so such a merge is skipped quietly (the designer lists the overlaps before a test).
+      const taken = new Set<string>();
       Object.entries(value.mergeCells)
         .sort(([a], [b]) => {
           const ca = cellCoords(a), cb = cellCoords(b);
           return ca.row - cb.row || ca.col - cb.col;
         })
         .forEach(([anchor, [colspan, rowspan]]) => {
-          try { instance.setMerge(anchor, colspan, rowspan); } catch { /* skip this one merge, keep the rest */ }
+          const { col, row } = cellCoords(anchor);
+          const covered: string[] = [];
+          for (let y = row; y < row + rowspan; y++) for (let x = col; x < col + colspan; x++) covered.push(`${x},${y}`);
+          if (covered.some(key => taken.has(key))) return;
+          try { instance.setMerge(anchor, colspan, rowspan); covered.forEach(key => taken.add(key)); } catch { /* skip this one merge, keep the rest */ }
         });
     });
 
     return () => {
+      container.removeEventListener("mousedown", noteRightDown, true);
       cancelAnimationFrame(mergeFrame);
       // jspreadsheet's own destroy() can throw on some instance shapes — if it does, the
       // unconditional innerHTML reset below must still run, or a remount (React 18 dev
       // double-invoke, switching templates, etc.) stacks a second toolbar on top.
-      try { jspreadsheet.destroy(container as JspreadsheetInstanceElement, true); } catch { /* ignore */ }
+      // destroy(…, true) also tears down the page-wide mouse / keyboard handlers that EVERY sheet on the page shares. When
+      // a second sheet is open (the read-only preview inside "Test this template"), closing it must not take the handlers
+      // away from the editable one — that is what left the sheet unable to be edited afterwards. Only the last sheet
+      // standing removes them.
+      const openSheets = (jspreadsheet as unknown as { spreadsheet?: unknown[] }).spreadsheet?.length ?? 1;
+      try { jspreadsheet.destroy(container as JspreadsheetInstanceElement, openSheets <= 1); } catch { /* ignore */ }
       container.innerHTML = "";
       instanceRef.current = null;
     };
@@ -464,10 +532,86 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
       const wrapper = containerRef.current?.parentElement;
       const a1 = instance.getCellFromCoords(0, 0);
       const imageOrigin = wrapper && a1 ? { x: Math.round(a1.getBoundingClientRect().left - wrapper.getBoundingClientRect().left), y: Math.round(a1.getBoundingClientRect().top - wrapper.getBoundingClientRect().top - 10) } : undefined;
-      return { data, style, mergeCells: merge, colWidths, rowHeights, images: value.images, imageOrigin, sheetName: value.sheetName };
+      return { data, style, mergeCells: merge, colWidths, rowHeights, images: value.images, imageOrigin, sheetName: value.sheetName, pageBreaks: value.pageBreaks };
     },
     getSelectedCell: () => selectedRef.current,
     getCellValue: cell => String(instanceRef.current?.getValue(cell) ?? ""),
+    markDropCell: cell => {
+      const instance = instanceRef.current;
+      dropCellRef.current?.removeAttribute("data-etm-drop-cell");
+      dropCellRef.current = null;
+      if (!instance || !cell) return;
+      const { col, row } = cellCoords(cell);
+      const td = instance.getCellFromCoords(col, row);
+      if (td) { td.setAttribute("data-etm-drop-cell", "1"); dropCellRef.current = td; }
+    },
+    getRenderedRowHeights: () => {
+      const instance = instanceRef.current;
+      const heights: Record<number, number> = {};
+      if (!instance) return heights;
+      const rows = (instance.getData() as unknown[][]).length;
+      for (let row = 0; row < rows; row++) {
+        const tr = instance.getCellFromCoords(0, row)?.parentElement;
+        if (tr && tr.offsetHeight > 0) heights[row] = tr.offsetHeight;
+      }
+      return heights;
+    },
+    markPickedRow: row => {
+      const instance = instanceRef.current;
+      if (!instance) return;
+      pickedRowCells.current.forEach(td => td.removeAttribute("data-etm-picked-row"));
+      pickedRowCells.current = [];
+      if (row === null) return;
+      const cols = instance.cols.length;
+      for (let col = 0; col < cols; col++) {
+        const td = instance.getCellFromCoords(col, row);
+        if (td) { td.setAttribute("data-etm-picked-row", "1"); pickedRowCells.current.push(td); }
+      }
+    },
+    glowCells: (cells, scrollIntoView = false) => {
+      const instance = instanceRef.current;
+      if (!instance) return;
+      glowing.current.forEach(td => td.removeAttribute("data-etm-glow"));
+      glowing.current = [];
+      cells.forEach((cell, index) => {
+        const { col, row } = cellCoords(cell);
+        const td = instance.getCellFromCoords(col, row);
+        if (!td) return;
+        td.setAttribute("data-etm-glow", "1");
+        glowing.current.push(td);
+        if (scrollIntoView && index === 0) td.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+      });
+    },
+    getTokenCells: () => {
+      const instance = instanceRef.current;
+      const found: Record<string, string[]> = {};
+      if (!instance) return found;
+      const data = instance.getData() as (string | number)[][];
+      data.forEach((row, y) => row.forEach((value, x) => {
+        if (typeof value !== "string" || !value.includes("{{")) return;
+        for (const match of value.matchAll(/\{\{([a-z][a-z0-9_]*)\}\}/g)) {
+          (found[match[1]] ??= []).push(`${columnName(x)}${y + 1}`);
+        }
+      }));
+      return found;
+    },
+    markFieldCells: marks => {
+      const instance = instanceRef.current;
+      if (!instance) return;
+      fieldMarked.current.forEach(td => { td.removeAttribute("data-etm-field"); td.removeAttribute("data-etm-field-label"); });
+      fieldMarked.current = [];
+      marks.forEach(({ cell, kind, label }) => {
+        const { col, row } = cellCoords(cell);
+        const td = instance.getCellFromCoords(col, row);
+        if (!td) return;
+        // A cell holding both kinds shows as the whole-cell kind.
+        if (td.getAttribute("data-etm-field") === "cell") return;
+        td.setAttribute("data-etm-field", kind);
+        td.setAttribute("data-etm-field-label", label);
+        td.title = `Fill-in field: ${label}`;
+        fieldMarked.current.push(td);
+      });
+    },
     markOverlayCells: (owner, cells) => {
       const instance = instanceRef.current;
       if (!instance) return;

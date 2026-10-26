@@ -15,8 +15,9 @@ import IPCRGridRichTextOverlay from "./IPCRGridRichTextOverlay";
 import IPCRFillForm from "./IPCRFillForm";
 import IPCRLivePreview from "./IPCRLivePreview";
 import IPCRRichTextField from "./IPCRRichTextField";
-import { AUTOFILL_LABEL } from "./ipcrAutofill";
-import { cellCoords, cellName, composeGroupedTasksHtml, fillGrid, flattenRuns, htmlToRuns, parseCellStyle, replaceRunsRange, runsNeedRichText, syncTaskCount, runsToEditorHtml } from "./ipcrGridUtils";
+import { AUTOFILL_LABEL, autofillKinds, normalizeAutofill, startingValue } from "./ipcrAutofill";
+import { useAuth } from "../../screens/Auth/AuthContext";
+import { cellCoords, cellName, composeGroupedTasksHtml, fillGrid, flattenRuns, htmlToRuns, parseCellStyle, replaceRunsRange, runsNeedRichText, syncTaskCount, runsToEditorHtml, applyStyleToRunsRange, findMergeConflicts } from "./ipcrGridUtils";
 import { parseIPCRWorkbookFile } from "./ipcrExport";
 import { buildIPCRPdfDocDefinition } from "./ipcrPdfExport";
 import { DEFAULT_GRID_COLS, MONTH_NAMES, yearChoices, emptyGrid, fieldToken, slugifyKey, PAPER_SIZE_OPTIONS, type IPCRAutofill, type IPCRExpandable, type IPCRField, type IPCRFieldMetaEntry, type IPCRImageAnchor, type IPCRFieldType, type IPCRFieldValue, type IPCRGridData, type IPCRGridImage, type IPCROrientation, type IPCRPaperSize, type IPCRRichTextRun, type IPCRTemplate, type IPCRTemplateInput, type IPCRTemplateSampleChange } from "./types";
@@ -123,6 +124,9 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
   const [colText, setColText] = useState("");
   const [rowAbove, setRowAbove] = useState(true);
   const [rowBelow, setRowBelow] = useState(true);
+  // What a tagged row is: an item people may add more of, or a section heading (e.g. a Key Result Area) whose look is copied
+  // when they add a new section.
+  const [rowKind, setRowKind] = useState<"item" | "section">("item");
   const [colBefore, setColBefore] = useState(true);
   const [colAfter, setColAfter] = useState(true);
   // Until the author edits the tags themselves, the last column of the sheet is repeatable by default.
@@ -138,7 +142,8 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
   const [editingCell, setEditingCell] = useState<string | null>(null);
   // The cell a grouped task being dragged would land in right now (highlighted while dragging).
   const [dropCell, setDropCell] = useState<string | null>(null);
-  const [sampleValues, setSampleValues] = useState<Record<string, string>>({});
+  // The example answer typed under each field: it previews here and is saved as the field's guide for whoever fills it in.
+  const [sampleValues, setSampleValues] = useState<Record<string, string>>(() => Object.fromEntries((template?.fields_config ?? []).filter(field => field.sample).map(field => [field.key, field.sample as string])));
   const [samplePreview, setSamplePreview] = useState<IPCRGridData | null>(null);
   const [textSelection, setTextSelection] = useState<{ start: number; end: number; text: string; value: string } | null>(null);
   const [dims, setDims] = useState({ rows: 0, cols: 0 });
@@ -154,6 +159,33 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
   const [testOpen, setTestOpen] = useState(false);
   const [testGrid, setTestGrid] = useState<IPCRGridData | null>(null);
   const [testValues, setTestValues] = useState<Record<string, IPCRFieldValue>>({});
+  const { user: testProfile } = useAuth();
+  const [testOfficeName, setTestOfficeName] = useState("");
+  const [testFocusField, setTestFocusField] = useState<string | null>(null);
+  const [testHoverField, setTestHoverField] = useState<string | null>(null);
+  // The test window floats: drag it by its title bar, resize it from the bottom-right corner.
+  const [testPos, setTestPos] = useState<{ x: number; y: number } | null>(null);
+  const testDrag = useRef<{ dx: number; dy: number } | null>(null);
+  function startTestDrag(event: React.PointerEvent<HTMLDivElement>) {
+    if ((event.target as HTMLElement).closest("button")) return;
+    const box = event.currentTarget.parentElement!.getBoundingClientRect();
+    testDrag.current = { dx: event.clientX - box.left, dy: event.clientY - box.top };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+  function moveTestDrag(event: React.PointerEvent<HTMLDivElement>) {
+    const drag = testDrag.current;
+    if (!drag) return;
+    setTestPos({ x: Math.max(-300, Math.min(window.innerWidth - 120, event.clientX - drag.dx)), y: Math.max(0, Math.min(window.innerHeight - 40, event.clientY - drag.dy)) });
+  }
+  function endTestDrag(event: React.PointerEvent<HTMLDivElement>) {
+    testDrag.current = null;
+    try { event.currentTarget.releasePointerCapture(event.pointerId); } catch { /* already released */ }
+  }
+  // The account only stores the office's id; look its name up so "Office" autofill fields can show it.
+  useEffect(() => {
+    if (!testProfile?.office) return;
+    taskService.projects().then(offices => setTestOfficeName(offices.find(office => office.id === testProfile.office)?.name ?? "")).catch(() => undefined);
+  }, [testProfile?.office]);
   const [testMeta, setTestMeta] = useState<Record<string, IPCRFieldMetaEntry>>({});
   const [testGroups, setTestGroups] = useState<GroupedTask[]>([]);
   // The signed-in user's grouped tasks, always listed in the side panel so they can be previewed
@@ -162,8 +194,37 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
   const [previewGroupId, setPreviewGroupId] = useState<number | null>(null);
   // Bumped when a column/row is dragged to a new size so overlays laid over the grid re-measure.
   const [layoutVersion, setLayoutVersion] = useState(0);
+  // Cells that already hold a field get coloured in the sheet. Redone for about half a second after any change, because
+  // the sheet settles its merges over a few frames and a mark made too early would be lost.
+  const fieldMarksKey = fields.map(field => `${field.cell}:${field.inline ? "i" : "c"}:${field.label}`).join("|");
   // Bumped by Reset: part of the grid's key, so it remounts from the saved template.
   const [resetVersion, setResetVersion] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    let frame = 0;
+    // A field is wherever its {{token}} is in the sheet NOW, so moving / cutting the text moves the colour (and the
+    // field's cell label) with it instead of leaving the old cell coloured. A field whose token has gone is not coloured.
+    const apply = () => {
+      const handle = gridRef.current;
+      if (!handle) return;
+      const where = handle.getTokenCells();
+      handle.markFieldCells(fields.flatMap(field => (where[field.key] ?? []).map(cell => ({ cell, kind: field.inline ? "inline" as const : "cell" as const, label: field.label }))));
+      // The field's own cell label follows its text, unless that text still sits in the cell it names (a field used in
+      // several places keeps its first one).
+      const moved = (field: IPCRField) => (where[field.key]?.length ?? 0) > 0 && !where[field.key].includes(field.cell);
+      if (fields.some(moved)) setFields(current => current.map(field => moved(field) ? { ...field, cell: where[field.key][0] } : field));
+    };
+    const tick = (count: number) => {
+      if (cancelled) return;
+      apply();
+      if (count < 30) frame = requestAnimationFrame(() => tick(count + 1));
+    };
+    tick(0);
+    // Cut / paste / drag edits do not announce themselves, so look again now and then while the designer is open.
+    const timer = window.setInterval(apply, 700);
+    return () => { cancelled = true; cancelAnimationFrame(frame); window.clearInterval(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fieldMarksKey, layoutVersion, resetVersion, dims.rows, dims.cols]);
   useEffect(() => {
     let cancelled = false;
     taskService.listGroupedTasks()
@@ -180,6 +241,27 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
   // Runs a grid-mutating action, then re-reads the selected cell's style so the toolbar's
   // active/pressed states (bold, font, colors, ...) reflect the change immediately — jspreadsheet
   // is imperative, so nothing here re-renders on its own the way DMT's own React-state grid does.
+  // Bold / italic / underline: with words highlighted inside the cell, only THOSE words change (the cell becomes
+  // mixed-formatting text); with no highlight, the whole cell changes as before.
+  function formatSelection(property: "bold" | "italic" | "underline", whole: () => void) {
+    const grid = gridRef.current;
+    const selection = textSelection;
+    const cell = selectedCell;
+    if (!grid || !selection || !cell) { runStyleAction(whole); return; }
+    const existing = richText[cell];
+    const base: IPCRRichTextRun[] = existing && flattenRuns(existing) === selection.value
+      ? existing
+      : [{ text: selection.value, bold: currentStyle.bold, italic: currentStyle.italic, underline: currentStyle.underline }];
+    const before = richText[cell] ?? null;
+    const after = applyStyleToRunsRange(base, selection.start, selection.end, property);
+    grid.cancelEdit();
+    const stepId = grid.runAsOneStep(() => grid.setCellValue(cell, selection.value));
+    setRichText(current => ({ ...current, [cell]: after }));
+    if (stepId !== null) pasteRichHistory.current.set(stepId, { before: { [cell]: before }, after: { [cell]: after } });
+    setFormulaValue(selection.value);
+    setTextSelection(null);
+  }
+
   function runStyleAction(action: () => void) {
     action();
     if (selectedCell) setSelectedStyle(gridRef.current?.getCellStyle(selectedCell) ?? "");
@@ -261,10 +343,26 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
   }
 
   function openTest() {
+    // Say plainly where the sheet is broken instead of letting the test fail with a bare browser alert.
+    const conflicts = findMergeConflicts(gridRef.current?.getSnapshot() ?? emptyGrid());
+    if (conflicts.length) {
+      const shown = conflicts.slice(0, 8).map(conflict => `<li><b>${conflict.a}</b> overlaps <b>${conflict.b}</b></li>`).join("");
+      void Swal.fire({
+        icon: "warning",
+        title: "Some merged cells overlap",
+        html: `<p style="text-align:left;margin:0 0 8px;font-size:13px">These merged ranges cover the same cells. The test skips the overlapping ones, so those areas may look unmerged. Unmerge one of each pair, or merge them again without the overlap:</p><ul style="text-align:left;font-size:13px;margin:0;padding-left:18px">${shown}</ul>${conflicts.length > 8 ? `<p style="text-align:left;font-size:12px;opacity:.7">…and ${conflicts.length - 8} more.</p>` : ""}`,
+      });
+    }
     setTestOpen(true);
+    setTestPos(null);  // opens centred each time
+    // Fields set to use the existing information start with the signed-in person's own details, exactly as a user
+    // making an IPCR would see them; anything already typed in a previous test is kept.
     setTestValues(current => {
       const next = { ...current };
-      fields.forEach(field => { if (!(field.key in next)) next[field.key] = field.type === "number" || field.type === "rating" || field.type === "month" || field.type === "year" ? null : ""; });
+      fields.forEach(field => {
+        const starting = startingValue(field, testProfile, testOfficeName);
+        if (!(field.key in next) || next[field.key] === "" || next[field.key] === null) next[field.key] = starting;
+      });
       return next;
     });
     if (!testGroups.length) taskService.listGroupedTasks().then(setTestGroups).catch(() => undefined);
@@ -543,27 +641,104 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
   }
 
   // For a text field: the "utilize the existing information" choice. Returns undefined when the admin picks "no".
-  async function askAutofill(): Promise<IPCRAutofill | undefined | null> {
+  async function askAutofill(): Promise<IPCRAutofill | IPCRAutofill[] | undefined | null> {
+    // Tick one or several (e.g. Designation + Office for a "<Designation, Office>" line); they are joined with ", ".
+    const kinds = Object.keys(AUTOFILL_LABEL) as IPCRAutofill[];
     const { value, isDismissed } = await Swal.fire({
       title: "Utilize the existing information?",
-      text: "Start this field filled in with the details of whoever is making the IPCR. They can still change it.",
-      input: "select",
-      inputOptions: { none: "No — leave it blank", ...AUTOFILL_LABEL },
-      inputValue: "none",
+      html: `<p style="margin:0 0 12px;font-size:13px;opacity:.8">Start this field filled in with the details of whoever is making the IPCR. Tick more than one to combine them (shown in this order, separated by commas). They can still change it.</p>`
+        + `<div id="etm-autofill-options" style="display:grid;gap:8px;text-align:left;max-width:260px;margin:0 auto">`
+        + kinds.map(kind => `<label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer"><input type="checkbox" value="${kind}" style="width:16px;height:16px" /> ${AUTOFILL_LABEL[kind]}</label>`).join("")
+        + `</div><p style="margin:12px 0 0;font-size:12px;opacity:.7">Tick nothing to leave it blank.</p>`,
       showCancelButton: true,
       confirmButtonText: "Add field",
+      preConfirm: () => kinds.filter(kind => (document.querySelector<HTMLInputElement>(`#etm-autofill-options input[value="${kind}"]`))?.checked),
     });
     if (isDismissed) return null;
-    return value && value !== "none" ? (value as IPCRAutofill) : undefined;
+    return normalizeAutofill((value ?? []) as IPCRAutofill[]);
   }
 
   // Turn just the highlighted words of a cell (e.g. "<NAME>" inside a sentence) into a fill-in field: the words
   // are swapped for a {{token}} that is filled with the user's answer in place, surrounding text untouched.
+  // Before making a NEW field, offer the ones that already exist: using one again puts the same {{token}} in this place, so
+  // a single input fills both (e.g. "Date signed" printed twice) and nothing has to be tagged twice.
+  // Returns the existing field's key, "" to make a new field, or null if the person backed out.
+  async function askExistingField(includeGrouped: boolean): Promise<string | null> {
+    const choices = fields.filter(field => includeGrouped || field.type !== "grouped_tasks");
+    if (!choices.length) return "";
+    const { value, isDismissed } = await Swal.fire({
+      title: "Use an existing field?",
+      text: "Pick a field that is already set up and this place will be filled by the same input — nobody has to answer it twice. Or make a new one.",
+      input: "select",
+      inputOptions: { "": "➕ Make a new field", ...Object.fromEntries(choices.map(field => [field.key, `${field.label}  (${field.cell})`])) },
+      inputValue: "",
+      showCancelButton: true,
+      confirmButtonText: "Next",
+    });
+    if (isDismissed) return null;
+    return typeof value === "string" ? value : "";
+  }
+
+  // The same as marking highlighted text in a cell, but done from inside the mixed-formatting window: the highlighted words
+  // become a {{token}} (keeping their bold / underline), and a field is made for them — or an existing one is reused.
+  async function markFromRichTextEditor(text: string, replace: (token: string) => void) {
+    const cell = richTextCell;
+    if (!cell) return;
+    if (!text.trim()) {
+      void Swal.fire({ title: "Highlight some words first", text: "Select the words that should become a fill-in field, then click Make field.", icon: "info" });
+      return;
+    }
+    const reuse = await askExistingField(false);
+    if (reuse === null) return;
+    if (reuse) { replace(fieldToken(reuse)); return; }
+    const suggestion = text.replace(/[<>{}[\]]/g, "").trim().toLowerCase().replace(/(^|\s)\S/g, letter => letter.toUpperCase());
+    const { value: label } = await Swal.fire({
+      title: `Make "${text.length > 40 ? `${text.slice(0, 40)}…` : text}" a fill-in field`,
+      input: "text",
+      inputLabel: "What should users see for this field?",
+      inputValue: suggestion,
+      showCancelButton: true,
+      confirmButtonText: "Next",
+      inputValidator: value => (!value || !value.trim() ? "Give this field a label." : undefined),
+    });
+    if (typeof label !== "string" || !label.trim()) return;
+    const { grouped_tasks: _grouped, ...inlineTypes } = FIELD_TYPE_LABEL;
+    const { value: type } = await Swal.fire({ title: "Field type", input: "select", inputOptions: inlineTypes, inputValue: "text", showCancelButton: true, confirmButtonText: "Add field" });
+    if (typeof type !== "string" || !type) return;
+    const autofill = type === "text" ? await askAutofill() : undefined;
+    if (autofill === null) return;
+    const dateMode = type === "date" ? await askDateMode() : undefined;
+    if (dateMode === null) return;
+    let key = slugifyKey(label);
+    if (fields.some(field => field.key === key)) key = `${key}_${fields.length + 1}`;
+    replace(fieldToken(key));
+    setFields(current => [...current, { cell, key, label: label.trim(), type: type as IPCRFieldType, inline: true, placeholder: text, ...(autofill ? { autofill } : {}), ...(dateMode ? { dateMode } : {}) }]);
+  }
+
   async function markSelectedText() {
     const grid = gridRef.current;
     const selection = textSelection;
     const cell = selectedCell;
     if (!grid || !selection || !cell) return;
+    const reuse = await askExistingField(false);
+    if (reuse === null) return;
+    if (reuse) {
+      const token = fieldToken(reuse);
+      grid.cancelEdit();
+      const reusedValue = selection.value.slice(0, selection.start) + token + selection.value.slice(selection.end);
+      const reusedRuns = richText[cell];
+      setRichText(current => {
+        if (!reusedRuns) return current;
+        const next = { ...current };
+        if (flattenRuns(reusedRuns) === selection.value) next[cell] = replaceRunsRange(reusedRuns, selection.start, selection.end, token);
+        else delete next[cell];
+        return next;
+      });
+      grid.setCellValue(cell, reusedValue);
+      setFormulaValue(reusedValue);
+      setTextSelection(null);
+      return;
+    }
     const suggestion = selection.text.replace(/[<>{}[\]]/g, "").trim().toLowerCase().replace(/(^|\s)\S/g, letter => letter.toUpperCase());
     const { value: label } = await Swal.fire({
       title: `Make "${selection.text.length > 40 ? `${selection.text.slice(0, 40)}…` : selection.text}" a fill-in field`,
@@ -619,6 +794,21 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
     const cell = grid.getSelectedCell();
     if (!cell) {
       void Swal.fire({ title: "Select a cell first", text: "Click a cell in the sheet, then mark it as a fill-in field.", icon: "info" });
+      return;
+    }
+    const reuse = await askExistingField(true);
+    if (reuse === null) return;
+    if (reuse) {
+      const reusedText = grid.getCellValue(cell);
+      const reusedUnderline = /^[\s_]{3,}$/.test(reusedText) && reusedText.includes("_");
+      grid.setCellValue(cell, fieldToken(reuse));
+      grid.markCell(cell, true);
+      if (reusedUnderline) {
+        grid.setCellStyle(cell, "border-bottom", "1px solid #000000");
+        grid.setCellStyle(cell, "vertical-align", "bottom");
+        grid.setCellStyle(cell, "text-align", "center");
+        setSelectedStyle(grid.getCellStyle(cell));
+      }
       return;
     }
     const { value: label } = await Swal.fire({
@@ -865,21 +1055,26 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
         </div>
       )}
 
-      {/* Test-fill preview modal */}
+      {/* Test-fill preview: a floating window (drag the title bar, resize from the corner), not a blocking dialog */}
       {testOpen && (
-        <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-xl w-full max-w-5xl h-[92vh] flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
-              <p className="text-sm font-semibold text-foreground">Test this template<span className="text-xs text-muted-foreground font-normal ml-2">fill in values to see exactly what a user would see — nothing is saved</span></p>
-              <button type="button" onClick={() => setTestOpen(false)} className="p-1 rounded hover:bg-accent" title="Close"><X className="w-4 h-4 text-muted-foreground" /></button>
+        <div
+          className="fixed z-[60] bg-card border border-border rounded-xl flex flex-col overflow-hidden shadow-2xl"
+          style={{
+            width: "min(1750px, 98vw)", height: "88vh", minWidth: 560, minHeight: 320, maxWidth: "100vw", maxHeight: "100vh", resize: "both",
+            ...(testPos ? { left: testPos.x, top: testPos.y } : { left: "50%", top: "5vh", transform: "translateX(-50%)" }),
+          }}
+        >
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0 cursor-move select-none touch-none"
+            onPointerDown={startTestDrag} onPointerMove={moveTestDrag} onPointerUp={endTestDrag} onPointerCancel={endTestDrag}>
+            <p className="text-sm font-semibold text-foreground">Test this template<span className="text-xs text-muted-foreground font-normal ml-2">fill in values to see exactly what a user would see — nothing is saved · drag this bar to move, pull the corner to resize</span></p>
+            <button type="button" onClick={() => setTestOpen(false)} className="p-1 rounded hover:bg-accent" title="Close"><X className="w-4 h-4 text-muted-foreground" /></button>
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 grid gap-4" style={{ gridTemplateColumns: "minmax(300px, 380px) minmax(0, 1fr)" }}>
+            <div>
+              <IPCRFillForm fields={fields} values={testValues} meta={testMeta} groups={testGroups} onUpdateValue={updateTestValue} onToggleGroupTag={toggleTestGroupTag} onFieldFocus={setTestFocusField} onFieldHover={setTestHoverField} />
+              <button type="button" className="etm-button primary small" style={{ marginTop: 10 }} onClick={refreshTest}><RefreshCw size={14} /> Refresh preview</button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 grid gap-4" style={{ gridTemplateColumns: "320px 1fr" }}>
-              <div>
-                <IPCRFillForm fields={fields} values={testValues} meta={testMeta} groups={testGroups} onUpdateValue={updateTestValue} onToggleGroupTag={toggleTestGroupTag} />
-                <button type="button" className="etm-button primary small" style={{ marginTop: 10 }} onClick={refreshTest}><RefreshCw size={14} /> Refresh preview</button>
-              </div>
-              <div>{testGrid && <IPCRLivePreview grid={testGrid} fields={fields} values={testValues} refreshKey={testRefreshKey} />}</div>
-            </div>
+            <div className="min-w-0 overflow-auto">{testGrid && <IPCRLivePreview grid={testGrid} fields={fields} values={testValues} refreshKey={testRefreshKey} focusKey={testFocusField ?? testHoverField} />}</div>
           </div>
         </div>
       )}
@@ -896,7 +1091,7 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
             </div>
             <div className="p-4">
               <p className="text-xs text-muted-foreground mb-2">Select part of the text and bold/underline just that part — e.g. a name inside a sentence.</p>
-              <IPCRRichTextField value={richTextDraft} onChange={setRichTextDraft} placeholder="Cell text" />
+              <IPCRRichTextField value={richTextDraft} onChange={setRichTextDraft} placeholder="Cell text" onMakeField={(text, replace) => void markFromRichTextEditor(text, replace)} />
             </div>
             <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border">
               <button type="button" className="etm-button ghost small" onClick={() => setRichTextModalOpen(false)}>Cancel</button>
@@ -950,9 +1145,9 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
           className="w-12 text-[11px] border border-border rounded px-1.5 bg-background h-6 shrink-0 disabled:opacity-40" title="Font size (px)" />
         <div className="w-px h-4 bg-border mx-1 shrink-0" />
 
-        <button type="button" disabled={!sel} onClick={() => runStyleAction(() => gridRef.current?.toggleStyle("font-weight", "bold"))} className={tbActive(currentStyle.bold)} title="Bold"><Bold className="w-3.5 h-3.5" /></button>
-        <button type="button" disabled={!sel} onClick={() => runStyleAction(() => gridRef.current?.toggleStyle("font-style", "italic"))} className={tbActive(currentStyle.italic)} title="Italic"><Italic className="w-3.5 h-3.5" /></button>
-        <button type="button" disabled={!sel} onClick={() => runStyleAction(() => gridRef.current?.toggleStyle("text-decoration", "underline"))} className={tbActive(currentStyle.underline)} title="Underline"><Underline className="w-3.5 h-3.5" /></button>
+        <button type="button" disabled={!sel} onMouseDown={event => event.preventDefault()} onClick={() => formatSelection("bold", () => gridRef.current?.toggleStyle("font-weight", "bold"))} className={tbActive(currentStyle.bold)} title="Bold"><Bold className="w-3.5 h-3.5" /></button>
+        <button type="button" disabled={!sel} onMouseDown={event => event.preventDefault()} onClick={() => formatSelection("italic", () => gridRef.current?.toggleStyle("font-style", "italic"))} className={tbActive(currentStyle.italic)} title="Italic"><Italic className="w-3.5 h-3.5" /></button>
+        <button type="button" disabled={!sel} onMouseDown={event => event.preventDefault()} onClick={() => formatSelection("underline", () => gridRef.current?.toggleStyle("text-decoration", "underline"))} className={tbActive(currentStyle.underline)} title="Underline"><Underline className="w-3.5 h-3.5" /></button>
         <button type="button" disabled={!sel} onClick={() => openRichTextEditor()} className={tbActive(!!richText[selectedCell ?? ""])} title="Mixed formatting within this cell — bold/underline just part of the text (e.g. a name inside a sentence)"><Type className="w-3.5 h-3.5" /></button>
         <label className={`${tb} relative cursor-pointer ${!sel ? "opacity-30 pointer-events-none" : ""}`} title="Text color">
           <Baseline className="w-3.5 h-3.5" />
@@ -1137,6 +1332,10 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
           {!submissionMode && <>
           <div className="p-3 border-b border-border">
             <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Fill-in fields</p>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 mb-2 text-[10px] text-muted-foreground" aria-label="What the colours in the sheet mean">
+              <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ background: "rgba(23,179,172,.35)", boxShadow: "inset 0 0 0 1px rgba(23,179,172,.9)" }} />Whole cell is a field</span>
+              <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ background: "rgba(232,168,56,.35)", boxShadow: "inset 0 0 0 1px rgba(232,168,56,.9)" }} />Part of its text is a field</span>
+            </div>
             {/* onMouseDown keeps focus (and the text highlight) in the cell editor when this is clicked. */}
             <button type="button" onMouseDown={event => event.preventDefault()} onClick={() => { if (textSelection && !isUnderlineText(textSelection.text)) void markSelectedText(); else { gridRef.current?.cancelEdit(); setTextSelection(null); void markSelectedCell(); } }}
               className="w-full flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90">
@@ -1175,11 +1374,24 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
                   <span className="text-[10px] text-muted-foreground">1–{dims.rows}</span>
                 </div>
                 {row !== null ? (
-                  <div className="flex items-center gap-3 pl-1">
-                    <label className={box}><input type="checkbox" checked={rowAbove} onChange={event => setRowAbove(event.target.checked)} />Above</label>
-                    <label className={box}><input type="checkbox" checked={rowBelow} onChange={event => setRowBelow(event.target.checked)} />Below</label>
-                    <button type="button" disabled={!rowAbove && !rowBelow} className={button}
-                      onClick={() => { editExpandable(current => ({ ...current, rows: { ...current.rows, [row]: { before: rowAbove, after: rowBelow } } })); setRowText(""); setRowAbove(true); setRowBelow(true); }}>{rowMark ? "Update" : "Add"}</button>
+                  <div className="flex flex-col gap-1.5 pl-1">
+                    <label className={box}>
+                      <span className="shrink-0">This row is</span>
+                      <select className={`${pick} min-w-0 flex-1`} value={rowKind} onChange={event => setRowKind(event.target.value as "item" | "section")} aria-label="What kind of row this is">
+                        <option value="item">An item — users can add more rows like it</option>
+                        <option value="section">A section heading — its look is used for new sections</option>
+                      </select>
+                    </label>
+                    <div className="flex items-center gap-3">
+                      {rowKind === "item" ? (
+                        <>
+                          <label className={box}><input type="checkbox" checked={rowAbove} onChange={event => setRowAbove(event.target.checked)} />Above</label>
+                          <label className={box}><input type="checkbox" checked={rowBelow} onChange={event => setRowBelow(event.target.checked)} />Below</label>
+                        </>
+                      ) : <span className="text-[10px] text-muted-foreground">Not repeated itself — new sections copy this row's colours, borders and size.</span>}
+                      <button type="button" disabled={rowKind === "item" && !rowAbove && !rowBelow} className={button}
+                        onClick={() => { editExpandable(current => ({ ...current, rows: { ...current.rows, [row]: rowKind === "section" ? { before: false, after: false, kind: "section" } : { before: rowAbove, after: rowBelow } } })); setRowText(""); setRowAbove(true); setRowBelow(true); setRowKind("item"); }}>{rowMark ? "Update" : "Add"}</button>
+                    </div>
                   </div>
                 ) : (
                   <button type="button" disabled className={`${button} self-end`}>Add</button>
@@ -1204,7 +1416,7 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
                   <div className="flex flex-wrap gap-1 mt-1" aria-label="Tagged rows and columns">
                     {tags.map(tag => (
                       <span key={tag.key} className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-semibold">
-                        <button type="button" className="hover:underline" onClick={() => { if (tag.axis === "rows") { setRowText(String(tag.index + 1)); setRowAbove(tag.mark.before); setRowBelow(tag.mark.after); } else { setColText(letter(tag.index)); setColBefore(tag.mark.before); setColAfter(tag.mark.after); } }} title="Edit this one">{tag.text} · {tag.mark.before && tag.mark.after ? (tag.axis === "rows" ? "above & below" : "before & after") : tag.mark.before ? (tag.axis === "rows" ? "above" : "before") : (tag.axis === "rows" ? "below" : "after")}</button>
+                        <button type="button" className="hover:underline" onClick={() => { if (tag.axis === "rows") { setRowText(String(tag.index + 1)); setRowAbove(tag.mark.before); setRowBelow(tag.mark.after); setRowKind(tag.mark.kind === "section" ? "section" : "item"); } else { setColText(letter(tag.index)); setColBefore(tag.mark.before); setColAfter(tag.mark.after); } }} title="Edit this one">{tag.text} · {tag.axis === "rows" && tag.mark.kind === "section" ? "section style" : tag.mark.before && tag.mark.after ? (tag.axis === "rows" ? "above & below" : "before & after") : tag.mark.before ? (tag.axis === "rows" ? "above" : "before") : (tag.axis === "rows" ? "below" : "after")}</button>
                         <button type="button" aria-label={`Remove tag from ${tag.text}`} onClick={() => editExpandable(current => { const next = { ...current[tag.axis] }; delete next[tag.index]; return { ...current, [tag.axis]: next }; })}><X className="w-3 h-3" /></button>
                       </span>
                     ))}
@@ -1290,18 +1502,37 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
                   )}
                   {field.type === "text" && (
                     <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                      <input type="checkbox" checked={!!field.autofill} onChange={event => setFields(current => current.map(item => item.key === field.key ? { ...item, autofill: event.target.checked ? "name" : undefined } : item))} />
+                      <input type="checkbox" checked={autofillKinds(field.autofill).length > 0} onChange={event => setFields(current => current.map(item => item.key === field.key ? { ...item, autofill: event.target.checked ? "name" : undefined } : item))} />
                       Utilize the existing information
-                      {field.autofill && (
-                        <select value={field.autofill} onChange={event => setFields(current => current.map(item => item.key === field.key ? { ...item, autofill: event.target.value as IPCRAutofill } : item))} aria-label={`Information used for ${field.label}`} className="ml-auto rounded border border-border bg-background px-1 py-0.5 text-[10px] text-foreground">
-                          {(Object.keys(AUTOFILL_LABEL) as IPCRAutofill[]).map(kind => <option key={kind} value={kind}>{AUTOFILL_LABEL[kind]}</option>)}
-                        </select>
-                      )}
                     </label>
+                  )}
+                  {field.type === "text" && autofillKinds(field.autofill).length > 0 && (
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 pl-5" role="group" aria-label={`Information used for ${field.label}`}>
+                      {(Object.keys(AUTOFILL_LABEL) as IPCRAutofill[]).map(kind => {
+                        const chosen = autofillKinds(field.autofill);
+                        return (
+                          <label key={kind} className="flex items-center gap-1 text-[10px] text-foreground">
+                            <input type="checkbox" checked={chosen.includes(kind)}
+                              onChange={event => setFields(current => current.map(item => {
+                                if (item.key !== field.key) return item;
+                                const now = autofillKinds(item.autofill);
+                                const next = event.target.checked ? [...now, kind] : now.filter(entry => entry !== kind);
+                                // Always keep the order Full name, Email, Designation, Office, and never end up with none here (untick the box above for that).
+                                const ordered = (Object.keys(AUTOFILL_LABEL) as IPCRAutofill[]).filter(entry => next.includes(entry));
+                                return { ...item, autofill: normalizeAutofill(ordered.length ? ordered : now) };
+                              }))} />
+                            {AUTOFILL_LABEL[kind]}
+                          </label>
+                        );
+                      })}
+                    </div>
                   )}
                   {field.type !== "grouped_tasks" && !(field.type === "date" && field.dateMode === "today") && (() => {
                     const sampleClass = "w-full rounded border border-border bg-background px-2 py-1 text-[11px] text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary/50";
-                    const setSample = (value: string) => setSampleValues(current => ({ ...current, [field.key]: value }));
+                    const setSample = (value: string) => {
+                      setSampleValues(current => ({ ...current, [field.key]: value }));
+                      setFields(current => current.map(item => item.key === field.key ? { ...item, sample: value } : item));
+                    };
                     const sample = sampleValues[field.key] ?? "";
                     if (field.type === "textarea") return <textarea rows={2} value={sample} onChange={event => setSample(event.target.value)} placeholder="Type sample text to preview…" aria-label={`Sample text for ${field.label}`} className={`${sampleClass} resize-y`} />;
                     if (field.type === "date") return <input type="date" value={sample} onChange={event => setSample(event.target.value)} aria-label={`Sample date for ${field.label}`} className={sampleClass} />;

@@ -420,3 +420,28 @@
 .etm-vbar-col-button:disabled { cursor: default; }
 .etm-vbar-col-button:not(:disabled):hover .etm-vbar-label, .etm-vbar-col-button:focus-visible .etm-vbar-label { color: var(--etm-ink); }
 .etm-vbar-col-button:not(:disabled):hover .etm-vbar-track { background: color-mix(in srgb, var(--etm-primary) 14%, var(--etm-surface-sunken)); }
+
+/* Due-soon / Due-today cards: a red border that pulses the same way the "N due soon" pill does
+   (the old glow was too faint to notice). The pulse lives on an overlay so the card's own content stays steady. */
+.etm-kpi-card.due-soon:not(.selected) { position: relative; border-color: transparent; animation: none; }
+.etm-kpi-card.due-soon:not(.selected)::after { content: ""; position: absolute; inset: -1px; border: 2px solid #e0453a; border-radius: inherit; box-shadow: 0 0 14px #c0392b88; pointer-events: none; animation: etm-due-soon-blink 1.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .etm-kpi-card.due-soon:not(.selected)::after { animation: none; } }
+
+/* A large, faint copy of each card's icon tucked into its bottom-right corner. It sits on its own clipped layer so the
+   card's blinking border and glow are not cut off. */
+.etm-kpi-card { position: relative; }
+.etm-kpi-card > *:not(.etm-kpi-silhouette) { position: relative; z-index: 1; }
+.etm-kpi-silhouette { position: absolute; inset: 0; z-index: 0; display: flex; align-items: flex-end; justify-content: flex-end; overflow: hidden; border-radius: inherit; pointer-events: none; color: var(--etm-primary); }
+.etm-kpi-silhouette > svg { margin: 0 -18px -26px 0; opacity: .08; transform: rotate(-8deg); }
+.etm-kpi-card.warn .etm-kpi-silhouette { color: #c18a31; }
+.etm-kpi-card.success .etm-kpi-silhouette { color: #3e9276; }
+.etm-kpi-card.danger .etm-kpi-silhouette { color: #c85f5a; }
+:root.dark .etm-kpi-silhouette > svg { opacity: .1; }
+:root.dark .etm-kpi-card.warn .etm-kpi-silhouette { color: #e6c179; }
+:root.dark .etm-kpi-card.success .etm-kpi-silhouette { color: #7fd6ac; }
+:root.dark .etm-kpi-card.danger .etm-kpi-silhouette { color: #e3928d; }
+
+/* The small icon chip is gone from the stat cards — the large faint icon in the corner is the only icon now, so it is a touch stronger. */
+.etm-kpi-card-top .etm-kpi-icon { display: none; }
+.etm-kpi-silhouette > svg { opacity: .13; }
+:root.dark .etm-kpi-silhouette > svg { opacity: .17; }

@@ -20,18 +20,29 @@ interface IPCRFillFormProps {
   groups: GroupedTask[];
   onUpdateValue: (key: string, value: IPCRFieldValue) => void;
   onToggleGroupTag: (field: IPCRField, groupId: number) => void;
+  // Which field the person is typing in / pointing at (null when none), so the sheet can glow its cell.
+  onFieldFocus?: (key: string | null) => void;
+  onFieldHover?: (key: string | null) => void;
 }
 
-export default function IPCRFillForm({ fields, values, meta, groups, onUpdateValue, onToggleGroupTag }: IPCRFillFormProps) {
+export default function IPCRFillForm({ fields, values, meta, groups, onUpdateValue, onToggleGroupTag, onFieldFocus, onFieldHover }: IPCRFillFormProps) {
   return (
-    <div className="etm-ipcr-fill-form">
+    <div
+      className="etm-ipcr-fill-form"
+      // The sheet beside the form listens for keys on the whole page (Tab moves its selection, Delete clears a cell, …) and
+      // takes them over — that is why Tab would not move to the next input. Keys typed in the form stay in the form.
+      onKeyDown={event => {
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "p") return;  // Print still reaches the page
+        event.stopPropagation();
+      }}
+    >
       {fields.map(field => {
         const Icon = FIELD_ICON[field.type];
         if (field.type === "grouped_tasks") {
           const taggedIds = meta[field.key]?.grouped_task_ids ?? [];
           const taggedGroups = groups.filter(group => taggedIds.includes(group.id));
           return (
-            <div className="etm-ipcr-fill-field" key={field.key}>
+            <div className="etm-ipcr-fill-field" key={field.key} onFocusCapture={() => onFieldFocus?.(field.key)} onBlurCapture={() => onFieldFocus?.(null)} onMouseEnter={() => onFieldHover?.(field.key)} onMouseLeave={() => onFieldHover?.(null)}>
               <label><Icon size={14} /> {field.label} <span className="etm-ipcr-field-cell">{field.cell}</span></label>
               <div className="etm-ipcr-group-tag-row">
                 {taggedGroups.map(group => (
@@ -55,16 +66,17 @@ export default function IPCRFillForm({ fields, values, meta, groups, onUpdateVal
         }
         if (field.type === "textarea") {
           return (
-            <div className="etm-ipcr-fill-field" key={field.key}>
+            <div className="etm-ipcr-fill-field" key={field.key} onFocusCapture={() => onFieldFocus?.(field.key)} onBlurCapture={() => onFieldFocus?.(null)} onMouseEnter={() => onFieldHover?.(field.key)} onMouseLeave={() => onFieldHover?.(null)}>
               <label><Icon size={14} /> {field.label} <span className="etm-ipcr-field-cell">{field.cell}</span></label>
-              <IPCRRichTextField value={String(values[field.key] ?? "")} onChange={html => onUpdateValue(field.key, html)} placeholder={field.label} />
+              <IPCRRichTextField value={String(values[field.key] ?? "")} onChange={html => onUpdateValue(field.key, html)} placeholder={field.sample ? `e.g. ${field.sample}` : field.label} />
+              {field.sample && <small className="etm-ipcr-sample-hint">Example: {field.sample}</small>}
             </div>
           );
         }
         if (field.type === "month" || field.type === "year") {
           const options: SelectOption<number>[] = field.type === "month" ? MONTH_OPTIONS : yearChoices().map(year => ({ value: year, label: String(year) }));
           return (
-            <div className="etm-ipcr-fill-field" key={field.key}>
+            <div className="etm-ipcr-fill-field" key={field.key} onFocusCapture={() => onFieldFocus?.(field.key)} onBlurCapture={() => onFieldFocus?.(null)} onMouseEnter={() => onFieldHover?.(field.key)} onMouseLeave={() => onFieldHover?.(null)}>
               <label><Icon size={14} /> {field.label} <span className="etm-ipcr-field-cell">{field.cell}</span></label>
               <ThemedSelect<SelectOption<number>>
                 size="small"
@@ -81,7 +93,7 @@ export default function IPCRFillForm({ fields, values, meta, groups, onUpdateVal
         }
         if (field.type === "rating") {
           return (
-            <div className="etm-ipcr-fill-field" key={field.key}>
+            <div className="etm-ipcr-fill-field" key={field.key} onFocusCapture={() => onFieldFocus?.(field.key)} onBlurCapture={() => onFieldFocus?.(null)} onMouseEnter={() => onFieldHover?.(field.key)} onMouseLeave={() => onFieldHover?.(null)}>
               <label><Icon size={14} /> {field.label} <span className="etm-ipcr-field-cell">{field.cell}</span></label>
               <ThemedSelect<SelectOption<number>>
                 size="small"
@@ -97,9 +109,10 @@ export default function IPCRFillForm({ fields, values, meta, groups, onUpdateVal
           );
         }
         return (
-          <div className="etm-ipcr-fill-field" key={field.key}>
+          <div className="etm-ipcr-fill-field" key={field.key} onFocusCapture={() => onFieldFocus?.(field.key)} onBlurCapture={() => onFieldFocus?.(null)} onMouseEnter={() => onFieldHover?.(field.key)} onMouseLeave={() => onFieldHover?.(null)}>
             <label><Icon size={14} /> {field.label} <span className="etm-ipcr-field-cell">{field.cell}</span></label>
-            <input type={field.type === "date" ? "date" : field.type === "number" ? "number" : "text"} value={values[field.key] ?? ""} onChange={event => onUpdateValue(field.key, event.target.value)} />
+            <input type={field.type === "date" ? "date" : field.type === "number" ? "number" : "text"} value={values[field.key] ?? ""} onChange={event => onUpdateValue(field.key, event.target.value)} placeholder={field.sample && field.type !== "date" ? `e.g. ${field.sample}` : undefined} />
+            {field.sample && field.type !== "date" && <small className="etm-ipcr-sample-hint">Example: {field.sample}</small>}
           </div>
         );
       })}

@@ -455,6 +455,9 @@ export function ReportsContent({ taskBasePath = "/etms/tasks", ownTasksOnly = fa
     created: group => new Date(group.created_at).getTime(),
   });
 
+  // Nothing of the page is drawn until the data has loaded (or failed), so no half-built layout shows next to the message.
+  if (loading || error) return <TaskFeedback />;
+
   return (
     <div className="etm-reports">
       <TaskPreviewModal task={completedTasks.find(task => task.id === previewTaskId) ?? null} onClose={() => setPreviewTaskId(null)} onOpenFull={task => { setPreviewTaskId(null); navigate(`${taskBasePath}/${task.id}`); }} />

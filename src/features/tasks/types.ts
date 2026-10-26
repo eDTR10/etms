@@ -187,6 +187,8 @@ export interface Task {
   // Off: once the deadline has passed only the owner can complete the task / its subtasks.
   allow_late_submission?: boolean;
   late_submission_blocked?: boolean;
+  // True for a head (admin / officer / Chief): may allow late submission on this task.
+  can_set_late_submission?: boolean;
   // The creator's eTMS roles (and 'admin'), used to decide who outranks whom on the dashboard.
   created_by_roles?: string[];
   // Set when the viewer may take back the last turnover; holds the name of whoever has the task now.

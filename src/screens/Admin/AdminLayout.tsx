@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { isSuperAdmin } from "../Auth/roles";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -89,7 +90,7 @@ const AdminLayout = ({ title, subtitle, children }: AdminLayoutProps) => {
         </div>
 
         <nav className="flex-1 px-3 py-4 flex flex-col gap-1">
-          {NAV_ITEMS.map((item, index) => {
+          {NAV_ITEMS.filter(item => item.to !== "/etms/admin/users" || isSuperAdmin(user)).map((item, index) => {
             const isActive = pathname === item.to;
             if (isIPCRComingSoon(item.to)) {
               return (

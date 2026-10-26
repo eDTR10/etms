@@ -71,3 +71,45 @@
    the browser default (black on the dark theme). */
 .etm-form-section-body .etm-field > label, .etm-form-section-body .etm-field > legend { color: var(--etm-ink); font-size: 14px; font-weight: 600; line-height: 1.5; }
 .etm-form-section-body .etm-field { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+/* Fill-and-preview screen: the inputs in a fixed column on the left, the document filling the rest on the right.
+   (Plain CSS rather than the Tailwind breakpoint classes, which are max-width based in this project.) */
+.etm-ipcr-fill-body { display: flex; flex-direction: row; flex: 1; min-height: 0; }
+.etm-ipcr-fill-side { flex: 0 0 420px; width: 420px; min-width: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding: 16px; border-right: 1px solid var(--etm-border, var(--border)); background: color-mix(in srgb, var(--etm-surface, transparent) 60%, transparent); }
+.etm-ipcr-fill-main { flex: 1; min-width: 0; min-height: 0; overflow: auto; padding: 12px; background: color-mix(in srgb, var(--etm-surface-alt, #888) 40%, transparent); }
+@media (max-width: 900px) {
+  .etm-ipcr-fill-body { flex-direction: column; }
+  .etm-ipcr-fill-side { flex: 0 0 auto; width: auto; max-height: 46%; border-right: 0; border-bottom: 1px solid var(--etm-border, var(--border)); }
+}
+
+/* Dark-mode legibility of the "Add rows and columns" lines, and the manual-edit offer bar. */
+.etm-ipcr-fill-side .etm-ipcr-field-list > li { flex-wrap: wrap; color: var(--etm-ink); }
+.etm-ipcr-fill-side .etm-ipcr-field-list > li > span:first-child { color: var(--etm-ink); font-size: 12.5px; font-weight: 600; overflow-wrap: anywhere; }
+.etm-ipcr-manual-ask { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 8px 14px; border-bottom: 1px solid var(--etm-border, var(--border)); background: color-mix(in srgb, var(--etm-primary, #17b3ac) 12%, transparent); color: var(--etm-ink); font-size: 12.5px; }
+
+/* "Add rows and columns": the name on one line (cut with "…" if long), the two buttons together on one line under it. */
+.etm-ipcr-fill-side .etm-ipcr-field-list > li { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: center; }
+.etm-ipcr-fill-side .etm-ipcr-field-list > li > span:first-child { grid-column: 1 / -1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
+.etm-ipcr-fill-side .etm-ipcr-field-list > li > .etm-button { justify-content: center; white-space: nowrap; width: 100%; min-width: 0; }
+
+/* Designer: cells that already hold a fill-in field. Display only — drawn over the cell, never saved into its style. */
+.etm-ipcr-grid-host td[data-etm-field="cell"] { background-image: linear-gradient(rgba(23, 179, 172, .28), rgba(23, 179, 172, .28)) !important; box-shadow: inset 0 0 0 2px rgba(23, 179, 172, .85); }
+.etm-ipcr-grid-host td[data-etm-field="inline"] { background-image: linear-gradient(rgba(232, 168, 56, .28), rgba(232, 168, 56, .28)) !important; box-shadow: inset 0 0 0 2px rgba(232, 168, 56, .85); }
+
+.etm-ipcr-sample-hint { display: block; margin-top: 4px; color: var(--etm-muted, #8a97a1); font-size: 11px; font-style: italic; overflow-wrap: anywhere; }
+
+/* The cell of the input being filled in glows in the sheet beside it. */
+@keyframes etm-cell-glow { 0%, 100% { box-shadow: 0 0 0 2px rgba(23, 179, 172, .9), 0 0 10px 2px rgba(23, 179, 172, .45); } 50% { box-shadow: 0 0 0 3px rgba(23, 179, 172, 1), 0 0 24px 8px rgba(23, 179, 172, .75); } }
+.etm-ipcr-grid-host td[data-etm-glow] { position: relative; z-index: 4; outline: 2px solid #17b3ac; animation: etm-cell-glow 1.2s ease-in-out infinite; background-image: linear-gradient(rgba(23, 179, 172, .22), rgba(23, 179, 172, .22)) !important; }
+@media (prefers-reduced-motion: reduce) { .etm-ipcr-grid-host td[data-etm-glow] { animation: none; } }
+
+/* IPCR cards: the name gets the full width of the card; the action icons sit on their own row underneath. */
+.etm-ipcr-card { flex-direction: column; align-items: stretch; gap: 10px; min-height: 0; }
+.etm-ipcr-card .etm-quicklink-card-open { flex: 0 0 auto; width: 100%; }
+.etm-ipcr-card .etm-quicklink-card-body strong { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: break-word; }
+.etm-ipcr-card .etm-quicklink-card-actions { margin-top: auto; padding-top: 8px; border-top: 1px solid var(--etm-border); justify-content: flex-end; gap: 6px; }
+
+/* The row picked in the preview, to add rows above or below it. */
+.etm-ipcr-grid-host td[data-etm-picked-row] { background-image: linear-gradient(rgba(23, 179, 172, .16), rgba(23, 179, 172, .16)) !important; box-shadow: inset 0 2px 0 rgba(23, 179, 172, .9), inset 0 -2px 0 rgba(23, 179, 172, .9); }
+
+/* The cell a task is being dragged over: it glows where the drop will land. */
+.etm-ipcr-grid-host td[data-etm-drop-cell] { animation: etm-cell-glow 1s ease-in-out infinite; position: relative; z-index: 3; background-image: linear-gradient(rgba(23, 179, 172, .22), rgba(23, 179, 172, .22)) !important; }

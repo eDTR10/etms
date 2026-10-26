@@ -53,8 +53,12 @@ export default function Calendar({ basePath = "/etms/tasks", showOwner = false }
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const dayListRef = useRef<HTMLDivElement>(null);
   // Tapping a date smoothly brings the list of that day's tasks (below the grid) into view.
+  const skipNextScroll = useRef(false);
+  const autoSelected = useRef(false);
   useEffect(() => {
     if (!selectedDate) return;
+    // The day opened automatically on arrival is shown where it is, without the page jumping down to it.
+    if (skipNextScroll.current) { skipNextScroll.current = false; return; }
     const frame = requestAnimationFrame(() => dayListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
     return () => cancelAnimationFrame(frame);
   }, [selectedDate]);
@@ -96,6 +100,12 @@ export default function Calendar({ basePath = "/etms/tasks", showOwner = false }
   }, [filteredTasks, cells]);
 
   const todayKey = toDateKey(new Date());
+  // On arrival, if today already has tasks, its list is open — no need to tap the highlighted date first.
+  useEffect(() => {
+    if (autoSelected.current) return;
+    autoSelected.current = true;
+    if ((tasksByDate.get(todayKey) ?? []).length > 0) { skipNextScroll.current = true; setSelectedDate(todayKey); }
+  }, [tasksByDate, todayKey]);
   const monthLabel = viewDate.toLocaleDateString(undefined, { month: "long", year: "numeric" });
 
   function isOccurrenceCompleted(task: Task, dateKey: string): boolean {

@@ -70,21 +70,25 @@ export function TemplatesContent() {
 
   return (
     <div className="etm-reports">
-      <section className="etm-report-heading">
-        <div>
-          <p className="etm-report-eyebrow"><Bookmark size={15} /> Reusable blueprints</p>
-          <p>Save the details you retype every time, then start a new task from a template in one click.</p>
-        </div>
-        <div className="etm-report-section-title-actions">
-          {/* Import Template hidden for now:
-          <input ref={importInputRef} type="file" accept=".json,application/json" hidden onChange={event => void handleImportFile(event)} />
-          <button type="button" className="etm-button ghost" onClick={() => importInputRef.current?.click()}><Upload size={16} /> Import Template</button>
-          */}
-          <button type="button" className="etm-button" onClick={openCreate}><Plus size={16} /> New Template</button>
-        </div>
-      </section>
-
       <TaskFeedback />
+      {!loading && !error && (
+        <>
+        <section className="etm-report-heading">
+          <div>
+            <p className="etm-report-eyebrow"><Bookmark size={15} /> Reusable blueprints</p>
+            <p>Save the details you retype every time, then start a new task from a template in one click.</p>
+          </div>
+          <div className="etm-report-section-title-actions">
+            {/* Import Template hidden for now:
+            <input ref={importInputRef} type="file" accept=".json,application/json" hidden onChange={event => void handleImportFile(event)} />
+            <button type="button" className="etm-button ghost" onClick={() => importInputRef.current?.click()}><Upload size={16} /> Import Template</button>
+            */}
+            <button type="button" className="etm-button" onClick={openCreate}><Plus size={16} /> New Template</button>
+          </div>
+        </section>
+        </>
+      )}
+
       {!loading && !error && (
         <section className="etm-panel etm-table-wrap">
           <table className="etm-tasks-table etm-report-table">

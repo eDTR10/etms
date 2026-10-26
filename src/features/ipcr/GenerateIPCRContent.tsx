@@ -5,28 +5,14 @@ import Swal from "sweetalert2";
 import ThemedSelect, { type SelectOption } from "../../components/ThemedSelect";
 import { taskService, taskError } from "../tasks/taskService";
 import { useAuth } from "../../screens/Auth/AuthContext";
-import { autofillValue } from "./ipcrAutofill";
+import { startingValue } from "./ipcrAutofill";
 import { ipcrService } from "./ipcrService";
 import { downloadIPCRWorkbook } from "./ipcrExport";
 import { downloadIPCRPdf } from "./ipcrPdfExport";
 import { fillGrid } from "./ipcrGridUtils";
-import { adjectivalRating, normalizeGrid, type IPCRField, type IPCRFieldValue, type IPCRSubmission, type IPCRTemplate } from "./types";
-import type { UserProfile } from "../../screens/Auth/authService";
+import { adjectivalRating, normalizeGrid, type IPCRSubmission, type IPCRTemplate } from "./types";
 import "../tasks/forms.css";
 import "./ipcr.css";
-
-// Today as the YYYY-MM-DD a date input uses (local time, not UTC, so it is the right day late in the evening).
-function todayIso(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-}
-
-// What a field starts out as: blank, or filled from the account / today's date if the template says so.
-function startingValue(field: IPCRField, profile: UserProfile | null, officeName: string): IPCRFieldValue {
-  if (field.type === "number" || field.type === "rating" || field.type === "month" || field.type === "year") return null;
-  if (field.type === "date" && field.dateMode === "today") return todayIso();
-  return field.autofill ? autofillValue(field.autofill, profile, officeName) : "";
-}
 
 export default function GenerateIPCRContent() {
   const { user: profile } = useAuth();
@@ -54,7 +40,7 @@ export default function GenerateIPCRContent() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Makes the user's own copy of the template (with whatever the account already knows filled in) and opens it for editing.
+  // Makes the user's own copy of the template (with whatever the account already knows pre-filled) and opens it.
   async function generate() {
     const template = templates.find(item => item.id === templateId);
     if (!template) { setError("Choose a template first."); return; }
@@ -68,12 +54,16 @@ export default function GenerateIPCRContent() {
       const saved = await ipcrService.createSubmission({
         template: template.id,
         label: label.trim(),
-        grid_snapshot: fillGrid(normalizeGrid(template.grid), fields, values),
-        fields_snapshot: [],
+        // The fill-in fields stay fields: the next screen shows them as inputs (the ones the account can answer already
+        // filled in, still editable) beside a live preview of the document.
+        grid_snapshot: normalizeGrid(template.grid),
+        fields_snapshot: fields,
         paper_size: template.paper_size,
         orientation: template.orientation,
-        field_values: {},
+        field_values: values,
         field_meta: {},
+        synced_template_at: template.updated_at,
+        layout_edited: false,
       });
       navigate(`/etms/ipcr/${saved.id}`);
     } catch (caught) {
@@ -110,7 +100,6 @@ export default function GenerateIPCRContent() {
       <section className="etm-report-heading">
         <div>
           <p className="etm-report-eyebrow"><FileSpreadsheet size={15} /> Your IPCRs</p>
-          <h2>Generate IPCR</h2>
           <p>Pick a template and name your file — then edit it and drag in your grouped activities.</p>
         </div>
         {!creating && <button type="button" className="etm-button" onClick={() => { setCreating(true); setError(""); }}><Plus size={16} /> New IPCR</button>}
@@ -119,7 +108,7 @@ export default function GenerateIPCRContent() {
       {error && !creating && <p className="etm-report-error">{error}</p>}
 
       {creating && (
-        <section className="etm-panel etm-form-section" style={{ marginTop: 18 }}>
+        <section className="etm-panel etm-form-section etm-task-form" style={{ marginTop: 18 }}>
           <div className="etm-form-section-heading">
             <span className="etm-form-section-icon"><FileSpreadsheet size={19} /></span>
             <div><h2>New IPCR</h2><p>Choose a template and give your file a name.</p></div>
@@ -147,10 +136,10 @@ export default function GenerateIPCRContent() {
             </div>
             <div className="etm-field">
               <label htmlFor="ipcr-label">File name <span aria-hidden="true">*</span></label>
-              <input id="ipcr-label" value={label} onChange={event => setLabel(event.target.value)} placeholder="e.g. IPCR January to June 2026" maxLength={255} onKeyDown={event => { if (event.key === "Enter") void generate(); }} />
+              <input id="ipcr-label" type="text" autoFocus value={label} onChange={event => setLabel(event.target.value)} placeholder="e.g. IPCR January to June 2026" maxLength={255} onKeyDown={event => { if (event.key === "Enter") void generate(); }} />
             </div>
             <div className="etm-form-footer">
-              <span>You can edit the whole sheet on the next screen.</span>
+              <span>Next you fill in your details with the finished document shown beside them.</span>
               <div>
                 <button type="button" className="etm-button ghost" onClick={() => { setCreating(false); setError(""); }} disabled={saving}>Cancel</button>
                 <button type="button" className="etm-button primary" onClick={() => void generate()} disabled={saving || !templateId || !label.trim()}>{saving ? <Loader2 size={17} className="etm-form-spinner" /> : <FileSpreadsheet size={17} />}{saving ? "Generating…" : "Save & generate"}</button>
@@ -164,7 +153,7 @@ export default function GenerateIPCRContent() {
         submissions.length ? (
           <div className="etm-quicklinks-grid">
             {submissions.map(submission => (
-              <div className="etm-panel etm-quicklink-card" key={submission.id}>
+              <div className="etm-panel etm-quicklink-card etm-ipcr-card" key={submission.id}>
                 <button type="button" className="etm-quicklink-card-open" style={{ background: "none", border: 0, padding: 0, textAlign: "left", font: "inherit", color: "inherit", cursor: submission.can_manage ? "pointer" : "default" }}
                   onClick={() => { if (submission.can_manage) navigate(`/etms/ipcr/${submission.id}`); }} aria-label={`Open ${submission.label || "IPCR"}`}>
                   <span className="etm-quicklink-card-icon"><FileSpreadsheet size={19} /></span>

@@ -73,6 +73,8 @@ export const taskService = {
     (await api.post<Task>(`etm/tasks/${id}/subtasks/reorder/`, { parent: parentId, order })).data,
   officeScope: async () =>
     (await api.get<{ enabled: boolean; office_name: string | null; members: Member[]; tasks: Task[] }>("etm/tasks/office/")).data,
+  setLateSubmission: async (id: number, allow: boolean) =>
+    (await api.post<Task>(`etm/tasks/${id}/late-submission/`, { allow })).data,
   revertTurnover: async (id: number) =>
     (await api.post<Task>(`etm/tasks/${id}/revert-turnover/`)).data,
   turnoverTask: async (id: number, userId: number, note: string) =>

@@ -13,11 +13,14 @@ function TasksContent() {
   return (
     <div>
       <TaskFeedback />
-      <div className="etm-report-heading">
-        <div><p className="etm-report-eyebrow">Full access</p><h2>All Tasks</h2></div>
-        <Link to="/etms/admin/tasks/new" className="etm-button"><Plus size={16} /> New Task</Link>
-      </div>
-      {!loading && !error && <EtmMajorTasks basePath="/etms/admin/tasks" />}
+      {/* The heading waits for the data too, so nothing is drawn half-finished next to the loading message. */}
+      {!loading && !error && <>
+        <div className="etm-report-heading">
+          <div><p className="etm-report-eyebrow">Full access</p><h2>All Tasks</h2></div>
+          <Link to="/etms/admin/tasks/new" className="etm-button"><Plus size={16} /> New Task</Link>
+        </div>
+        <EtmMajorTasks basePath="/etms/admin/tasks" />
+      </>}
     </div>
   );
 }

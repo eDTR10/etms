@@ -194,6 +194,7 @@ export default function MajorTasks({ basePath = "/etms/tasks" }: MajorTasksProps
             onClick={() => setStatus(current => current === kpiStatus ? "all" : kpiStatus)}
           >
             <div className="etm-kpi-card-top"><span className="etm-kpi-label">{kpiStatus}</span><span className="etm-kpi-icon"><Icon size={17} /></span></div>
+            <span className="etm-kpi-silhouette" aria-hidden="true"><Icon size={110} strokeWidth={1.3} /></span>
             <span className="etm-kpi-value">{statusCounts[kpiStatus]}</span>
           </button>
         ))}

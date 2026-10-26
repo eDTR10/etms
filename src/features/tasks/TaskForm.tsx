@@ -85,7 +85,7 @@ function initialValues(task?: Task): FormValues {
     priority: task?.priority ?? "Medium",
     deadline: task?.deadline?.slice(0, 10) ?? "",
     eodb_compliance: task?.eodb_compliance ?? "",
-    allow_late_submission: task?.allow_late_submission ?? true,
+    allow_late_submission: task?.allow_late_submission ?? false,
     recurrence: task?.recurrence ?? "None",
     recurrence_weekdays: task?.recurrence_weekdays ?? "",
     recurrence_dates: task?.recurrence_dates ?? [],
@@ -200,6 +200,8 @@ function TaskLivePreview({ values, members }: { values: FormValues; members: Mem
 
 function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskFormProps) {
   const { user: currentUser } = useAuth();
+  // Admins, Provincial / Focal Officers and Chiefs may switch "Allow late submission?"; a Regular Employee may not.
+  const canSetLateSubmission = !!currentUser && (currentUser.is_staff || currentUser.role === "admin" || currentUser.role === "super_admin" || (currentUser.etms_roles ?? []).some(role => role !== "regular_employee"));
   const fieldId = useId();
   const formRef = useRef<HTMLFormElement>(null);
   const projectPickerRef = useRef<HTMLDivElement>(null);
@@ -517,9 +519,9 @@ function TaskFormContent({ task, members, projects, onSave, onCancel }: TaskForm
                   <input data-howto="deadline" type="date" id={`${fieldId}-deadline`} value={values.deadline ?? ""} onChange={event => update("deadline", event.target.value)} aria-invalid={!!errors.deadline} aria-describedby={errors.deadline ? `${fieldId}-deadline-error` : undefined} />
                   {errors.deadline && <p className="etm-field-error" id={`${fieldId}-deadline-error`}>{errors.deadline}</p>}
                 </div>
-                <label className={`etm-completion-control ${values.allow_late_submission ? "checked" : ""}`}>
-                  <input type="checkbox" checked={!!values.allow_late_submission} onChange={event => update("allow_late_submission", event.target.checked)} />
-                  <span><strong>Allow late submission?</strong><small>{values.allow_late_submission ? "The task can still be completed after its deadline." : "After the deadline only you (the owner) can complete it."}</small></span>
+                <label className={`etm-completion-control ${values.allow_late_submission ? "checked" : ""}`} title={canSetLateSubmission ? undefined : "Only officers and Chiefs can change this"} style={canSetLateSubmission ? undefined : { opacity: .6, cursor: "not-allowed" }}>
+                  <input type="checkbox" checked={!!values.allow_late_submission} disabled={!canSetLateSubmission} onChange={event => update("allow_late_submission", event.target.checked)} />
+                  <span><strong>Allow late submission?</strong><small>{!canSetLateSubmission ? "Only your head (a Provincial / Focal Officer or Chief) can allow late submission." : values.allow_late_submission ? "The task can still be completed after its deadline." : "After the deadline only you (the owner) can complete it."}</small></span>
                 </label>
                 <div className="etm-field">
                   <label htmlFor={`${fieldId}-eodb`}>EODB Compliance</label>

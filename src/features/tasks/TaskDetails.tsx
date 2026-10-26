@@ -1198,7 +1198,19 @@ function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = 
   const [turnoverNote, setTurnoverNote] = useState("");
   const [turningOver, setTurningOver] = useState(false);
   const [turnoverError, setTurnoverError] = useState("");
-  const { revertTurnover } = useTasks();
+  const { revertTurnover, setLateSubmission } = useTasks();
+  const [togglingLate, setTogglingLate] = useState(false);
+  async function toggleLateSubmission() {
+    if (togglingLate) return;
+    setTogglingLate(true);
+    try {
+      await setLateSubmission(task.id, !task.allow_late_submission);
+    } catch (caught) {
+      void Swal.fire({ title: "Couldn't change late submission", text: progressError(caught), icon: "error" });
+    } finally {
+      setTogglingLate(false);
+    }
+  }
   const [reverting, setReverting] = useState(false);
   async function returnTask() {
     if (reverting) return;
@@ -1341,6 +1353,12 @@ function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = 
         : <Dialog.Description asChild><div className="etm-details-description">{detailsToText(task.details) ? <RichDetails value={task.details} /> : "No description provided."}</div></Dialog.Description>}
       <div className="etm-details-badges"><span className={`etm-badge ${statusSlug(task.status)}`}><span className="etm-details-status-dot" />{task.status}</span><span className={`etm-details-priority ${task.priority.toLowerCase()}`}><Flag size={13} />{task.priority} priority</span>{task.recurrence !== "None" && <span className="etm-badge"><Repeat size={13} />{describeRecurrence(task)}</span>}</div>
       {task.late_submission_blocked && !task.is_completed && <p className="etm-details-assignee-note" role="alert"><AlertTriangle size={14} />The deadline has passed and this task does not allow late submission — only the task owner can complete it now.</p>}
+      {task.can_set_late_submission && !task.is_completed && (
+        <label className={`etm-completion-control ${task.allow_late_submission ? "checked" : ""}`} style={{ marginTop: 10, maxWidth: 520 }}>
+          <input type="checkbox" checked={!!task.allow_late_submission} disabled={togglingLate} onChange={() => void toggleLateSubmission()} />
+          <span><strong>Allow late submission</strong><small>{task.allow_late_submission ? "This task can still be completed after its deadline." : "After the deadline only the task owner can complete it."}</small></span>
+        </label>
+      )}
       {(task.completed_at || task.occurrence_completions.some(item => item.is_completed)) && (
         <div className="etm-details-completed-note" role="note">
           <CheckCheck size={14} />

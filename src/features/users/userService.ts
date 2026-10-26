@@ -3,6 +3,7 @@ import api from "../../plugin/axios";
 
 export const USER_ROLES = [
   { value: "user", label: "User" },
+  { value: "super_admin", label: "Super Admin" },
   { value: "admin", label: "Admin" },
   { value: "budget", label: "Budget" },
   { value: "accounting", label: "Accounting" },

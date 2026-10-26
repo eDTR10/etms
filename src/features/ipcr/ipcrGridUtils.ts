@@ -1,6 +1,9 @@
 import { adjectivalRating, MONTH_NAMES, type IPCRField, type IPCRFieldValue, type IPCRGridData, type IPCRRichTextRun } from "./types";
 import type { GroupedTask } from "../tasks/types";
 
+// Drag type used when a task or grouped task is dragged from the list onto a cell of the sheet.
+export const TASK_DRAG_TYPE = "application/x-etm-ipcr-task";
+
 export function composeGroupedTasksHtml(groupIds: number[], groups: GroupedTask[]): string {
   return groupIds
     .map(id => groups.find(group => group.id === id))
@@ -331,6 +334,53 @@ const TOKEN_EVERYWHERE = /\{\{([a-z][a-z0-9_]*)\}\}/g;
 
 // Replaces the text between `start` and `end` (positions in the runs' combined text) with `replacement`,
 // which takes the formatting of the run it lands in — so a field made from a bold word stays bold.
+// Turns bold / italic / underline on (or, when the whole stretch already has it, off) for just the characters between
+// `start` and `end` of the runs' combined text, splitting the runs at those two points; the rest keeps what it had.
+export function applyStyleToRunsRange(runs: IPCRRichTextRun[], start: number, end: number, property: "bold" | "italic" | "underline"): IPCRRichTextRun[] {
+  const pieces: { run: IPCRRichTextRun; inside: boolean }[] = [];
+  let position = 0;
+  runs.forEach(run => {
+    const runStart = position;
+    const runEnd = position + run.text.length;
+    position = runEnd;
+    const cutStart = Math.max(start, runStart);
+    const cutEnd = Math.min(end, runEnd);
+    if (cutStart >= cutEnd) { pieces.push({ run, inside: false }); return; }
+    if (cutStart > runStart) pieces.push({ run: { ...run, text: run.text.slice(0, cutStart - runStart) }, inside: false });
+    pieces.push({ run: { ...run, text: run.text.slice(cutStart - runStart, cutEnd - runStart) }, inside: true });
+    if (cutEnd < runEnd) pieces.push({ run: { ...run, text: run.text.slice(cutEnd - runStart) }, inside: false });
+  });
+  const turnOn = !pieces.filter(piece => piece.inside).every(piece => piece.run[property]);
+  const styled = pieces.map(({ run, inside }) => inside ? { ...run, [property]: turnOn } : run).filter(run => run.text.length > 0);
+  // Neighbours that ended up identical become one run again.
+  return styled.reduce<IPCRRichTextRun[]>((merged, run) => {
+    const last = merged[merged.length - 1];
+    if (last && !!last.bold === !!run.bold && !!last.italic === !!run.italic && !!last.underline === !!run.underline && last.link === run.link) last.text += run.text;
+    else merged.push({ ...run });
+    return merged;
+  }, []);
+}
+
+export interface MergeConflict { a: string; b: string }
+
+function mergeRange(anchor: string, [colspan, rowspan]: [number, number]): { col: number; row: number; col2: number; row2: number; label: string } {
+  const { col, row } = cellCoords(anchor);
+  return { col, row, col2: col + colspan - 1, row2: row + rowspan - 1, label: `${anchor}:${cellName(col + colspan - 1, row + rowspan - 1)}` };
+}
+
+// Merged cells that overlap each other (a sheet cannot have those), named by range, e.g. "C12:F12" and "E12:H13".
+export function findMergeConflicts(grid: IPCRGridData): MergeConflict[] {
+  const ranges = Object.entries(grid.mergeCells ?? {}).map(([anchor, spans]) => mergeRange(anchor, spans));
+  const conflicts: MergeConflict[] = [];
+  for (let i = 0; i < ranges.length; i++) {
+    for (let j = i + 1; j < ranges.length; j++) {
+      const a = ranges[i], b = ranges[j];
+      if (a.col <= b.col2 && b.col <= a.col2 && a.row <= b.row2 && b.row <= a.row2) conflicts.push({ a: a.label, b: b.label });
+    }
+  }
+  return conflicts;
+}
+
 export function replaceRunsRange(runs: IPCRRichTextRun[], start: number, end: number, replacement: string): IPCRRichTextRun[] {
   const clamp = (value: number, length: number) => Math.max(0, Math.min(length, value));
   const total = runs.reduce((sum, run) => sum + run.text.length, 0);

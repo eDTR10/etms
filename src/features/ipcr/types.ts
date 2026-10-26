@@ -33,8 +33,10 @@ export interface IPCRField {
   // Date fields: "today" starts the date filled in with the day the IPCR is made; "choose" (the default) leaves it for the
   // person to pick. Either way they can change it.
   dateMode?: "today" | "choose";
-  // Start this field with the signed-in user's own information.
-  autofill?: IPCRAutofill;
+  // Start this field with the signed-in user's own information. One kind, or several joined with ", " (e.g. designation + office).
+  autofill?: IPCRAutofill | IPCRAutofill[];
+  // An example answer, shown to whoever fills this field in as a guide (the greyed hint in the box and a line beneath it).
+  sample?: string;
   // Made from text highlighted inside a larger cell: only that text is replaced, not the whole cell.
   inline?: boolean;
   // The text an inline field replaced (e.g. "<NAME>"), put back if the field is removed.
@@ -84,7 +86,11 @@ export interface IPCRRichTextRun {
 
 // Rows / columns the template's author marked as repeatable: whoever fills in the IPCR may add a copy before and/or
 // after each one. Keyed by the row / column index (0-based).
-export interface IPCRBreakpoint { before: boolean; after: boolean }
+// `addedAfter` counts the rows / columns a person has already added below / after this one while filling in, so the next one
+// goes after the last of them (in order) instead of squeezing in right under the original.
+// `kind`: "item" (the default) is a row people may add more of; "section" is a heading row (e.g. a Key Result Area) whose look is
+// copied when a new section is added — it is not itself something to repeat.
+export interface IPCRBreakpoint { before: boolean; after: boolean; addedAfter?: number; kind?: "item" | "section" }
 export interface IPCRExpandable { rows: Record<number, IPCRBreakpoint>; cols: Record<number, IPCRBreakpoint> }
 
 export interface IPCRGridData {
@@ -99,6 +105,8 @@ export interface IPCRGridData {
   // Where the top-left corner of cell A1 sat inside the area `images` are positioned in (px), measured when
   // the snapshot was taken. Lets exports convert an image's on-screen x/y into a position over the table.
   imageOrigin?: { x: number; y: number };
+  // Rows a new printed page starts at ("start a new page here"); a break a merged cell runs across is ignored.
+  pageBreaks?: number[];
   // Name of the source .xlsx sheet/tab this layout was imported from, if any — carried
   // through so a later .xlsx export re-uses it instead of always falling back to "IPCR".
   sheetName?: string;
@@ -176,6 +184,9 @@ export interface IPCRSubmission {
   field_values: Record<string, IPCRFieldValue>;
   field_meta: Record<string, IPCRFieldMetaEntry>;
   final_rating: number | null;
+  // The template version this IPCR last matched, and whether the person changed the sheet itself (see ipcrSync.ts).
+  synced_template_at?: string | null;
+  layout_edited?: boolean;
   created_at: string;
   updated_at: string;
   can_manage: boolean;

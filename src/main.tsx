@@ -10,6 +10,7 @@ import Loader from './components/loader/loader.tsx';
 import { AuthProvider, useAuth } from './screens/Auth/AuthContext.tsx';
 import ProtectedRoute from './screens/Auth/ProtectedRoute.tsx';
 import AdminRoute from './screens/Auth/AdminRoute.tsx';
+import SuperAdminRoute from './screens/Auth/SuperAdminRoute.tsx';
 import GuestRoute from './screens/Auth/GuestRoute.tsx';
 import { getHomePath } from './screens/Auth/roles.ts';
 import { ThemeProvider } from './components/theme-provider.tsx';
@@ -197,7 +198,7 @@ const router = createBrowserRouter([
   },
   {
     path: "/etms/admin/users",
-    element: <AdminRoute><Suspense fallback={<Loader />}><AdminUsers /></Suspense></AdminRoute>,
+    element: <SuperAdminRoute><Suspense fallback={<Loader />}><AdminUsers /></Suspense></SuperAdminRoute>,
   },
   {
     path: "/etms/admin/profile",

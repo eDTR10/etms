@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Bold, Italic, Link2, List, Underline } from "lucide-react";
+import { Bold, Italic, Link2, List, MousePointerClick, Underline } from "lucide-react";
 import Swal from "sweetalert2";
 import "../tasks/forms.css";
 
@@ -8,6 +8,9 @@ interface IPCRRichTextFieldProps {
   onChange: (html: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  // When given, the toolbar gets a "make a fill-in field" button: it hands over the highlighted words and a function that
+  // swaps those words for the given text, keeping the formatting they had.
+  onMakeField?: (selectedText: string, replaceSelection: (token: string) => void) => void;
 }
 
 // Is the caret exactly at the start of this list item's text (nothing before it inside the item)?
@@ -18,7 +21,7 @@ function caretAtStartOf(item: HTMLElement, range: Range): boolean {
   return before.toString() === "";
 }
 
-export default function IPCRRichTextField({ value, onChange, placeholder, disabled }: IPCRRichTextFieldProps) {
+export default function IPCRRichTextField({ value, onChange, placeholder, disabled, onMakeField }: IPCRRichTextFieldProps) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { if (ref.current && ref.current.innerHTML !== value) ref.current.innerHTML = value; }, [value]);
 
@@ -56,6 +59,22 @@ export default function IPCRRichTextField({ value, onChange, placeholder, disabl
     else if (saved.collapsed) document.execCommand("insertHTML", false, `<a href="${url.replace(/"/g, "&quot;")}">${url.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</a>`);
     else document.execCommand("createLink", false, url);
     emit();
+  }
+
+  function makeField() {
+    const editor = ref.current;
+    const selection = window.getSelection();
+    if (!editor || !onMakeField) return;
+    const inside = !!selection && selection.rangeCount > 0 && editor.contains(selection.anchorNode);
+    const saved = inside ? selection!.getRangeAt(0).cloneRange() : null;
+    const text = saved ? saved.toString() : "";
+    onMakeField(text, token => {
+      editor.focus();
+      if (saved) { const current = window.getSelection(); current?.removeAllRanges(); current?.addRange(saved); }
+      // insertText takes on the formatting of the words it replaces, so a bold word stays bold.
+      document.execCommand("insertText", false, token);
+      emit();
+    });
   }
 
   function onKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
@@ -100,6 +119,7 @@ export default function IPCRRichTextField({ value, onChange, placeholder, disabl
         <button type="button" onMouseDown={event => event.preventDefault()} onClick={() => format("underline")} aria-label="Underline"><Underline size={14} /></button>
         <button type="button" onMouseDown={event => event.preventDefault()} onClick={() => format("insertUnorderedList")} aria-label="Bullet list" title="Bullet list (or type - then Space)"><List size={14} /></button>
         <button type="button" onMouseDown={event => event.preventDefault()} onClick={() => void addLink()} aria-label="Link" title="Add or edit a link"><Link2 size={14} /></button>
+        {onMakeField && <button type="button" onMouseDown={event => event.preventDefault()} onClick={makeField} aria-label="Make the highlighted words a fill-in field" title="Make the highlighted words a fill-in field" style={{ width: "auto", padding: "0 8px", gap: 5, display: "inline-flex", alignItems: "center", fontSize: 11, fontWeight: 600 }}><MousePointerClick size={14} />Make field</button>}
       </div>
       <div
         ref={ref}
