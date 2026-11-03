@@ -1,6 +1,6 @@
 import type { UserProfile } from "../../screens/Auth/authService";
 import type { Project } from "../tasks/types";
-import type { DtmsDocumentTemplate, DtmsFieldValue, DtmsPeopleAttr, DtmsSignatoryEntry, DtmsSignatoryUser, DtmsTemplateFormField, DtmsTemplateRouting } from "./dtmsDocumentTypes";
+import type { DtmsDocumentStatus, DtmsDocumentTemplate, DtmsFieldValue, DtmsPeopleAttr, DtmsSignatoryEntry, DtmsSignatoryUser, DtmsTemplateFormField, DtmsTemplateRouting } from "./dtmsDocumentTypes";
 
 // Ported from DMT-Front-end's CreateDocument.tsx — evaluates a field's depends_on/
 // condition_operator/condition_value against the current answers. A field with no
@@ -107,4 +107,10 @@ export function templateIncompatibilityReason(template: DtmsDocumentTemplate): s
   if (unsupportedStep) return `Routes through a "${unsupportedStep.role === "next_document" ? "Next Document" : "Manual Step"}" step, which isn't supported here yet — use DMT instead.`;
 
   return null;
+}
+
+// The newest signed copy of a DTMS document, or null while nothing has been signed yet.
+export function latestSignedFileUrl(status: DtmsDocumentStatus | null | undefined): string | null {
+  const signed = (status?.files ?? []).filter(file => file.file_type === "signed" && file.file_url);
+  return signed.length ? signed[signed.length - 1].file_url : null;
 }

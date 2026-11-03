@@ -189,6 +189,8 @@ export interface IPCRSubmission {
   // The template version this IPCR last matched, and whether the person changed the sheet itself (see ipcrSync.ts).
   synced_template_at?: string | null;
   layout_edited?: boolean;
+  // Tracking number of the DTMS document made from this IPCR's PDF ('' when none).
+  dtms_tracknumber?: string;
   created_at: string;
   updated_at: string;
   can_manage: boolean;

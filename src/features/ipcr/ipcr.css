@@ -125,3 +125,23 @@
 
 .etm-ipcr-image-reset { position: absolute; left: 0; top: -26px; display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border: 0; border-radius: 6px; background: #0d8a92; color: #fff; font: 600 10.5px/1 inherit; white-space: nowrap; cursor: pointer; box-shadow: 0 2px 8px #0004; }
 .etm-ipcr-image-reset:hover { filter: brightness(1.1); }
+
+/* IPCR cards: header, DTMS signing strip, labelled footer actions */
+.etm-ipcr-card { padding: 18px; gap: 14px; border-radius: 14px; }
+.etm-ipcr-card .etm-quicklink-card-icon { width: 42px; height: 42px; flex-basis: 42px; border-radius: 12px; }
+.etm-ipcr-card .etm-quicklink-card-body strong { font-size: 15px; }
+.etm-ipcr-doc { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; padding: 10px 12px; border: 1px solid var(--etm-border); border-radius: 10px; background: var(--etm-surface-alt); }
+.etm-ipcr-doc-label { width: 100%; color: var(--etm-muted); font-size: 10.5px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; }
+.etm-ipcr-doc-actions { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; }
+.etm-ipcr-doc-create { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 9px 12px; border: 1px dashed var(--etm-border); border-radius: 10px; background: transparent; color: var(--etm-muted); font-family: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.etm-ipcr-doc-create:hover:not(:disabled) { border-color: var(--etm-primary); color: var(--etm-primary); }
+.etm-ipcr-card-footer { display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--etm-border); }
+.etm-ipcr-card-footer .etm-button { gap: 6px; }
+.etm-ipcr-card-delete { margin-left: auto; }
+/* Keep the footer inside the card: wrap instead of overflowing, trash stays on the same row when it fits */
+.etm-ipcr-card { min-width: 0; box-sizing: border-box; }
+.etm-ipcr-card-footer { flex-wrap: wrap; min-width: 0; gap: 6px; }
+.etm-ipcr-card-footer .etm-button { padding-left: 10px; padding-right: 10px; }
+.etm-ipcr-card-footer .etm-button.primary { flex: 1 1 auto; justify-content: center; }
+.etm-ipcr-card-delete { flex: 0 0 auto; }
+.etm-ipcr-card { min-width: min(320px, 100%); }

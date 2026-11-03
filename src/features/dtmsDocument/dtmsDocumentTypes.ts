@@ -114,6 +114,14 @@ export interface DtmsDocumentStatusSignatory {
 
 // The read-only slice of DocumentSerializer this app needs for the status chip and its
 // click-through detail view.
+// One attachment on a DTMS document. file_type 'signed' marks a copy that has been signed.
+export interface DtmsDocumentFileInfo {
+  id: number;
+  file_url: string | null;
+  file_type: string;
+  uploaded_at?: string;
+}
+
 export interface DtmsDocumentStatus {
   id: number;
   tracknumber: string;
@@ -128,6 +136,8 @@ export interface DtmsDocumentStatus {
   rejected_count: number;
   to_office_name: string | null;
   signatories: DtmsDocumentStatusSignatory[];
+  files?: DtmsDocumentFileInfo[];
+  file_url?: string | null;
 }
 
 export type DtmsFieldValue = string | string[];

@@ -16,6 +16,8 @@ interface CreateDocumentFormProps {
   // default_document_template hint (set when it was created from a Task Template). Ignored
   // if that template can't be found or isn't supported here — the picker just starts blank.
   initialTemplateId?: number | null;
+  // Files already attached when the form opens (e.g. a generated IPCR PDF); the user can still remove or add more.
+  initialFiles?: File[];
   onCreated: (tracknumber: string) => Promise<void>;
   onCancel: () => void;
 }
@@ -97,7 +99,7 @@ function DynamicField({ field, value, onChange, fieldId }: {
   return <input id={fieldId} type={inputType} value={value as string} onChange={event => onChange(event.target.value)} required={field.required} />;
 }
 
-export default function CreateDocumentForm({ defaultTitle, initialTemplateId, onCreated, onCancel }: CreateDocumentFormProps) {
+export default function CreateDocumentForm({ defaultTitle, initialTemplateId, initialFiles, onCreated, onCancel }: CreateDocumentFormProps) {
   const fieldId = useId();
   const { user } = useAuth();
   const { projects, dtmsDocumentTemplates: templates } = useTasks();
@@ -114,7 +116,7 @@ export default function CreateDocumentForm({ defaultTitle, initialTemplateId, on
   const [message, setMessage] = useState("");
   const [formFieldValues, setFormFieldValues] = useState<Record<number, DtmsFieldValue>>({});
   const [signatories, setSignatories] = useState<EditableSignatoryEntry[]>([]);
-  const [files, setFiles] = useState<File[]>([]);
+  const [files, setFiles] = useState<File[]>(initialFiles ?? []);
 
   const [sigPickerOpen, setSigPickerOpen] = useState(false);
   const [sigSearch, setSigSearch] = useState("");

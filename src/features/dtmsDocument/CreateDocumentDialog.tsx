@@ -6,11 +6,12 @@ interface CreateDocumentDialogProps {
   open: boolean;
   defaultTitle: string;
   initialTemplateId?: number | null;
+  initialFiles?: File[];
   onClose: () => void;
   onCreated: (tracknumber: string) => Promise<void>;
 }
 
-export default function CreateDocumentDialog({ open, defaultTitle, initialTemplateId, onClose, onCreated }: CreateDocumentDialogProps) {
+export default function CreateDocumentDialog({ open, defaultTitle, initialTemplateId, initialFiles, onClose, onCreated }: CreateDocumentDialogProps) {
   if (!open) return null;
   return (
     <Dialog.Root open={open} onOpenChange={next => { if (!next) onClose(); }}>
@@ -22,7 +23,7 @@ export default function CreateDocumentDialog({ open, defaultTitle, initialTempla
             <Dialog.Close asChild><button type="button" className="etm-icon-button" aria-label="Close"><X size={18} /></button></Dialog.Close>
           </div>
           <div className="etm-taskform-dialog-body">
-            <CreateDocumentForm defaultTitle={defaultTitle} initialTemplateId={initialTemplateId} onCreated={async tracknumber => { await onCreated(tracknumber); onClose(); }} onCancel={onClose} />
+            <CreateDocumentForm defaultTitle={defaultTitle} initialTemplateId={initialTemplateId} initialFiles={initialFiles} onCreated={async tracknumber => { await onCreated(tracknumber); onClose(); }} onCancel={onClose} />
           </div>
         </Dialog.Content>
       </Dialog.Portal>

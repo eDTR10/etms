@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Download, FileSpreadsheet, FileText, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { Download, FilePlus2, FileSpreadsheet, FileText, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import Swal from "sweetalert2";
 import ThemedSelect, { type SelectOption } from "../../components/ThemedSelect";
 import { taskService, taskError } from "../tasks/taskService";
@@ -8,7 +8,13 @@ import { useAuth } from "../../screens/Auth/AuthContext";
 import { startingValue } from "./ipcrAutofill";
 import { ipcrService } from "./ipcrService";
 import { downloadIPCRWorkbook } from "./ipcrExport";
-import { downloadIPCRPdf } from "./ipcrPdfExport";
+import { buildIPCRPdfBlob, downloadIPCRPdf } from "./ipcrPdfExport";
+import CreateDocumentDialog from "../dtmsDocument/CreateDocumentDialog";
+import { DocumentActionButtons, DocumentStatusChip, openInDmt } from "../dtmsDocument/SubtaskDocumentControls";
+import { dtmsDocumentService } from "../dtmsDocument/dtmsDocumentService";
+import type { DtmsDocumentStatus } from "../dtmsDocument/dtmsDocumentTypes";
+import { latestSignedFileUrl } from "../dtmsDocument/dtmsDocumentUtils";
+import api from "../../plugin/axios";
 import { fillGrid } from "./ipcrGridUtils";
 import { adjectivalRating, normalizeGrid, type IPCRSubmission, type IPCRTemplate } from "./types";
 import "../tasks/forms.css";
@@ -92,6 +98,97 @@ export default function GenerateIPCRContent() {
     }
   }
 
+  // DTMS: start a blank (no template) document with this IPCR's PDF already attached.
+  const [dtmsDraft, setDtmsDraft] = useState<{ id: number; title: string; file: File } | null>(null);
+  const [docStatuses, setDocStatuses] = useState<Record<string, DtmsDocumentStatus | null>>({});
+  const [docLoading, setDocLoading] = useState<Record<string, boolean>>({});
+  async function loadDocStatus(tracknumber: string) {
+    setDocLoading(current => ({ ...current, [tracknumber]: true }));
+    try {
+      const status = await dtmsDocumentService.getStatus(tracknumber);
+      setDocStatuses(current => ({ ...current, [tracknumber]: status }));
+    } catch {
+      setDocStatuses(current => ({ ...current, [tracknumber]: null }));
+    } finally {
+      setDocLoading(current => ({ ...current, [tracknumber]: false }));
+    }
+  }
+  // Fetch each linked document's live status once the list is in (and again for newly linked ones).
+  useEffect(() => {
+    submissions.forEach(item => {
+      if (item.dtms_tracknumber && !(item.dtms_tracknumber in docStatuses)) void loadDocStatus(item.dtms_tracknumber);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submissions]);
+  // PDF button: once the linked DTMS document has a signed copy, that is what gets downloaded.
+  async function downloadPdf(submission: IPCRSubmission) {
+    const tracknumber = submission.dtms_tracknumber;
+    const generated = () => downloadIPCRPdf(fillGrid(normalizeGrid(submission.grid_snapshot), submission.fields_snapshot, submission.field_values), filename(submission), submission.paper_size, submission.orientation);
+    if (!tracknumber) { generated(); return; }
+    let status = docStatuses[tracknumber] ?? null;
+    try { status = await dtmsDocumentService.getStatus(tracknumber); setDocStatuses(current => ({ ...current, [tracknumber]: status })); } catch { /* use what we already have */ }
+    const signedUrl = latestSignedFileUrl(status);
+    if (!signedUrl) {
+      const choice = await Swal.fire({
+        title: "Not signed yet",
+        text: `${tracknumber} has no signed copy in DTMS${status ? ` (status: ${status.status})` : ""}. Download the unsigned PDF instead?`,
+        icon: "info", showCancelButton: true, confirmButtonText: "Download unsigned", cancelButtonText: "Cancel",
+      });
+      if (choice.isConfirmed) generated();
+      return;
+    }
+    try {
+      const response = await api.get<Blob>(signedUrl, { responseType: "blob" });
+      const href = URL.createObjectURL(response.data);
+      const link = document.createElement("a");
+      link.href = href; link.download = `${filename(submission)}-signed.pdf`;
+      document.body.appendChild(link); link.click(); link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(href), 1000);
+    } catch {
+      window.open(signedUrl, "_blank", "noopener,noreferrer");
+    }
+  }
+  async function setDocLink(id: number, tracknumber: string) {
+    const updated = await ipcrService.updateSubmission(id, { dtms_tracknumber: tracknumber });
+    setSubmissions(current => current.map(item => item.id === id ? { ...item, dtms_tracknumber: updated.dtms_tracknumber ?? tracknumber } : item));
+  }
+  async function unlinkDoc(submission: IPCRSubmission) {
+    const result = await Swal.fire({
+      title: "Unlink this document?",
+      text: `"${submission.dtms_tracknumber}" stays in DTMS untouched — only the link from this IPCR is removed.`,
+      icon: "warning", showCancelButton: true, confirmButtonText: "Unlink", cancelButtonText: "Cancel",
+    });
+    if (!result.isConfirmed) return;
+    try { await setDocLink(submission.id, ""); } catch (caught) { void Swal.fire({ title: "Couldn't unlink", text: taskError(caught), icon: "error" }); }
+  }
+  const [preparingId, setPreparingId] = useState<number | null>(null);
+  async function startDtmsDocument(submission: IPCRSubmission) {
+    if (preparingId !== null) return;
+    setPreparingId(submission.id);
+    try {
+      const blob = await buildIPCRPdfBlob(fillGrid(normalizeGrid(submission.grid_snapshot), submission.fields_snapshot, submission.field_values), submission.paper_size, submission.orientation);
+      setDtmsDraft({ id: submission.id, title: submission.label || "IPCR", file: new File([blob], `${filename(submission)}.pdf`, { type: "application/pdf" }) });
+    } catch (caught) {
+      void Swal.fire({ title: "Couldn't prepare the PDF", text: taskError(caught), icon: "error" });
+    } finally {
+      setPreparingId(null);
+    }
+  }
+  async function dtmsCreated(tracknumber: string) {
+    const draftId = dtmsDraft?.id;
+    if (draftId !== undefined) {
+      try { await setDocLink(draftId, tracknumber); } catch { /* document exists in DTMS either way; the link can be re-made */ }
+    }
+    const result = await Swal.fire({
+      title: "Document created",
+      text: `Tracking number ${tracknumber}. The IPCR PDF is attached.`,
+      icon: "success",
+      showCancelButton: !!import.meta.env.VITE_DMT_FRONTEND_URL,
+      confirmButtonText: "Done",
+      cancelButtonText: "Open in DTMS",
+    });
+    if (result.dismiss === Swal.DismissReason.cancel) openInDmt(tracknumber);
+  }
   const filename = (submission: IPCRSubmission) => `IPCR-${(submission.label || "form").replace(/\s+/g, "-")}`;
   const chosen = templates.find(template => template.id === templateId);
 
@@ -164,17 +261,28 @@ export default function GenerateIPCRContent() {
                     <span className="etm-quicklink-card-url">Updated {new Date(submission.updated_at).toLocaleDateString()}</span>
                   </span>
                 </button>
-                <div className="etm-quicklink-card-actions">
-                  {submission.can_manage && <button type="button" className="etm-icon-button" aria-label="Edit" title="Edit" onClick={() => navigate(`/etms/ipcr/${submission.id}`)}><Pencil size={15} /></button>}
-                  <button type="button" className="etm-icon-button" aria-label="Download Excel" title="Download Excel" onClick={() => void downloadIPCRWorkbook(fillGrid(normalizeGrid(submission.grid_snapshot), submission.fields_snapshot, submission.field_values), filename(submission))}><Download size={15} /></button>
-                  <button type="button" className="etm-icon-button" aria-label="Download PDF" title="Download PDF" onClick={() => downloadIPCRPdf(fillGrid(normalizeGrid(submission.grid_snapshot), submission.fields_snapshot, submission.field_values), filename(submission), submission.paper_size, submission.orientation)}><FileText size={15} /></button>
-                  {submission.can_manage && <button type="button" className="etm-icon-button danger" aria-label="Delete" title="Delete" onClick={() => void confirmDelete(submission)}><Trash2 size={15} /></button>}
+                {submission.dtms_tracknumber ? (
+                  <div className="etm-ipcr-doc">
+                    <span className="etm-ipcr-doc-label">DTMS document</span>
+                    <DocumentStatusChip tracknumber={submission.dtms_tracknumber} status={docStatuses[submission.dtms_tracknumber] ?? null} loading={!!docLoading[submission.dtms_tracknumber]} />
+                    <span className="etm-ipcr-doc-actions"><DocumentActionButtons subtaskTitle={submission.label || "IPCR"} tracknumber={submission.dtms_tracknumber} refreshing={!!docLoading[submission.dtms_tracknumber]} unlinking={false} onRefresh={() => void loadDocStatus(submission.dtms_tracknumber!)} onUnlink={() => void unlinkDoc(submission)} /></span>
+                  </div>
+                ) : (
+                  <button type="button" className="etm-ipcr-doc-create" disabled={preparingId === submission.id} onClick={() => void startDtmsDocument(submission)}>{preparingId === submission.id ? <Loader2 size={14} className="etm-form-spinner" /> : <FilePlus2 size={14} />}Send for signing in DTMS</button>
+                )}
+                <div className="etm-ipcr-card-footer">
+                  {submission.can_manage && <button type="button" className="etm-button primary small" onClick={() => navigate(`/etms/ipcr/${submission.id}`)}><Pencil size={14} />Edit</button>}
+                  <button type="button" className="etm-button ghost small" title={latestSignedFileUrl(submission.dtms_tracknumber ? docStatuses[submission.dtms_tracknumber] : null) ? "Download the signed copy from DTMS" : "Download PDF"} onClick={() => void downloadPdf(submission)}><FileText size={15} />{latestSignedFileUrl(submission.dtms_tracknumber ? docStatuses[submission.dtms_tracknumber] : null) ? "Signed PDF" : "PDF"}</button>
+                  <button type="button" className="etm-button ghost small" title="Download Excel" onClick={() => void downloadIPCRWorkbook(fillGrid(normalizeGrid(submission.grid_snapshot), submission.fields_snapshot, submission.field_values), filename(submission))}><Download size={15} />Excel</button>
+                  {submission.can_manage && <button type="button" className="etm-icon-button danger etm-ipcr-card-delete" aria-label="Delete" title="Delete" onClick={() => void confirmDelete(submission)}><Trash2 size={15} /></button>}
                 </div>
               </div>
             ))}
           </div>
         ) : <p className="etm-empty-row">No IPCRs generated yet. Create one to get started.</p>
       )}
+
+      <CreateDocumentDialog open={!!dtmsDraft} defaultTitle={dtmsDraft?.title ?? ""} initialFiles={dtmsDraft ? [dtmsDraft.file] : undefined} onClose={() => setDtmsDraft(null)} onCreated={dtmsCreated} />
     </div>
   );
 }
