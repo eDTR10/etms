@@ -120,10 +120,10 @@ export default function GenerateIPCRContent() {
               <ThemedSelect<SelectOption<number>>
                 inputId="ipcr-template"
                 classNamePrefix="etm-ipcr-template-select"
-                isDisabled={templates.length === 0}
+                isDisabled={templates.every(template => template.is_enabled === false)}
                 isSearchable
-                placeholder={templates.length ? "Choose an IPCR template…" : "No IPCR templates available"}
-                options={templates.map(template => ({ value: template.id, label: template.name }))}
+                placeholder={templates.some(template => template.is_enabled !== false) ? "Choose an IPCR template…" : "No IPCR templates available"}
+                options={templates.filter(template => template.is_enabled !== false).map(template => ({ value: template.id, label: template.name }))}
                 value={chosen ? { value: chosen.id, label: chosen.name } : null}
                 onChange={option => setTemplateId(option?.value ?? null)}
               />

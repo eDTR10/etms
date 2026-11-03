@@ -1,16 +1,25 @@
 import { useEffect, useRef, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { RotateCcw, Trash2 } from "lucide-react";
 import type { IPCRGridImage } from "./types";
 
 interface IPCRGridImageOverlayProps {
   images: IPCRGridImage[];
   editable: boolean;
   onChange?: (images: IPCRGridImage[]) => void;
+  // Where each picture started out (e.g. in the template). A picture that has moved from there offers "Reset position".
+  originals?: IPCRGridImage[];
+  // Called once at the start of every change (a drag, a resize, a removal, a reset) so the owner can remember the picture
+  // list as it was for undo.
+  onGestureStart?: () => void;
 }
 
-export default function IPCRGridImageOverlay({ images, editable, onChange }: IPCRGridImageOverlayProps) {
+export default function IPCRGridImageOverlay({ images, editable, onChange, originals, onGestureStart }: IPCRGridImageOverlayProps) {
+  const gestureStartRef = useRef(onGestureStart);
+  gestureStartRef.current = onGestureStart;
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [resizingId, setResizingId] = useState<string | null>(null);
+  // The picture that was tapped: only it shows its outline, remove button and resize handle.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
   const resizeStart = useRef({ x: 0, y: 0, width: 0, height: 0 });
@@ -25,6 +34,8 @@ export default function IPCRGridImageOverlay({ images, editable, onChange }: IPC
     event.preventDefault();
     const host = overlayRef.current?.getBoundingClientRect();
     dragOffset.current = { x: event.clientX - (host?.left ?? 0) - image.x, y: event.clientY - (host?.top ?? 0) - image.y };
+    setSelectedId(image.id);
+    gestureStartRef.current?.();
     setDraggingId(image.id);
   }
 
@@ -33,8 +44,17 @@ export default function IPCRGridImageOverlay({ images, editable, onChange }: IPC
     event.preventDefault();
     event.stopPropagation();
     resizeStart.current = { x: event.clientX, y: event.clientY, width: image.width, height: image.height };
+    gestureStartRef.current?.();
     setResizingId(image.id);
   }
+
+  // Tapping anywhere else puts the controls away.
+  useEffect(() => {
+    if (!selectedId) return;
+    const away = (event: PointerEvent) => { if (!(event.target as HTMLElement | null)?.closest?.(".etm-ipcr-image-item")) setSelectedId(null); };
+    window.addEventListener("pointerdown", away, true);
+    return () => window.removeEventListener("pointerdown", away, true);
+  }, [selectedId]);
 
   // Follow the pointer across the WHOLE window for the length of a drag/resize. Listening on the
   // image box itself lost the gesture whenever the pointer moved faster than the box could follow
@@ -54,7 +74,8 @@ export default function IPCRGridImageOverlay({ images, editable, onChange }: IPC
         update(image => ({ ...image, width, height }));
       } else {
         const x = Math.max(0, event.clientX - host.left - dragOffset.current.x);
-        const y = Math.max(0, event.clientY - host.top - dragOffset.current.y);
+        // A picture may go above the sheet, into the blank space over it (a logo sitting in the page margin).
+        const y = Math.max(-58, event.clientY - host.top - dragOffset.current.y);
         update(image => ({ ...image, x, y }));
       }
     };
@@ -74,22 +95,38 @@ export default function IPCRGridImageOverlay({ images, editable, onChange }: IPC
       {images.map(image => (
         <div
           key={image.id}
-          className={`etm-ipcr-image-item ${editable ? "editable" : ""}`}
+          className={`etm-ipcr-image-item ${editable ? "editable" : ""} ${editable && selectedId === image.id ? "selected" : ""}`}
           style={{ left: image.x, top: image.y, width: image.width, height: image.height, touchAction: editable ? "none" : undefined }}
           onPointerDown={event => startDrag(event, image)}
         >
           <img src={image.dataUrl} alt="" draggable={false} />
-          {editable && onChange && (
+          {editable && onChange && selectedId === image.id && (
             <>
               <button
                 type="button"
                 className="etm-ipcr-image-remove"
                 aria-label="Remove image"
                 onPointerDown={event => event.stopPropagation()}
-                onClick={() => onChange(images.filter(item => item.id !== image.id))}
+                onClick={() => { gestureStartRef.current?.(); onChange(images.filter(item => item.id !== image.id)); }}
               >
                 <Trash2 size={12} />
               </button>
+              {(() => {
+                const original = originals?.find(item => item.id === image.id);
+                const moved = original && (Math.abs(original.x - image.x) > 0.5 || Math.abs(original.y - image.y) > 0.5 || Math.abs(original.width - image.width) > 0.5 || Math.abs(original.height - image.height) > 0.5);
+                if (!original || !moved) return null;
+                return (
+                  <button
+                    type="button"
+                    className="etm-ipcr-image-reset"
+                    aria-label="Reset picture to its original position"
+                    onPointerDown={event => event.stopPropagation()}
+                    onClick={() => { gestureStartRef.current?.(); onChange(images.map(item => item.id === image.id ? { ...item, x: original.x, y: original.y, width: original.width, height: original.height } : item)); }}
+                  >
+                    <RotateCcw size={11} /> Reset position
+                  </button>
+                );
+              })()}
               <div className="etm-ipcr-image-resize-handle" style={{ touchAction: "none" }} onPointerDown={event => startResize(event, image)} />
             </>
           )}

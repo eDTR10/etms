@@ -82,6 +82,8 @@ export interface IPCRGridHandle {
   // direct DOM parent) — used to align an overlay (e.g. rich text) exactly over that cell. Null
   // if the cell isn't currently in the DOM (grid not mounted, or out of range).
   getCellRect: (cell: string) => IPCRGridCellRect | null;
+  // Selects one cell (as if it was clicked).
+  selectCell: (cell: string) => void;
   getDimensions: () => IPCRGridDimensions;
   // Live column widths / row heights (px) as they are on screen right now, resizes included.
   getLayout: () => { colWidths: Record<number, number>; rowHeights: Record<number, number> };
@@ -91,6 +93,8 @@ export interface IPCRGridHandle {
   insertRow: (position?: "above" | "below") => void;
   deleteColumn: () => void;
   deleteRow: () => void;
+  // The merged cells as they are right now (anchor cell -> [columns, rows]), which can differ from the loaded sheet.
+  getMerges: () => Record<string, [number, number]>;
   mergeSelection: () => void;
   unmergeSelection: () => void;
   toggleStyle: (property: "font-weight" | "font-style" | "text-decoration", onValue: string) => void;
@@ -149,6 +153,17 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
   // under the pointer, so this keeps the dragged range until they make a new selection with a normal click.
   const multiSelectionRef = useRef<[number, number, number, number] | null>(null);
   const lastRightDown = useRef(0);
+  // Rows picked one by one with Alt+click on their row number (not next to each other); styling acts on them as well.
+  const extraRows = useRef<number[]>([]);
+  // Alt is held right now: any selection the sheet makes then is ignored (and put back), so Alt+click never selects a block.
+  const altHeld = useRef(false);
+  const restoringSelection = useRef(false);
+  const clearExtraRows = () => {
+    if (!extraRows.current.length) return;
+    const instance = instanceRef.current;
+    extraRows.current.forEach(row => instance?.rows[row]?.element?.removeAttribute("data-etm-multirow"));
+    extraRows.current = [];
+  };
   const contextItemsRef = useRef(contextItems);
   contextItemsRef.current = contextItems;
   // The mount effect below runs once (see the mount-once note at file scope) — these refs
@@ -203,6 +218,10 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
       // not only the one right-clicked (the click itself shrinks the selection to that one).
       contextMenu: (worksheet, colIndex, rowIndex, _event, items, role) => {
         if (!editable && contextItemsRef.current) return contextItemsRef.current({ col: colIndex === null || colIndex === undefined ? null : Number(colIndex), row: rowIndex === null || rowIndex === undefined ? null : Number(rowIndex) });
+        if (extraRows.current.length && (role === "row" || role === "cell") && rowIndex !== null && extraRows.current.includes(Number(rowIndex))) {
+          const picked = extraRows.current.slice();
+          return items.map((item: { title: string }) => /delete selected rows?/i.test(item.title) ? { ...item, title: `Delete ${picked.length} picked row${picked.length === 1 ? "" : "s"}`, onclick: () => { clearExtraRows(); [...picked].sort((a, b) => b - a).forEach(row => worksheet.deleteRow(row, 1)); } } : item);
+        }
         const prior = multiSelectionRef.current;
         if (!prior) return items;
         const span = (a: number, b: number) => ({ first: Math.min(a, b), last: Math.max(a, b) });
@@ -223,11 +242,21 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
         return items;
       },
       onselection: (worksheet, x1, y1, x2, y2) => {
+        if (altHeld.current || restoringSelection.current) {
+          // Put the sheet's highlight back on what was selected before, then keep the old selection.
+          const keep = selectionRangeRef.current;
+          if (!restoringSelection.current && keep && (keep[0] !== x1 || keep[1] !== y1 || keep[2] !== x2 || keep[3] !== y2)) {
+            restoringSelection.current = true;
+            window.setTimeout(() => { try { worksheet.updateSelectionFromCoords(keep[0], keep[1], keep[2], keep[3]); } catch { /* sheet is gone */ } restoringSelection.current = false; }, 0);
+          }
+          return;
+        }
         const cell = `${columnName(x1)}${y1 + 1}`;
         selectedRef.current = cell;
         // A right-click's own re-selection must not replace the range being right-clicked.
         if (Date.now() - lastRightDown.current > 500) multiSelectionRef.current = x1 !== x2 || y1 !== y2 ? [x1, y1, x2, y2] : null;
         selectionRangeRef.current = [x1, y1, x2, y2];
+        if (Date.now() - lastRightDown.current > 500) clearExtraRows();
         const cellStyle = worksheet.getStyle(cell);
         onSelectionChangeRef.current?.({ cell, value: String(worksheet.getValue(cell) ?? ""), style: typeof cellStyle === "string" ? cellStyle : "", range: [x1, y1, x2, y2], rows: worksheet.rows.length, cols: worksheet.cols.length });
       },
@@ -238,8 +267,8 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
       },
       onresizecolumn: () => { onLayoutChangeRef.current?.(); },
       onresizerow: () => { onLayoutChangeRef.current?.(); },
-      oninsertrow: notifyDimensions,
-      ondeleterow: notifyDimensions,
+      oninsertrow: (worksheet: WorksheetInstance) => { clearExtraRows(); notifyDimensions(worksheet); },
+      ondeleterow: (worksheet: WorksheetInstance) => { clearExtraRows(); notifyDimensions(worksheet); },
       oninsertcolumn: notifyDimensions,
       ondeletecolumn: notifyDimensions,
       worksheets: [{
@@ -382,6 +411,59 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
     return () => container.removeEventListener("dblclick", onDoubleClick, true);
   }, [editable]);
 
+  // Alt+click on a row number adds / removes that row from the selection, so rows that are not next to each other can be
+  // styled together (the usual click or drag still selects one block).
+  useEffect(() => {
+    if (!editable) return;
+    const container = containerRef.current;
+    if (!container) return;
+    const onAltClick = (event: MouseEvent) => {
+      const alt = event.altKey || event.getModifierState?.("Alt") || event.getModifierState?.("AltGraph");
+      // Ctrl / Cmd on a row number picks too (the sheet itself would take that as a block).
+      if (!(alt || event.ctrlKey || event.metaKey) || event.button !== 0) return;
+      const instance = instanceRef.current;
+      const target = event.target as HTMLElement | null;
+      if (!target || !container.contains(target)) return;
+      // The row number, or any cell of the row.
+      const numberCell = target?.closest<HTMLElement>("td.jss_row") ?? null;
+      const rowHeader = numberCell ?? (alt ? target?.closest<HTMLElement>("tbody td[data-y]") ?? null : null);
+      if (!instance || !rowHeader || rowHeader.dataset.y === undefined) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const row = Number(rowHeader.dataset.y);
+      const element = instance.rows[row]?.element;
+      if (!element) return;
+      // The row that was selected the usual way before the first pick is one of the picked rows too.
+      const first = selectionRangeRef.current;
+      if (!extraRows.current.length && first && first[1] === first[3] && first[1] !== row) {
+        const firstElement = instance.rows[first[1]]?.element;
+        if (firstElement) { extraRows.current = [first[1]]; firstElement.setAttribute("data-etm-multirow", "1"); }
+      }
+      if (extraRows.current.includes(row)) {
+        extraRows.current = extraRows.current.filter(item => item !== row);
+        element.removeAttribute("data-etm-multirow");
+      } else {
+        extraRows.current = [...extraRows.current, row];
+        element.setAttribute("data-etm-multirow", "1");
+      }
+    };
+    // The rest of the click must not reach the sheet either, or it would drag a selection out.
+    const swallow = (event: MouseEvent) => { if (event.target instanceof HTMLElement && container.contains(event.target) && (event.altKey || ((event.ctrlKey || event.metaKey) && event.target.closest("td.jss_row")))) event.stopImmediatePropagation(); };
+    const keyChange = (event: KeyboardEvent) => { altHeld.current = event.altKey || event.getModifierState?.("Alt") || event.getModifierState?.("AltGraph"); };
+    const dropAlt = () => { altHeld.current = false; };
+    // On the window, in the capture phase: nothing in the sheet can see the click before this does.
+    window.addEventListener("mousedown", onAltClick, true);
+    window.addEventListener("mouseup", swallow, true);
+    window.addEventListener("click", swallow, true);
+    window.addEventListener("keydown", keyChange, true);
+    window.addEventListener("keyup", keyChange, true);
+    window.addEventListener("blur", dropAlt);
+    return () => {
+      window.removeEventListener("mousedown", onAltClick, true); window.removeEventListener("mouseup", swallow, true); window.removeEventListener("click", swallow, true);
+      window.removeEventListener("keydown", keyChange, true); window.removeEventListener("keyup", keyChange, true); window.removeEventListener("blur", dropAlt);
+    };
+  }, [editable]);
+
   // Pasting a range copied from Google Sheets (or any app that puts an HTML table on the clipboard)
   // brings its formatting along: the grid's built-in paste only ever reads plain text.
   useEffect(() => {
@@ -506,6 +588,22 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
     return () => document.removeEventListener("keydown", onKeyDown, true);
   }, [editable]);
 
+  // Every cell in the selected block plus the whole of each Alt+clicked row.
+  const selectedCells = (): string[] => {
+    const instance = instanceRef.current;
+    const range = selectionRangeRef.current;
+    const names = new Set<string>();
+    // Once rows are picked with Alt, they are exactly the rows meant: a larger block selected earlier is left out.
+    if (range && (!extraRows.current.length || range[1] === range[3])) {
+      for (let y = Math.min(range[1], range[3]); y <= Math.max(range[1], range[3]); y++) {
+        for (let x = Math.min(range[0], range[2]); x <= Math.max(range[0], range[2]); x++) names.add(`${columnName(x)}${y + 1}`);
+      }
+    }
+    const cols = instance?.cols.length ?? 0;
+    extraRows.current.forEach(row => { for (let x = 0; x < cols; x++) names.add(`${columnName(x)}${row + 1}`); });
+    return [...names];
+  };
+
   useImperativeHandle(ref, () => ({
     getSnapshot: () => {
       const instance = instanceRef.current;
@@ -627,15 +725,7 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
         if (td) { td.setAttribute("data-etm-overlay", "1"); marked.current.push(td); }
       });
     },
-    getSelectedCells: () => {
-      const range = selectionRangeRef.current;
-      if (!range) return [];
-      const cells: string[] = [];
-      for (let y = Math.min(range[1], range[3]); y <= Math.max(range[1], range[3]); y++) {
-        for (let x = Math.min(range[0], range[2]); x <= Math.max(range[0], range[2]); x++) cells.push(`${columnName(x)}${y + 1}`);
-      }
-      return cells;
-    },
+    getSelectedCells: () => selectedCells(),
     runAsOneStep: action => {
       const instance = instanceRef.current;
       if (!instance) { action(); return null; }
@@ -666,6 +756,10 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
     getCellStyle: cell => {
       const cellStyle = instanceRef.current?.getStyle(cell);
       return typeof cellStyle === "string" ? cellStyle : "";
+    },
+    selectCell: cell => {
+      const { col, row } = cellCoords(cell);
+      try { instanceRef.current?.updateSelectionFromCoords(col, row, col, row); } catch { /* sheet is gone */ }
     },
     getCellRect: cell => {
       const instance = instanceRef.current;
@@ -734,9 +828,13 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
       const instance = instanceRef.current;
       const range = selectionRangeRef.current;
       if (!instance || !range) return;
-      const [, y1, , y2] = range;
-      instance.deleteRow(Math.min(y1, y2), Math.abs(y2 - y1) + 1);
+      const rows = new Set<number>(extraRows.current);
+      if (!extraRows.current.length || range[1] === range[3]) for (let y = Math.min(range[1], range[3]); y <= Math.max(range[1], range[3]); y++) rows.add(y);
+      clearExtraRows();
+      // Bottom up, so the numbers of the rows still to delete don't shift.
+      [...rows].sort((p, q) => q - p).forEach(row => instance.deleteRow(row, 1));
     },
+    getMerges: () => ({ ...((instanceRef.current?.getMerge() as Record<string, [number, number]> | null) ?? {}) }),
     mergeSelection: () => {
       const instance = instanceRef.current;
       const range = selectionRangeRef.current;
@@ -778,75 +876,43 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
     },
     toggleStyle: (property, onValue) => {
       const instance = instanceRef.current;
-      const range = selectionRangeRef.current;
-      if (!instance || !range) return;
-      const [x1, y1, x2, y2] = range;
-      const cells: string[] = [];
-      for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) {
-        for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) cells.push(`${columnName(x)}${y + 1}`);
-      }
+      const cells = selectedCells();
+      if (!instance || !cells.length) return;
       const current = instance.getStyle(cells[0], property);
       const next = current === onValue ? "" : onValue;
       cells.forEach(cell => setStyleProp(instance, cell, property, next));
     },
     setSelectionColor: (property, value) => {
       const instance = instanceRef.current;
-      const range = selectionRangeRef.current;
-      if (!instance || !range) return;
-      const [x1, y1, x2, y2] = range;
-      for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) {
-        for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) setStyleProp(instance, `${columnName(x)}${y + 1}`, property, value);
-      }
+      if (instance) selectedCells().forEach(cell => setStyleProp(instance, cell, property, value));
     },
     clearSelectionFill: () => {
       const instance = instanceRef.current;
-      const range = selectionRangeRef.current;
-      if (!instance || !range) return;
-      const [x1, y1, x2, y2] = range;
-      for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) {
-        for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) setStyleProp(instance, `${columnName(x)}${y + 1}`, "background-color", "");
-      }
+      if (instance) selectedCells().forEach(cell => setStyleProp(instance, cell, "background-color", ""));
     },
     setFontFamily: fontFamily => {
       const instance = instanceRef.current;
-      const range = selectionRangeRef.current;
-      if (!instance || !range) return;
-      const [x1, y1, x2, y2] = range;
-      for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) {
-        for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) setStyleProp(instance, `${columnName(x)}${y + 1}`, "font-family", fontFamily);
-      }
+      if (instance) selectedCells().forEach(cell => setStyleProp(instance, cell, "font-family", fontFamily));
     },
     setFontSize: fontSize => {
       const instance = instanceRef.current;
-      const range = selectionRangeRef.current;
-      if (!instance || !range) return;
-      const [x1, y1, x2, y2] = range;
-      for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) {
-        for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) setStyleProp(instance, `${columnName(x)}${y + 1}`, "font-size", `${fontSize}px`);
-      }
+      if (instance) selectedCells().forEach(cell => setStyleProp(instance, cell, "font-size", `${fontSize}px`));
     },
     alignSelection: align => {
       const instance = instanceRef.current;
-      const range = selectionRangeRef.current;
-      if (!instance || !range) return;
-      const [x1, y1, x2, y2] = range;
-      for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) {
-        for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) setStyleProp(instance, `${columnName(x)}${y + 1}`, "text-align", align);
-      }
+      if (instance) selectedCells().forEach(cell => setStyleProp(instance, cell, "text-align", align));
     },
     setVerticalAlign: valign => {
       const instance = instanceRef.current;
-      const range = selectionRangeRef.current;
-      if (!instance || !range) return;
-      const [x1, y1, x2, y2] = range;
-      for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) {
-        for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) setStyleProp(instance, `${columnName(x)}${y + 1}`, "vertical-align", valign);
-      }
+      if (instance) selectedCells().forEach(cell => setStyleProp(instance, cell, "vertical-align", valign));
     },
     applyBorder: (kind, color, width = 1) => {
       const instance = instanceRef.current;
-      const range = selectionRangeRef.current;
-      if (!instance || !range) return;
+      const primary = selectionRangeRef.current;
+      if (!instance || !primary) return;
+      const lastCol = Math.max(0, instance.cols.length - 1);
+      const blocks: [number, number, number, number][] = [...(!extraRows.current.length || primary[1] === primary[3] ? [primary] : []), ...extraRows.current.map(row => [0, row, lastCol, row] as [number, number, number, number])];
+      blocks.forEach(range => {
       const [rx1, ry1, rx2, ry2] = range;
       const minX = Math.min(rx1, rx2), maxX = Math.max(rx1, rx2);
       const minY = Math.min(ry1, ry2), maxY = Math.max(ry1, ry2);
@@ -943,6 +1009,7 @@ const IPCRGrid = forwardRef<IPCRGridHandle, IPCRGridProps>(function IPCRGrid({ v
           }
         }
       }
+      });
     },
     undo: () => undoStep(),
     redo: () => redoStep(),

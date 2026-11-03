@@ -4,7 +4,7 @@ import type { IPCRSubmission, IPCRSubmissionInput, IPCRTemplate, IPCRTemplateInp
 export const ipcrService = {
   listTemplates: async () => (await api.get<IPCRTemplate[]>("etm/ipcr-templates/")).data,
   createTemplate: async (input: IPCRTemplateInput) => (await api.post<IPCRTemplate>("etm/ipcr-templates/", input)).data,
-  updateTemplate: async (id: number, input: IPCRTemplateInput) => (await api.patch<IPCRTemplate>(`etm/ipcr-templates/${id}/`, input)).data,
+  updateTemplate: async (id: number, input: Partial<IPCRTemplateInput> & { is_enabled?: boolean }) => (await api.patch<IPCRTemplate>(`etm/ipcr-templates/${id}/`, input)).data,
   deleteTemplate: async (id: number) => { await api.delete(`etm/ipcr-templates/${id}/`); },
   uploadSampleDocument: async (id: number, file: File) => {
     const body = new FormData();

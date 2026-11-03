@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Download, FileSpreadsheet, Pencil, Plus, Trash2, Upload } from "lucide-react";
+import { Copy, Download, FileSpreadsheet, Pencil, Plus, Trash2, Type, Upload } from "lucide-react";
 import Swal from "sweetalert2";
 import AdminLayout from "./AdminLayout";
 import IPCRTemplateForm from "../../features/ipcr/IPCRTemplateForm";
@@ -53,6 +53,57 @@ function IPCRTemplatesContent() {
       void Swal.fire({ title: "Template deleted", icon: "success", timer: 1400, showConfirmButton: false });
     } catch (err) {
       void Swal.fire({ title: "Couldn't delete template", text: taskError(err), icon: "error" });
+    }
+  };
+
+  // "Make a copy": a new template with the same sheet, fields, paper and orientation, named "Copy of …". The sample document
+  // is a separate file and is not copied.
+  const duplicateTemplate = async (template: IPCRTemplate) => {
+    try {
+      const saved = await ipcrService.createTemplate({
+        name: `Copy of ${template.name}`.slice(0, 255),
+        grid: template.grid,
+        fields_config: template.fields_config,
+        paper_size: template.paper_size,
+        orientation: template.orientation,
+      });
+      setTemplates(current => [...current, saved].sort((a, b) => a.name.localeCompare(b.name)));
+      void Swal.fire({ title: "Copy made", text: `"${saved.name}" was added. Open it to rename or change it.`, icon: "success", timer: 2000, showConfirmButton: false });
+    } catch (err) {
+      void Swal.fire({ title: "Couldn't make a copy", text: taskError(err), icon: "error" });
+    }
+  };
+
+  // Renames a template without opening the designer.
+  const renameTemplate = async (template: IPCRTemplate) => {
+    const result = await Swal.fire({
+      title: "Rename template",
+      input: "text",
+      inputValue: template.name,
+      inputAttributes: { maxlength: "255" },
+      showCancelButton: true,
+      confirmButtonText: "Rename",
+      inputValidator: value => (value.trim() ? null : "Give the template a name."),
+    });
+    const name = typeof result.value === "string" ? result.value.trim() : "";
+    if (!result.isConfirmed || !name || name === template.name) return;
+    try {
+      await ipcrService.updateTemplate(template.id, { name });
+      setTemplates(current => current.map(item => item.id === template.id ? { ...item, name } : item).sort((a, b) => a.name.localeCompare(b.name)));
+    } catch (err) {
+      void Swal.fire({ title: "Couldn't rename the template", text: taskError(err), icon: "error" });
+    }
+  };
+
+  // Switches a template on or off: off hides it from the people who generate an IPCR (theirs already made keep working).
+  const toggleEnabled = async (template: IPCRTemplate) => {
+    const next = template.is_enabled === false;
+    setTemplates(current => current.map(item => item.id === template.id ? { ...item, is_enabled: next } : item));
+    try {
+      await ipcrService.updateTemplate(template.id, { is_enabled: next });
+    } catch (err) {
+      setTemplates(current => current.map(item => item.id === template.id ? { ...item, is_enabled: !next } : item));
+      void Swal.fire({ title: "Couldn't change the template", text: taskError(err), icon: "error" });
     }
   };
 
@@ -138,20 +189,32 @@ function IPCRTemplatesContent() {
       {!loading && !error && (
         <section className="etm-panel etm-table-wrap">
           <table className="etm-tasks-table etm-report-table">
-            <thead><tr><th>Template Name</th><th>Fill-in fields</th><th>Last updated</th><th className="etm-tasks-table-actions-col">Action Buttons</th></tr></thead>
+            <thead><tr><th>Template Name</th><th>Status</th><th>Fill-in fields</th><th>Last updated</th><th className="etm-tasks-table-actions-col">Action Buttons</th></tr></thead>
             <tbody>
               {templates.length ? templates.map(template => (
                 <tr key={template.id}>
                   <td className="etm-tasks-table-details-col">{template.name}</td>
+                  <td>
+                    <button type="button" role="switch" aria-checked={template.is_enabled !== false} onClick={() => void toggleEnabled(template)}
+                      title={template.is_enabled !== false ? "On: people can start an IPCR from this template. Click to turn it off." : "Off: hidden from people generating an IPCR. Click to turn it on."}
+                      style={{ display: "inline-flex", alignItems: "center", gap: 8, border: 0, background: "transparent", color: "inherit", font: "inherit", fontSize: 12, cursor: "pointer", padding: 0 }}>
+                      <span style={{ position: "relative", width: 34, height: 18, borderRadius: 18, background: template.is_enabled !== false ? "var(--etm-primary, #17b3ac)" : "var(--etm-border, #44505c)", transition: "background .15s" }}>
+                        <span style={{ position: "absolute", top: 2, left: template.is_enabled !== false ? 18 : 2, width: 14, height: 14, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
+                      </span>
+                      {template.is_enabled !== false ? "Enabled" : "Disabled"}
+                    </button>
+                  </td>
                   <td>{template.fields_config.length}</td>
                   <td>{new Date(template.updated_at).toLocaleDateString()}</td>
                   <td className="etm-report-group-actions">
+                    <button type="button" className="etm-icon-button" aria-label={`Make a copy of ${template.name}`} title="Make a copy" onClick={() => void duplicateTemplate(template)}><Copy size={15} /></button>
                     <button type="button" className="etm-icon-button" aria-label={`Download ${template.name}`} title="Download this template as a file" onClick={() => downloadTemplate(template)}><Download size={15} /></button>
+                    <button type="button" className="etm-icon-button" aria-label={`Rename ${template.name}`} title="Rename" onClick={() => void renameTemplate(template)}><Type size={15} /></button>
                     <button type="button" className="etm-icon-button" aria-label={`Edit ${template.name}`} onClick={() => setEditing(template)}><Pencil size={15} /></button>
                     <button type="button" className="etm-icon-button danger" aria-label={`Delete ${template.name}`} onClick={() => void confirmDelete(template)}><Trash2 size={15} /></button>
                   </td>
                 </tr>
-              )) : <tr><td colSpan={4} className="etm-empty-row">No IPCR templates yet. Create one so users can generate their IPCR from it.</td></tr>}
+              )) : <tr><td colSpan={5} className="etm-empty-row">No IPCR templates yet. Create one so users can generate their IPCR from it.</td></tr>}
             </tbody>
           </table>
         </section>

@@ -27,11 +27,11 @@ const DEFAULT_ROW_HEIGHT = 24;
 // summed directly from the grid's own known colWidths/rowHeights across the merge's span — data
 // we already have and trust (it's what was used to build the merge in the first place) — while
 // the anchor's live top-left position (unaffected by merge sizing) still comes from the DOM.
-function computeSize(grid: IPCRGridData, cell: string, live?: { colWidths: Record<number, number>; rowHeights: Record<number, number> }): { width: number; height: number } {
+function computeSize(grid: IPCRGridData, cell: string, live?: { colWidths: Record<number, number>; rowHeights: Record<number, number> }, merges: Record<string, [number, number]> = grid.mergeCells): { width: number; height: number } {
   const colWidths = live?.colWidths ?? grid.colWidths;
   const rowHeights = live?.rowHeights ?? grid.rowHeights;
   const { col, row } = cellCoords(cell);
-  const merge = grid.mergeCells[cell];
+  const merge = merges[cell];
   if (!merge) return { width: colWidths[col] ?? DEFAULT_COL_WIDTH, height: rowHeights?.[row] ?? DEFAULT_ROW_HEIGHT };
   const [colspan, rowspan] = merge;
   let width = 0;
@@ -59,6 +59,8 @@ export default function IPCRGridRichTextOverlay({ grid, gridRef, refreshKey, aut
   const [sizes, setSizes] = useState<Record<string, { width: number; height: number }>>({});
   // Each cell's style string right now and the font it is really drawn in. `grid.style` is only the sheet as it
   // was loaded, so an alignment / font change made afterwards (or a font the cell never had set) was ignored.
+  // The merged cells right now: a merge made (or undone) since the sheet loaded is not in `grid.mergeCells`.
+  const [merges, setMerges] = useState<Record<string, [number, number]>>(grid.mergeCells);
   const [live, setLive] = useState<Record<string, { style: string; family: string; size: string }>>({});
 
   useEffect(() => {
@@ -69,11 +71,13 @@ export default function IPCRGridRichTextOverlay({ grid, gridRef, refreshKey, aut
       const nextSizes: Record<string, { width: number; height: number }> = {};
       const nextLive: Record<string, { style: string; family: string; size: string }> = {};
       const layout = handle.getLayout();
+      const liveMerges = handle.getMerges();
+      setMerges(liveMerges);
       handle.markOverlayCells(owner, cells);
       cells.forEach(cell => {
         const rect = handle.getCellRect(cell);
         if (rect) next[cell] = rect;
-        nextSizes[cell] = computeSize(grid, cell, layout);
+        nextSizes[cell] = computeSize(grid, cell, layout, liveMerges);
         const font = handle.getCellFont(cell);
         nextLive[cell] = { style: handle.getCellStyle(cell), family: font?.family ?? "", size: font?.size ?? "" };
       });
@@ -125,7 +129,7 @@ export default function IPCRGridRichTextOverlay({ grid, gridRef, refreshKey, aut
       if (!element || !rect) return;
       const needed = element.offsetHeight + 2;
       const { row } = cellCoords(cell);
-      const merge = grid.mergeCells[cell];
+      const merge = merges[cell];
       const available = merge ? sizes[cell]?.height ?? rect.height : rect.height;
       if (needed > available + 1) {
         // A merged block grows by adding to its last row; a plain cell grows its own row.
@@ -152,7 +156,7 @@ export default function IPCRGridRichTextOverlay({ grid, gridRef, refreshKey, aut
         const runs = grid.richText?.[cell];
         if (!rect || !runs) return null;
         const parsed = parseCellStyle(live[cell]?.style ?? grid.style[cell]);
-        const size = sizes[cell] ?? computeSize(grid, cell);
+        const size = sizes[cell] ?? computeSize(grid, cell, undefined, merges);
         return (
           <div
             key={cell}
@@ -173,7 +177,7 @@ export default function IPCRGridRichTextOverlay({ grid, gridRef, refreshKey, aut
               // grouped task dropped into a narrow column) — use it so the cover layer never ends
               // short and lets the cell's own plain text show through underneath. Merged cells'
               // measured height isn't reliable (see computeSize), so they keep the summed one.
-              minHeight: Math.max(0, (grid.mergeCells[cell] ? size.height : Math.max(size.height, rect.height)) - 2),
+              minHeight: Math.max(0, (merges[cell] ? size.height : Math.max(size.height, rect.height)) - 2),
               justifyContent: parsed.valign === "middle" ? "center" : parsed.valign === "bottom" ? "flex-end" : "flex-start",
             }}
           >

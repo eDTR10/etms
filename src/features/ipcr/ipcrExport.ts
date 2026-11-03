@@ -102,7 +102,7 @@ function writeGridToSheet(sheet: ExcelJS.Worksheet, workbook: ExcelJS.Workbook, 
     const extension = match[1] === "jpg" ? "jpeg" : (match[1] as "png" | "jpeg" | "gif");
     const imageId = workbook.addImage({ base64: image.dataUrl, extension });
     sheet.addImage(imageId, {
-      tl: { col: image.x / AVG_COL_WIDTH_PX, row: image.y / AVG_ROW_HEIGHT_PX },
+      tl: { col: image.x / AVG_COL_WIDTH_PX, row: Math.max(0, image.y) / AVG_ROW_HEIGHT_PX },
       ext: { width: image.width, height: image.height },
     });
   });

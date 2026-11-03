@@ -144,6 +144,8 @@ export function normalizeGrid(value: unknown): IPCRGridData {
 export interface IPCRTemplate {
   id: number;
   name: string;
+  // Off: hidden from the people who generate an IPCR (undefined on older data means on).
+  is_enabled?: boolean;
   grid: IPCRGridData;
   fields_config: IPCRField[];
   paper_size: IPCRPaperSize;

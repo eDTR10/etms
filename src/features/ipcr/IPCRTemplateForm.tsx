@@ -15,6 +15,8 @@ import IPCRGridRichTextOverlay from "./IPCRGridRichTextOverlay";
 import IPCRFillForm from "./IPCRFillForm";
 import IPCRLivePreview from "./IPCRLivePreview";
 import IPCRRichTextField from "./IPCRRichTextField";
+import { askAddRowsDialog } from "./ipcrAddRowsDialog";
+import { addRepeatedLines, duplicateRowNextTo } from "./ipcrExpand";
 import { AUTOFILL_LABEL, autofillKinds, normalizeAutofill, startingValue } from "./ipcrAutofill";
 import { useAuth } from "../../screens/Auth/AuthContext";
 import { cellCoords, cellName, composeGroupedTasksHtml, fillGrid, flattenRuns, htmlToRuns, parseCellStyle, replaceRunsRange, runsNeedRichText, syncTaskCount, runsToEditorHtml, applyStyleToRunsRange, findMergeConflicts } from "./ipcrGridUtils";
@@ -64,6 +66,8 @@ interface IPCRTemplateFormProps {
   // The same sheet editor, opened on someone's own generated IPCR instead of an admin template: no field
   // marking or sample document, only editing the sheet and dragging in their grouped activities.
   submissionMode?: boolean;
+  // Opens with this cell already selected (e.g. the cell that was double-clicked on the way in).
+  initialCell?: string | null;
   onSave: (input: IPCRTemplateInput, sample: IPCRTemplateSampleChange) => Promise<void>;
   onCancel: () => void;
 }
@@ -79,7 +83,7 @@ const FIELD_TYPE_LABEL: Record<IPCRFieldType, string> = {
   grouped_tasks: "Grouped Tasks (tag activities as evidence)",
 };
 
-export default function IPCRTemplateForm({ template, onSave, onCancel, submissionMode = false }: IPCRTemplateFormProps) {
+export default function IPCRTemplateForm({ template, onSave, onCancel, submissionMode = false, initialCell = null }: IPCRTemplateFormProps) {
   const gridRef = useRef<IPCRGridHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sampleInputRef = useRef<HTMLInputElement>(null);
@@ -158,6 +162,9 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
 
   const [testOpen, setTestOpen] = useState(false);
   const [testGrid, setTestGrid] = useState<IPCRGridData | null>(null);
+  // The test has its own copy of the fields (adding rows in it adds fields to it, not to the template) and a row picked to add next to.
+  const [testFields, setTestFields] = useState<IPCRField[]>([]);
+  const [testPickedRow, setTestPickedRow] = useState<number | null>(null);
   const [testValues, setTestValues] = useState<Record<string, IPCRFieldValue>>({});
   const { user: testProfile } = useAuth();
   const [testOfficeName, setTestOfficeName] = useState("");
@@ -235,6 +242,14 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
   }, []);
   const [testRefreshKey, setTestRefreshKey] = useState(0);
 
+  // The sheet is built a moment after this opens, so the first cell is selected once it exists.
+  useEffect(() => {
+    if (!initialCell) return;
+    const timers = [120, 400, 900].map(delay => window.setTimeout(() => { if (!selectedCellRef.current) gridRef.current?.selectCell(initialCell); }, delay));
+    return () => timers.forEach(window.clearTimeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const currentStyle = parseCellStyle(selectedStyle);
   const sel = !!selectedCell;
 
@@ -270,6 +285,8 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
   function refreshTest() {
     const snapshot = gridRef.current?.getSnapshot() ?? emptyGrid();
     setTestGrid({ ...snapshot, images, richText, expandable });
+    setTestFields(fields.map(field => ({ ...field })));
+    setTestPickedRow(null);
     setTestRefreshKey(key => key + 1);
   }
 
@@ -367,6 +384,36 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
     });
     if (!testGroups.length) taskService.listGroupedTasks().then(setTestGroups).catch(() => undefined);
     refreshTest();
+  }
+
+  // Rows added while testing: another item or a new section (like the person filling in an IPCR gets), above or below a row.
+  function applyTestAdd(result: { grid: IPCRGridData; fields: IPCRField[]; addedFields: IPCRField[] }) {
+    setTestGrid(result.grid);
+    setTestFields(result.fields);
+    setTestValues(current => ({ ...current, ...Object.fromEntries(result.addedFields.map(field => [field.key, startingValue(field, testProfile, testOfficeName)])) }));
+    setTestRefreshKey(key => key + 1);
+  }
+
+  async function askTestAddRows(index: number) {
+    if (!testGrid) return;
+    const result = await askAddRowsDialog(testGrid, testFields, index, null);
+    if (!result) return;
+    setTestPickedRow(null);
+    applyTestAdd(result);
+  }
+
+  function testSheetMenu({ col, row }: { col: number | null; row: number | null }) {
+    const items: { title: string; onclick: () => void }[] = [];
+    if (!testGrid) return items;
+    if (row !== null) {
+      items.push({ title: "Add rows above or below…", onclick: () => { setTestPickedRow(row); void askTestAddRows(row); } });
+      items.push({ title: "Duplicate this row", onclick: () => { applyTestAdd(duplicateRowNextTo(testGrid, testFields, row, row, "after")); setTestPickedRow(row + 1); } });
+    }
+    if (col !== null) {
+      items.push({ title: "Add column before", onclick: () => applyTestAdd(addRepeatedLines(testGrid, testFields, "col", col, "before", 1)) });
+      items.push({ title: "Add column after", onclick: () => applyTestAdd(addRepeatedLines(testGrid, testFields, "col", col, "after", 1)) });
+    }
+    return items;
   }
 
   function updateTestValue(key: string, value: IPCRFieldValue) {
@@ -1060,8 +1107,8 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
         <div
           className="fixed z-[60] bg-card border border-border rounded-xl flex flex-col overflow-hidden shadow-2xl"
           style={{
-            width: "min(1750px, 98vw)", height: "88vh", minWidth: 560, minHeight: 320, maxWidth: "100vw", maxHeight: "100vh", resize: "both",
-            ...(testPos ? { left: testPos.x, top: testPos.y } : { left: "50%", top: "5vh", transform: "translateX(-50%)" }),
+            width: "min(2400px, 98vw)", height: "94vh", minWidth: 560, minHeight: 320, maxWidth: "100vw", maxHeight: "100vh", resize: "both",
+            ...(testPos ? { left: testPos.x, top: testPos.y } : { left: "50%", top: "2vh", transform: "translateX(-50%)" }),
           }}
         >
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0 cursor-move select-none touch-none"
@@ -1071,10 +1118,26 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto p-4 grid gap-4" style={{ gridTemplateColumns: "minmax(300px, 380px) minmax(0, 1fr)" }}>
             <div>
-              <IPCRFillForm fields={fields} values={testValues} meta={testMeta} groups={testGroups} onUpdateValue={updateTestValue} onToggleGroupTag={toggleTestGroupTag} onFieldFocus={setTestFocusField} onFieldHover={setTestHoverField} />
+              <IPCRFillForm fields={testFields} values={testValues} meta={testMeta} groups={testGroups} onUpdateValue={updateTestValue} onToggleGroupTag={toggleTestGroupTag} onFieldFocus={setTestFocusField} onFieldHover={setTestHoverField} />
               <button type="button" className="etm-button primary small" style={{ marginTop: 10 }} onClick={refreshTest}><RefreshCw size={14} /> Refresh preview</button>
+              <p className="text-[10px] text-muted-foreground" style={{ margin: "4px 0 10px" }}>Refresh starts the test over from the sheet as designed (rows added below are removed).</p>
+              <div style={{ display: "grid", gap: 8, padding: 10, border: "1px solid var(--etm-border)", borderRadius: 8 }}>
+                <strong style={{ fontSize: 12 }}>Try adding rows</strong>
+                {testPickedRow === null ? (
+                  <span style={{ fontSize: 12, color: "var(--etm-muted)" }}>Click any row in the preview (or its row number), then add an item or a new section above or below it. Right-click a row also works.</span>
+                ) : (
+                  <>
+                    <span style={{ fontSize: 12.5, fontWeight: 600 }}>Row {testPickedRow + 1}</span>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
+                      <button type="button" className="etm-button primary small" onClick={() => void askTestAddRows(testPickedRow)}>Add above or below…</button>
+                      <button type="button" className="etm-button ghost small" onClick={() => setTestPickedRow(null)}>Clear</button>
+                      <button type="button" className="etm-button ghost small" style={{ gridColumn: "1 / -1" }} onClick={() => { if (testGrid) { applyTestAdd(duplicateRowNextTo(testGrid, testFields, testPickedRow, testPickedRow, "after")); setTestPickedRow(testPickedRow + 1); } }}>Duplicate this row</button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
-            <div className="min-w-0 overflow-auto">{testGrid && <IPCRLivePreview grid={testGrid} fields={fields} values={testValues} refreshKey={testRefreshKey} focusKey={testFocusField ?? testHoverField} />}</div>
+            <div className="min-w-0 overflow-auto">{testGrid && <IPCRLivePreview grid={testGrid} fields={testFields} values={testValues} refreshKey={testRefreshKey} focusKey={testFocusField ?? testHoverField} onCellClick={cell => setTestPickedRow(cellCoords(cell).row)} onRowHeaderClick={row => setTestPickedRow(row)} pickedRow={testPickedRow} contextItems={testSheetMenu} />}</div>
           </div>
         </div>
       )}
@@ -1251,7 +1314,7 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
       <div className="flex-1 flex overflow-hidden">
         {/* Grid */}
         <div className="flex-1 overflow-auto bg-muted/40">
-          <div style={{ zoom }}>
+          <div style={{ zoom, paddingTop: 48 }}>
             <div className="relative inline-block pb-10 pr-10 etm-ipcr-grid-overlay-wrap"
               onDragOver={event => {
                 const types = Array.from(event.dataTransfer.types);
@@ -1329,7 +1392,7 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
 
         {/* Fill-in fields sidebar */}
         <div className="w-64 border-l border-border bg-card flex flex-col shrink-0">
-          {!submissionMode && <>
+          <>
           <div className="p-3 border-b border-border">
             <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Fill-in fields</p>
             <div className="flex flex-wrap gap-x-3 gap-y-1 mb-2 text-[10px] text-muted-foreground" aria-label="What the colours in the sheet mean">
@@ -1344,11 +1407,11 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
             </button>
             <p className="text-[10px] text-muted-foreground mt-2 leading-snug">
               {textSelection && !isUnderlineText(textSelection.text)
-                ? <>Turns <strong className="text-foreground">&ldquo;{textSelection.text.length > 30 ? `${textSelection.text.slice(0, 30)}…` : textSelection.text}&rdquo;</strong> into a blank users fill in. The rest of the cell stays as it is.</>
-                : "Select a cell, then use the button to turn it into a blank users fill in. To make just some words a field, double-click the cell and highlight them first."}
+                ? <>Turns <strong className="text-foreground">&ldquo;{textSelection.text.length > 30 ? `${textSelection.text.slice(0, 30)}…` : textSelection.text}&rdquo;</strong> into a blank {submissionMode ? "you fill in" : "users fill in"}. The rest of the cell stays as it is.</>
+                : `Select a cell, then use the button to turn it into a blank ${submissionMode ? "you fill in (only in this IPCR)" : "users fill in"}. To make just some words a field, double-click the cell and highlight them first.`}
             </p>
           </div>
-          {(() => {
+          {!submissionMode && (() => {
             const letter = (index: number) => { let name = ""; let n = index; do { name = String.fromCharCode(65 + (n % 26)) + name; n = Math.floor(n / 26) - 1; } while (n >= 0); return name; };
             const rowNumber = parseInt(rowText, 10);
             const row = rowNumber >= 1 && rowNumber <= dims.rows ? rowNumber - 1 : null;
@@ -1425,7 +1488,7 @@ export default function IPCRTemplateForm({ template, onSave, onCancel, submissio
               </div>
             );
           })()}
-          </>}
+          </>
           <div className={`border-b border-border p-2 overflow-y-auto ${submissionMode ? "flex-1" : "max-h-[45%] shrink-0"}`}>
             <p className="flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 px-1"><Layers className="w-3 h-3" /> {submissionMode ? "Your grouped activities" : "Grouped tasks"}</p>
             {groupsLoading ? <p className="text-xs text-muted-foreground px-1 py-1">Loading…</p>

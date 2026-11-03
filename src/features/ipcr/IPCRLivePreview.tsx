@@ -24,13 +24,17 @@ interface IPCRLivePreviewProps {
   pickedRow?: number | null;
   // Something dragged from the task list and dropped on a cell: the cell and what was dragged (the drag's payload string).
   onDropTask?: (cell: string, payload: string) => void;
+  // When given, the pictures on the sheet (logos) can be clicked, dragged, resized and removed; this gets the new list.
+  onImagesChange?: (images: IPCRGridData["images"]) => void;
+  imageOriginals?: IPCRGridData["images"];
+  onImageGestureStart?: () => void;
   // Filled in with a function that reports the heights the rows really have on screen (see IPCRGrid).
   measureRef?: { current: (() => Record<number, number>) | null };
   // What the right-click menu of the sheet offers (see IPCRGrid's `contextItems`).
   contextItems?: (target: { col: number | null; row: number | null }) => { title: string; onclick: () => void }[];
 }
 
-export default function IPCRLivePreview({ grid, fields, values, refreshKey, focusKey = null, onCellDoubleClick, onCellClick, onRowHeaderClick, pickedRow = null, onDropTask, contextItems, measureRef }: IPCRLivePreviewProps) {
+export default function IPCRLivePreview({ grid, fields, values, refreshKey, focusKey = null, onCellDoubleClick, onCellClick, onRowHeaderClick, pickedRow = null, onDropTask, contextItems, measureRef, onImagesChange, imageOriginals, onImageGestureStart }: IPCRLivePreviewProps) {
   if (measureRef) measureRef.current = () => gridRef.current?.getRenderedRowHeights() ?? {};
   const gridRef = useRef<IPCRGridHandle>(null);
   // Every cell of the (unfilled) sheet that holds this field's {{token}}.
@@ -119,7 +123,7 @@ export default function IPCRLivePreview({ grid, fields, values, refreshKey, focu
       } : undefined}
     >
       <IPCRGrid key={structureKey} ref={gridRef} value={filled} editable={false} contextItems={contextItems} />
-      <IPCRGridImageOverlay images={grid.images} editable={false} />
+      <IPCRGridImageOverlay images={grid.images} editable={!!onImagesChange} onChange={onImagesChange} originals={imageOriginals} onGestureStart={onImageGestureStart} />
       <IPCRGridRichTextOverlay grid={filled} gridRef={gridRef} refreshKey={refreshKey} />
     </div>
   );

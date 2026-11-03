@@ -2,17 +2,18 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Copy, Download, FileSpreadsheet, FileText, LayoutGrid, Loader2, Eye, Plus, Printer, RefreshCw, Save, Star } from "lucide-react";
 import Swal from "sweetalert2";
+import IPCRCellBar from "../../features/ipcr/IPCRCellBar";
 import IPCRFillForm from "../../features/ipcr/IPCRFillForm";
 import IPCRLivePreview from "../../features/ipcr/IPCRLivePreview";
-import IPCRRichTextField from "../../features/ipcr/IPCRRichTextField";
 import IPCRTemplateForm from "../../features/ipcr/IPCRTemplateForm";
 import { ipcrService } from "../../features/ipcr/ipcrService";
-import { addRepeatedLines, addSection, duplicateRowNextTo, findSectionRow, type Axis, type Side } from "../../features/ipcr/ipcrExpand";
+import { askAddRowsDialog } from "../../features/ipcr/ipcrAddRowsDialog";
+import { addRepeatedLines, duplicateRowNextTo, type Axis, type Side } from "../../features/ipcr/ipcrExpand";
 import { startingValue } from "../../features/ipcr/ipcrAutofill";
 import { syncWithTemplate } from "../../features/ipcr/ipcrSync";
 import { downloadIPCRWorkbook } from "../../features/ipcr/ipcrExport";
 import { buildIPCRPdfBlob, downloadIPCRPdf, estimateIPCRPageStarts, printIPCRPdf } from "../../features/ipcr/ipcrPdfExport";
-import { TASK_DRAG_TYPE, columnName, cellCoords, composeGroupedTasksHtml, computeFinalRating, fillGrid, flattenRuns, htmlToRuns, parseCellStyle, runsNeedRichText, runsToEditorHtml } from "../../features/ipcr/ipcrGridUtils";
+import { TASK_DRAG_TYPE, columnName, cellCoords, composeGroupedTasksHtml, computeFinalRating, fillGrid, flattenRuns, parseCellStyle } from "../../features/ipcr/ipcrGridUtils";
 import { adjectivalRating, normalizeGrid, type IPCRRichTextRun, type IPCRField, type IPCRFieldMetaEntry, type IPCRFieldValue, type IPCRGridData, type IPCROrientation, type IPCRPaperSize, type IPCRSubmission, type IPCRTemplate } from "../../features/ipcr/types";
 import { taskService, taskError } from "../../features/tasks/taskService";
 import { useAuth } from "../Auth/AuthContext";
@@ -52,7 +53,13 @@ export default function IPCREditor() {
   const [saving, setSaving] = useState(false);
   const [layoutOpen, setLayoutOpen] = useState(false);
   // The "edit the sheet manually?" offer at the top of the screen; hidden once answered.
-  const [manualAsked, setManualAsked] = useState(false);
+  // The cell to have selected when the sheet editor opens (null: none).
+  // The cell being typed in right on the sheet (double-click), and the box drawn over it for that.
+  const [inlineCell, setInlineCell] = useState<string | null>(null);
+  const [inlineHost, setInlineHost] = useState<HTMLDivElement | null>(null);
+  const [inlineRect, setInlineRect] = useState<{ left: number; top: number; width: number; height: number; css: React.CSSProperties } | null>(null);
+  const previewWrap = useRef<HTMLDivElement>(null);
+  const [layoutCell, setLayoutCell] = useState<string | null>(null);
   // The preview redraws a moment after typing stops, not on every key.
   const [previewKey, setPreviewKey] = useState(0);
   // The input being typed in (or pointed at) — its cell glows in the preview.
@@ -70,7 +77,6 @@ export default function IPCREditor() {
   const [pageStarts, setPageStarts] = useState<number[]>([]);
   const [dragBreak, setDragBreak] = useState<{ from: number; to: number } | null>(null);
   // The cell being edited in the rich-text dialog (opened by double-clicking a cell of the preview).
-  const [cellEdit, setCellEdit] = useState<{ cell: string; html: string; font: string; size: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -142,6 +148,34 @@ export default function IPCREditor() {
     setMeta(currentMeta => ({ ...currentMeta, [field.key]: { grouped_task_ids: next } }));
     updateValue(field.key, composeGroupedTasksHtml(next, groups));
   }
+
+  // Undo / redo for the pictures on the sheet (moving, resizing, removing, resetting): Ctrl+Z / Ctrl+Y. Each entry is the
+  // list of pictures as it was before one change. Typing in a box keeps its own undo, so the keys are left to it there.
+  const imageUndo = useRef<IPCRGridData["images"][]>([]);
+  const imageRedo = useRef<IPCRGridData["images"][]>([]);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+      const key = event.key.toLowerCase();
+      if (key !== "z" && key !== "y") return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest?.("input, textarea, select, [contenteditable='true']")) return;
+      const redo = key === "y" || event.shiftKey;
+      const from = redo ? imageRedo.current : imageUndo.current;
+      if (!from.length) return;
+      event.preventDefault();
+      setGrid(current => {
+        if (!current) return current;
+        const target = from.pop()!;
+        (redo ? imageUndo.current : imageRedo.current).push((current.images ?? []).map(image => ({ ...image })));
+        return { ...current, images: target };
+      });
+      setLayoutEdited(true);
+      setDirty(true);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   // Adds rows / columns next to one the template's author marked as repeatable (see ipcrExpand.ts).
   function applyAdd(result: { grid: IPCRGridData; fields: IPCRField[]; addedFields: IPCRField[] }) {
@@ -233,6 +267,21 @@ export default function IPCREditor() {
     setDirty(true);
   }
 
+  // Changes (or, with null, removes) rules of one cell's look: { "font-weight": "bold" } and the like.
+  function styleCell(cell: string, patch: Record<string, string | null>) {
+    setGrid(currentGrid => {
+      if (!currentGrid) return currentGrid;
+      let rules = (currentGrid.style[cell] ?? "").split(";").map(part => part.trim()).filter(Boolean);
+      Object.entries(patch).forEach(([property, value]) => {
+        rules = rules.filter(part => part.split(":")[0].trim().toLowerCase() !== property);
+        if (value !== null) rules.push(`${property}: ${value}`);
+      });
+      return { ...currentGrid, style: { ...currentGrid.style, [cell]: rules.length ? `${rules.join("; ")};` : "" } };
+    });
+    setLayoutEdited(true);
+    setDirty(true);
+  }
+
   // Copy / paste in the sheet: Ctrl+C copies the clicked cell, or the whole row when its row number was clicked; Ctrl+V pastes
   // it into the clicked cell / row. What was copied here keeps its formatting; text copied from anywhere else (a block from
   // Excel included) can be pasted too.
@@ -295,7 +344,7 @@ export default function IPCREditor() {
   }
 
   useEffect(() => {
-    if (printView || cellEdit || layoutOpen || !copyTarget) return;
+    if (printView || layoutOpen || !copyTarget) return;
     // Keys typed in a form field or an open dialog keep their own copy / paste.
     const typing = (target: EventTarget | null) => target instanceof HTMLElement && !!target.closest("input, textarea, select, [contenteditable='true'], .swal2-container");
     const onCopy = (event: ClipboardEvent) => {
@@ -316,7 +365,7 @@ export default function IPCREditor() {
     window.addEventListener("paste", onPaste, true);
     return () => { window.removeEventListener("copy", onCopy, true); window.removeEventListener("paste", onPaste, true); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [printView, cellEdit, layoutOpen, copyTarget, grid, submission]);
+  }, [printView, layoutOpen, copyTarget, grid, submission]);
 
   // A task or grouped task dragged from the list and dropped on a cell.
   async function dropTask(cell: string, payload: string) {
@@ -404,60 +453,13 @@ export default function IPCREditor() {
   // For a tagged row: what to add (an item, or a new section such as a Key Result Area), above or below it, and how many items.
   async function askAddRows(index: number) {
     if (!grid) return;
-    const mark = grid.expandable?.rows?.[index];
-    // Any row can be picked; a row that was tagged in the template may limit the sides, others allow both.
-    const allowBefore = mark ? mark.before || !mark.after : true;
-    const allowAfter = mark ? mark.after || !mark.before : true;
     // An IPCR made before the heading was tagged has no tag of its own; the template's heading is used instead.
-    const templateGrid = template ? normalizeGrid(template.grid) : null;
-    const templateHeading = templateGrid ? findSectionRow(templateGrid, 0) : null;
-    const canSection = findSectionRow(grid, index) !== null || templateHeading !== null;
-    const radio = (name: string, value: string, label: string, checked: boolean) =>
-      `<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin:4px 0;cursor:pointer"><input type="radio" name="${name}" value="${value}" ${checked ? "checked" : ""} /> ${label}</label>`;
-    const { value, isConfirmed } = await Swal.fire({
-      title: "Add to the sheet",
-      html: `<div style="text-align:left;max-width:360px;margin:0 auto">`
-        + `<div style="font-size:12px;opacity:.7;margin-bottom:4px">What do you want to add?</div>`
-        + radio("etm-add-kind", "item", "Another item (a row like this one)", true)
-        + (canSection ? radio("etm-add-kind", "section", "A new section (like a Key Result Area)", false) : `<div style="font-size:12px;opacity:.7;margin:4px 0">New sections are not set up in this template yet (tag a heading row as a section heading in the template).</div>`)
-        + `<div style="font-size:12px;opacity:.7;margin:12px 0 4px">Where?</div>`
-        + (allowBefore ? radio("etm-add-side", "before", "Above this row", !allowAfter) : "")
-        + (allowAfter ? radio("etm-add-side", "after", "Below this row", true) : "")
-        + `<div id="etm-add-count-wrap"><div style="font-size:12px;opacity:.7;margin:12px 0 4px">How many rows?</div><input id="etm-add-count" class="etm-swal-field" type="number" min="1" max="20" value="1" /></div>`
-        + `<div id="etm-add-title-wrap" style="display:none"><div style="font-size:12px;opacity:.7;margin:12px 0 4px">Name of the new section</div><input id="etm-add-title" class="etm-swal-field" type="text" placeholder="e.g. Key Result Area #2" /></div>`
-        + `</div>`,
-      didOpen: () => {
-        const sync = () => {
-          const section = (document.querySelector('input[name="etm-add-kind"]:checked') as HTMLInputElement | null)?.value === "section";
-          (document.getElementById("etm-add-count-wrap") as HTMLElement).style.display = section ? "none" : "block";
-          (document.getElementById("etm-add-title-wrap") as HTMLElement).style.display = section ? "block" : "none";
-        };
-        document.querySelectorAll('input[name="etm-add-kind"]').forEach(input => input.addEventListener("change", sync));
-        sync();
-      },
-      preConfirm: () => {
-        const kind = (document.querySelector('input[name="etm-add-kind"]:checked') as HTMLInputElement | null)?.value ?? "item";
-        const side = (document.querySelector('input[name="etm-add-side"]:checked') as HTMLInputElement | null)?.value ?? "after";
-        const count = Math.max(1, Math.min(20, Number((document.getElementById("etm-add-count") as HTMLInputElement | null)?.value) || 1));
-        const title = ((document.getElementById("etm-add-title") as HTMLInputElement | null)?.value ?? "").trim();
-        if (kind === "section" && !title) { Swal.showValidationMessage("Give the new section a name."); return false; }
-        return { kind, side, count, title };
-      },
-      showCancelButton: true,
-      confirmButtonText: "Add",
-    });
-    if (!isConfirmed || !value) return;
+    const result = await askAddRowsDialog(grid, fields, index, template ? normalizeGrid(template.grid) : null);
+    if (!result) return;
     setPickedRow(null);
-    const choice = value as { kind: "item" | "section"; side: Side; count: number; title: string };
-    if (choice.kind === "section") {
-      const result = addSection(grid, fields, index, choice.side, choice.title, templateGrid && templateHeading !== null ? { grid: templateGrid, row: templateHeading } : undefined);
-      if (result) applyAdd(result);
-    } else {
-      applyAdd(addRepeatedLines(grid, fields, "row", index, choice.side, choice.count));
-    }
+    applyAdd(result);
   }
 
-  const selectStyle: React.CSSProperties = { width: "100%", padding: "8px 10px", border: "1px solid var(--etm-border)", borderRadius: 8, background: "var(--etm-surface-alt)", color: "var(--etm-ink)", font: "inherit", fontSize: 13 };
 
   const pickedRowText = (() => {
     if (!grid || pickedRow === null) return "";
@@ -489,21 +491,72 @@ export default function IPCREditor() {
 
   // Double-click a cell of the preview to change what it holds — the way out when a cell still shows what the template
   // used to have there (the sheet of an IPCR that has been edited is kept as it is, see ipcrSync.ts).
-  function editCell(cell: string) {
-    if (!grid || !submission?.can_manage) return;
-    const { col, row } = cellCoords(cell);
-    const runs = grid.richText?.[cell] ?? [{ text: String(grid.data[row]?.[col] ?? "") }];
-    const look = parseCellStyle(grid.style[cell]);
-    setCellEdit({ cell, html: runsToEditorHtml(runs), font: look.fontFamily ?? "", size: look.fontSize ? String(look.fontSize) : "" });
+  // Keeps the sheet where it is on the screen for a moment after a tap. Picking a cell opens the editing bar and the typing
+  // box, and focusing / resizing those moves the page a little; that shifted the sheet under the second tap of a
+  // double-tap, which then landed on another row. Any such shift is scrolled straight back.
+  function holdSheetInPlace(duration = 700) {
+    const wrap = previewWrap.current;
+    if (!wrap) return;
+    let scroller: HTMLElement | null = wrap.parentElement;
+    while (scroller && !(scroller.scrollHeight > scroller.clientHeight && /(auto|scroll)/.test(getComputedStyle(scroller).overflowY))) scroller = scroller.parentElement;
+    const topNow = () => wrap.getBoundingClientRect().top;
+    const anchor = topNow();
+    const started = performance.now();
+    const step = () => {
+      const delta = topNow() - anchor;
+      if (Math.abs(delta) > 0.5) { if (scroller) scroller.scrollTop += delta; else window.scrollBy(0, delta); }
+      if (performance.now() - started < duration) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
   }
 
-  function applyCellEdit() {
-    if (!cellEdit) return;
-    const { cell, html, font, size } = cellEdit;
-    const runs = htmlToRuns(html, { keepBlankLines: true });
-    writeCell(cell, runsNeedRichText(runs) ? runs : null, flattenRuns(runs), { font, size });
-    setCellEdit(null);
+  function editCell(cell: string) {
+    if (!grid || !submission?.can_manage) return;
+    holdSheetInPlace();
+    setPickedCell(cell);
+    setPickedRow(cellCoords(cell).row);
+    setInlineCell(cell);
   }
+
+  // Where the cell being typed in is on the sheet, so the typing box can sit exactly over it.
+  useEffect(() => {
+    if (!inlineCell) { setInlineRect(null); return; }
+    const { col, row } = cellCoords(inlineCell);
+    const place = () => {
+      const wrap = previewWrap.current;
+      const td = wrap?.querySelector<HTMLElement>(`td[data-x="${col}"][data-y="${row}"]`);
+      if (!wrap || !td) return;
+      const a = wrap.getBoundingClientRect();
+      const b = td.getBoundingClientRect();
+      const c = getComputedStyle(td);
+      // A cell whose text is drawn by a text layer has its own text made see-through (so it does not show twice), and
+      // the typing box copied that — typed text was invisible until the box was left. Use the cell's real colour.
+      const seeThrough = !c.color || c.color === "transparent" || /rgba\(.*,\s*0\)$/.test(c.color);
+      const visibleColor = seeThrough ? (parseCellStyle(grid?.style[inlineCell] ?? "").color || "#000") : c.color;
+      const clear = !c.backgroundColor || c.backgroundColor === "transparent" || c.backgroundColor === "rgba(0, 0, 0, 0)";
+      setInlineRect({ left: b.left - a.left, top: b.top - a.top, width: b.width, height: b.height, css: { fontFamily: c.fontFamily, fontSize: c.fontSize, fontWeight: c.fontWeight, fontStyle: c.fontStyle, color: visibleColor, textAlign: c.textAlign as React.CSSProperties["textAlign"], background: clear ? "#fff" : c.backgroundColor } });
+    };
+    place();
+    const timer = window.setTimeout(place, 150);
+    return () => window.clearTimeout(timer);
+  }, [inlineCell]);
+
+  // Typing starts right away in the box over the cell.
+  useEffect(() => {
+    if (!inlineHost) return;
+    const timer = window.setTimeout(() => {
+      const editable = inlineHost.querySelector<HTMLElement>("[contenteditable]");
+      if (!editable) return;
+      editable.focus({ preventScroll: true });
+      const range = document.createRange();
+      range.selectNodeContents(editable);
+      range.collapse(false);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    }, 30);
+    return () => window.clearTimeout(timer);
+  }, [inlineHost]);
 
   // Throws away the changes made to the sheet of this IPCR and takes the template's current sheet; answers for fields that
   // still exist in the template are kept.
@@ -607,6 +660,7 @@ export default function IPCREditor() {
       <IPCRTemplateForm
         submissionMode
         template={asTemplate}
+        initialCell={layoutCell}
         onCancel={() => setLayoutOpen(false)}
         onSave={async input => {
           setGrid(input.grid);
@@ -645,6 +699,7 @@ export default function IPCREditor() {
         </div>
         {error && <span className="text-[11px] text-destructive">{error}</span>}
         <button type="button" className={`${barButton}${printView ? " bg-primary/10" : ""}`} onClick={() => setPrintView(on => !on)} title="Show the sheet the way it will print — the form on the left stays editable"><Eye className="w-3.5 h-3.5" />{printView ? "Edit sheet" : "Print preview"}</button>
+        {submission.can_manage && <button type="button" className={barButton} onClick={() => { setLayoutCell(null); setLayoutOpen(true); }} title="Open the full sheet editor (rows, columns, images, merging). Only this IPCR changes, not the template."><LayoutGrid className="w-3.5 h-3.5" />Full editor</button>}
         {template && submission.can_manage && <button type="button" className={barButton} onClick={() => void resetToTemplate()} title="Use the template's current sheet again (removes rows and cell edits you made)"><RefreshCw className="w-3.5 h-3.5" />Reset sheet</button>}
         <button type="button" className={barButton} onClick={() => { const sheet = forExport(); if (sheet) printIPCRPdf(sheet, paperSize, orientation); }} title="Open the PDF to print or save (Ctrl+P)"><Printer className="w-3.5 h-3.5" />Print</button>
         <button type="button" className={barButton} onClick={() => { const sheet = forExport(); if (sheet) void downloadIPCRWorkbook(sheet, filename); }}><Download className="w-3.5 h-3.5" />Excel</button>
@@ -655,14 +710,6 @@ export default function IPCREditor() {
         </button>
       </div>
 
-      {!manualAsked && submission.can_manage && (
-        <div className="etm-ipcr-manual-ask" role="region" aria-label="Edit the sheet manually">
-          <LayoutGrid className="w-4 h-4 shrink-0" />
-          <span className="flex-1 min-w-0">Want to edit the sheet itself manually — cells, rows, columns, images and formatting, like editing a template?</span>
-          <button type="button" className="etm-button primary small" onClick={() => { setManualAsked(true); setLayoutOpen(true); }}>Yes, edit manually</button>
-          <button type="button" className="etm-button ghost small" onClick={() => setManualAsked(true)}>No, thanks</button>
-        </div>
-      )}
       <div className="etm-ipcr-fill-body">
         <aside className="etm-ipcr-fill-side">
           <div>
@@ -782,45 +829,27 @@ export default function IPCREditor() {
               </div>
             </div>
           )}
-          <div style={printView ? { position: "absolute", left: -10000, top: 0, width: 1800, pointerEvents: "none" } : undefined} aria-hidden={printView || undefined}>
+          {/* The bar above the sheet appears when a cell is clicked. It used to push the sheet down by its own height, so the
+              second tap of a double-tap landed on a different row; its space is now kept free whether or not it is shown. */}
+          {!printView && submission.can_manage && (
+            <div style={{ minHeight: 170 }}>
+              {pickedCell && grid && (
+                <IPCRCellBar key={pickedCell} grid={grid} fields={fields} cell={pickedCell}
+                  onText={(runs, text) => writeCell(pickedCell, runs, text, { font: "", size: "" })}
+                  onStyle={patch => styleCell(pickedCell, patch)} editorHost={inlineCell === pickedCell ? inlineHost : null} />
+              )}
+            </div>
+          )}
+          <div ref={previewWrap} style={printView ? { position: "absolute", left: -10000, top: 0, width: 1800, pointerEvents: "none" } : { position: "relative" }} aria-hidden={printView || undefined}>
           <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">{printView ? "Print preview" : "Live preview"}</p>
-          <IPCRLivePreview grid={grid} fields={fields} values={values} refreshKey={previewKey} focusKey={focusField ?? hoverField} onCellDoubleClick={cell => editCell(cell)} onCellClick={cell => { setPickedRow(cellCoords(cell).row); setPickedCell(cell); }} onRowHeaderClick={row => { setPickedRow(row); setPickedCell(null); }} pickedRow={pickedRow} contextItems={sheetMenu} measureRef={measureRef} onDropTask={submission.can_manage ? (cell, payload) => void dropTask(cell, payload) : undefined} />
+          <IPCRLivePreview grid={grid} fields={fields} values={values} refreshKey={previewKey} focusKey={focusField ?? hoverField} onCellDoubleClick={cell => editCell(cell)} onCellClick={cell => { holdSheetInPlace(); setPickedRow(cellCoords(cell).row); setPickedCell(cell); if (cell !== inlineCell) setInlineCell(null); }} onRowHeaderClick={row => { setPickedRow(row); setPickedCell(null); setInlineCell(null); }} pickedRow={pickedRow} contextItems={sheetMenu} measureRef={measureRef} imageOriginals={template?.grid.images} onImageGestureStart={() => { imageUndo.current.push((grid?.images ?? []).map(image => ({ ...image }))); if (imageUndo.current.length > 50) imageUndo.current.shift(); imageRedo.current = []; }} onImagesChange={submission.can_manage ? images => { setGrid(current => current ? { ...current, images } : current); setLayoutEdited(true); setDirty(true); } : undefined} onDropTask={submission.can_manage ? (cell, payload) => void dropTask(cell, payload) : undefined} />
+          {!printView && inlineCell && inlineRect && (
+            <div ref={setInlineHost} className="etm-inline-cell" onKeyDown={event => { if (event.key === "Escape") setInlineCell(null); }}
+              style={{ position: "absolute", left: inlineRect.left, top: inlineRect.top, width: inlineRect.width, minHeight: inlineRect.height, zIndex: 30, ...inlineRect.css, outline: "2px solid #0d8a92", outlineOffset: -1, boxSizing: "border-box" }} />
+          )}
           </div>
         </main>
       </div>
-      {cellEdit && (
-        <div role="dialog" aria-modal="true" aria-label={`Edit cell ${cellEdit.cell}`} onKeyDown={event => { event.stopPropagation(); if (event.key === "Escape") setCellEdit(null); }}
-          onMouseDown={event => { if (event.target === event.currentTarget) setCellEdit(null); }}
-          style={{ position: "fixed", inset: 0, zIndex: 1000, display: "grid", placeItems: "center", background: "rgba(0,0,0,.5)", padding: 16 }}>
-          <div style={{ width: "min(560px, 100%)", maxHeight: "92vh", overflow: "auto", background: "var(--etm-surface)", color: "var(--etm-ink)", border: "1px solid var(--etm-border)", borderRadius: 14, padding: 18, display: "grid", gap: 12 }}>
-            <div>
-              <strong style={{ fontSize: 16 }}>Edit cell {cellEdit.cell}</strong>
-              <p style={{ margin: "4px 0 0", fontSize: 12.5, color: "var(--etm-muted)" }}>Format the text, make a bulleted list (type “-” then Space, or use the list button), or insert one of your fields.</p>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 90px", gap: 8 }}>
-              <select style={selectStyle} value="" aria-label="Insert a field" onChange={event => { const token = event.target.value; if (token) setCellEdit(current => current && ({ ...current, html: `${current.html}${token}` })); }}>
-                <option value="">Insert a field…</option>
-                {fields.map(field => <option key={field.key} value={`{{${field.key}}}`}>{field.label} ({field.cell})</option>)}
-              </select>
-              <select style={selectStyle} value={cellEdit.font} aria-label="Font" onChange={event => setCellEdit(current => current && ({ ...current, font: event.target.value }))}>
-                <option value="">Font: keep as is</option>
-                {["Arial", "Calibri", "Cambria", "Courier New", "Georgia", "Tahoma", "Times New Roman", "Verdana"].map(name => <option key={name} value={name}>{name}</option>)}
-                {cellEdit.font && !["Arial", "Calibri", "Cambria", "Courier New", "Georgia", "Tahoma", "Times New Roman", "Verdana"].includes(cellEdit.font) && <option value={cellEdit.font}>{cellEdit.font}</option>}
-              </select>
-              <select style={selectStyle} value={cellEdit.size} aria-label="Size" onChange={event => setCellEdit(current => current && ({ ...current, size: event.target.value }))}>
-                <option value="">Size</option>
-                {[8, 9, 10, 11, 12, 14, 16, 18, 20].map(size => <option key={size} value={String(size)}>{size}</option>)}
-                {cellEdit.size && ![8, 9, 10, 11, 12, 14, 16, 18, 20].includes(Number(cellEdit.size)) && <option value={cellEdit.size}>{cellEdit.size}</option>}
-              </select>
-            </div>
-            <IPCRRichTextField value={cellEdit.html} onChange={html => setCellEdit(current => current && ({ ...current, html }))} placeholder="Type what this cell should show" />
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <button type="button" className="etm-button ghost" onClick={() => setCellEdit(null)}>Cancel</button>
-              <button type="button" className="etm-button primary" onClick={applyCellEdit}>Apply</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
