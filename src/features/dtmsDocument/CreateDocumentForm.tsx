@@ -43,11 +43,14 @@ const SIGNATORY_ROLE_OPTIONS: SelectOption<"signer" | "viewer" | "reviewer">[] =
 // as a colored pill (matching the read-only role pills elsewhere) rather than a plain control.
 function pillSelectStyles(color: string) {
   return {
-    control: (base: Record<string, unknown>) => ({ ...base, minHeight: 26, border: 0, borderRadius: 20, backgroundColor: `color-mix(in srgb, ${color} 14%, transparent)`, boxShadow: "none" }),
-    valueContainer: (base: Record<string, unknown>) => ({ ...base, padding: "0 4px 0 8px" }),
+    control: (base: Record<string, unknown>) => ({ ...base, minHeight: 26, height: 26, border: 0, borderRadius: 20, backgroundColor: `color-mix(in srgb, ${color} 14%, transparent)`, boxShadow: "none" }),
+    valueContainer: (base: Record<string, unknown>) => ({ ...base, height: 26, padding: "0 2px 0 10px" }),
+    input: (base: Record<string, unknown>) => ({ ...base, margin: 0, padding: 0 }),
+    // Wide enough for "Reviewer" and drawn above the dialog, not clipped by the signatory list.
+    menu: (base: Record<string, unknown>) => ({ ...base, minWidth: 120, marginTop: 4, backgroundColor: "var(--etm-surface)", border: "1px solid var(--etm-border)", borderRadius: 8, overflow: "hidden" }),
     singleValue: (base: Record<string, unknown>) => ({ ...base, color, fontWeight: 700, fontSize: 11 }),
-    indicatorsContainer: (base: Record<string, unknown>) => ({ ...base, height: 24 }),
-    dropdownIndicator: (base: Record<string, unknown>) => ({ ...base, color, padding: "0 4px" }),
+    indicatorsContainer: (base: Record<string, unknown>) => ({ ...base, height: 26 }),
+    dropdownIndicator: (base: Record<string, unknown>) => ({ ...base, color, padding: "0 6px 0 2px" }),
   };
 }
 
@@ -393,12 +396,14 @@ export default function CreateDocumentForm({ defaultTitle, initialTemplateId, in
                     <div className="etm-sig-row">
                       <span className="etm-sig-row-badge" aria-hidden="true">{signatoryStepNumber(entry.order)}</span>
                       <span className="etm-sig-row-name" title={entry.user_name || entry.user_email}>{entry.user_name || entry.user_email}</span>
-                      <div style={{ width: 112, flexShrink: 0 }}>
+                      <div style={{ width: 104, flexShrink: 0 }}>
                         <ThemedSelect<SelectOption<"signer" | "viewer" | "reviewer">>
                           size="small"
                           classNamePrefix="etm-sig-role-select"
                           aria-label={`Role for ${entry.user_name}`}
                           isSearchable={false}
+                          menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
+                          menuPosition="fixed"
                           options={SIGNATORY_ROLE_OPTIONS}
                           value={SIGNATORY_ROLE_OPTIONS.find(option => option.value === entry.role) ?? SIGNATORY_ROLE_OPTIONS[0]}
                           onChange={option => updateSignatoryRole(entry.localKey, option?.value ?? "signer")}

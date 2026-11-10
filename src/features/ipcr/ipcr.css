@@ -145,3 +145,7 @@
 .etm-ipcr-card-footer .etm-button.primary { flex: 1 1 auto; justify-content: center; }
 .etm-ipcr-card-delete { flex: 0 0 auto; }
 .etm-ipcr-card { min-width: min(320px, 100%); }
+
+/* Fill-in preview: no spreadsheet selection tint or border — only the glowing cell of the input being filled in stands out. */
+.etm-ipcr-grid-overlay-wrap .jss_worksheet .highlight, .etm-ipcr-grid-overlay-wrap .jss_worksheet .selection, .etm-ipcr-grid-overlay-wrap .jss_worksheet .highlight-selected { background-color: transparent !important; }
+.etm-ipcr-grid-overlay-wrap .jss_worksheet .highlight-top, .etm-ipcr-grid-overlay-wrap .jss_worksheet .highlight-left, .etm-ipcr-grid-overlay-wrap .jss_worksheet .highlight-right, .etm-ipcr-grid-overlay-wrap .jss_worksheet .highlight-bottom, .etm-ipcr-grid-overlay-wrap .jss_worksheet .selection-top, .etm-ipcr-grid-overlay-wrap .jss_worksheet .selection-left, .etm-ipcr-grid-overlay-wrap .jss_worksheet .selection-right, .etm-ipcr-grid-overlay-wrap .jss_worksheet .selection-bottom { box-shadow: none !important; }

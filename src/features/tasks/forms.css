@@ -146,6 +146,11 @@
 .etm-task-form .etm-sig-queue .etm-sig-row-role.viewer { background: color-mix(in srgb, #a17527 16%, transparent); color: #a17527; }
 :root.dark .etm-task-form .etm-sig-queue .etm-sig-row-role.reviewer { color: #bda3dd; background: color-mix(in srgb, #bda3dd 18%, transparent); }
 :root.dark .etm-task-form .etm-sig-queue .etm-sig-row-role.viewer { color: #e6c179; background: color-mix(in srgb, #e6c179 18%, transparent); }
+/* The role pill is a react-select, whose inner <input> sits inside .etm-field and so inherits the
+   form's full-size input rule (43px min-height, 11px/13px padding, 100% width) — that is what
+   stretched the pill and pushed its arrow to the top. Reset it so the pill stays compact. */
+.etm-task-form .etm-field .etm-sig-role-select__control input,
+.etm-task-details .etm-field .etm-sig-role-select__control input { width: auto; min-width: 0; min-height: 0; height: auto; padding: 0; border: 0; background: transparent; box-shadow: none; }
 .etm-subtask-doc-chip { cursor: pointer; }
 .etm-subtask-doc-chip:hover { background: color-mix(in srgb, var(--etm-primary) 22%, var(--etm-surface)); }
 .etm-subtask-doc-chip:focus-visible { outline: 2px solid var(--etm-primary); outline-offset: 2px; }

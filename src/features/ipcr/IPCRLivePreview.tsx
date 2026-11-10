@@ -63,12 +63,12 @@ export default function IPCRLivePreview({ grid, fields, values, refreshKey, focu
     let frame = 0;
     const apply = (count: number) => {
       if (cancelled) return;
-      gridRef.current?.markPickedRow(pickedRow);
+      gridRef.current?.markPickedRow(focusKey ? null : pickedRow);
       if (count < 20) frame = requestAnimationFrame(() => apply(count + 1));
     };
     apply(0);
     return () => { cancelled = true; cancelAnimationFrame(frame); };
-  }, [pickedRow, refreshKey]);
+  }, [pickedRow, refreshKey, focusKey]);
   const dropCell = useRef<string | null>(null);
   const cellAt = (event: { clientX: number; clientY: number }) => {
     // Text layers sit over the cells, so look through everything under the pointer for the cell itself.
