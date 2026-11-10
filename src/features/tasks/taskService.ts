@@ -13,14 +13,19 @@ interface OfficeDirectoryItem {
   name: string;
 }
 
+// An admin who switches to the user view sees what an ordinary user sees: only the tasks that are theirs or that they are part
+// of, not every task of the office / project (the admin pages keep the full list).
+export const isUserView = () => !/\/etms\/admin(\/|$)/.test(window.location.pathname);
+const viewAsUserParams = (): Record<string, string> => (isUserView() ? { as: "user" } : {});
+
 export const taskService = {
-  list: async () => (await api.get<Task[]>("etm/tasks/")).data,
+  list: async () => (await api.get<Task[]>("etm/tasks/", { params: viewAsUserParams() })).data,
   listGroupedTasks: async () => (await api.get<GroupedTask[]>("etm/grouped-tasks/")).data,
   createGroupedTask: async (input: GroupedTaskInput) => (await api.post<GroupedTask>("etm/grouped-tasks/", input)).data,
   updateGroupedTask: async (id: number, input: Partial<GroupedTaskInput>) =>
     (await api.patch<GroupedTask>(`etm/grouped-tasks/${id}/`, input)).data,
   deleteGroupedTask: async (id: number) => { await api.delete(`etm/grouped-tasks/${id}/`); },
-  listArchived: async () => (await api.get<Task[]>("etm/tasks/", { params: { archived: "1" } })).data,
+  listArchived: async () => (await api.get<Task[]>("etm/tasks/", { params: { archived: "1", ...viewAsUserParams() } })).data,
   members: async () => (await api.get<Member[]>("etm/members/")).data,
   addMember: async (input: { first_name: string; last_name: string; email: string; position?: string }) =>
     (await api.post<Member>("etm/members/quick-add/", input)).data,

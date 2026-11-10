@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { TaskContext, type OfficeScope } from "./taskContext";
 import { withBlockingLoader } from "./blockingLoader";
-import { taskError, taskService } from "./taskService";
+import { isUserView, taskError, taskService } from "./taskService";
 import { flattenSubtasks, type Member, type Project, type Task, type TaskInput, type TaskStatus, type TaskTemplate, type TaskTemplateInput } from "./types";
 import { dtmsDocumentService } from "../dtmsDocument/dtmsDocumentService";
 import type { DtmsDocumentTemplate } from "../dtmsDocument/dtmsDocumentTypes";
@@ -14,6 +14,7 @@ import { secureStorage } from "../../lib/secureStorage";
 const CACHE_TTL_MS = 5 * 60 * 1000;
 interface TaskSnapshot {
   token: string | null;
+  userView: boolean;
   at: number;
   tasks: Task[];
   officeScope: OfficeScope;
@@ -25,7 +26,7 @@ interface TaskSnapshot {
 let taskCache: TaskSnapshot | null = null;
 const currentToken = () => secureStorage.getItem<string>("auth_token") ?? null;
 function freshCache(): TaskSnapshot | null {
-  return taskCache && taskCache.token === currentToken() && Date.now() - taskCache.at < CACHE_TTL_MS ? taskCache : null;
+  return taskCache && taskCache.token === currentToken() && taskCache.userView === isUserView() && Date.now() - taskCache.at < CACHE_TTL_MS ? taskCache : null;
 }
 
 export default function TaskProvider({ children }: { children: ReactNode }) {
@@ -81,7 +82,7 @@ export default function TaskProvider({ children }: { children: ReactNode }) {
   // still counts from the last real request, not from a local edit).
   useEffect(() => {
     if (loading || error) return;
-    taskCache = { token: currentToken(), at: fetchedAt.current, tasks, officeScope, members, projects, templates, dtmsDocumentTemplates };
+    taskCache = { token: currentToken(), userView: isUserView(), at: fetchedAt.current, tasks, officeScope, members, projects, templates, dtmsDocumentTemplates };
   }, [loading, error, tasks, officeScope, members, projects, templates, dtmsDocumentTemplates]);
 
   useEffect(() => {
