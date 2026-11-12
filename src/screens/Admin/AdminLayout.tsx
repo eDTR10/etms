@@ -25,19 +25,35 @@ import etmsLogo from "../../assets/eTMS-icon.png";
 // ── Nav config ────────────────────────────────────────────────────────────
 // Deliberately a short, focused list — an admin oversees everyone's data, so the
 // personal-workflow items from UserLayout (Add Task, Calendar, Reports, How To) don't apply.
-const NAV_ITEMS = [
-  { label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, to: "/etms/admin/dashboard" },
-  { label: "Tasks", icon: <ListChecks className="w-4 h-4" />, to: "/etms/admin/tasks" },
-  { label: "Calendar", icon: <Calendar className="w-4 h-4" />, to: "/etms/admin/calendar" },
-  { label: "Task Template", icon: <Bookmark className="w-4 h-4" />, to: "/etms/admin/templates" },
-  { label: "Task Grouping", icon: <BarChart3 className="w-4 h-4" />, to: "/etms/admin/task-grouping" },
-  { label: "Users", icon: <Users className="w-4 h-4" />, to: "/etms/admin/users" },
-  { label: "Quick Links", icon: <Link2 className="w-4 h-4" />, to: "/etms/admin/quick-links" },
-  { label: "eLGU Project Task", icon: <Table2 className="w-4 h-4" />, to: "/etms/admin/elgu" },
-  { label: "TOD Tasks", icon: <Table2 className="w-4 h-4" />, to: "/etms/admin/tod" },
-  { label: "Send to Sheet", icon: <Table2 className="w-4 h-4" />, to: "/etms/admin/send-to-sheet" },
-  { label: "Sheets", icon: <Table2 className="w-4 h-4" />, to: "/etms/admin/sheets" },
-  { label: "Generate IPCR Template", icon: <FileSpreadsheet className="w-4 h-4" />, to: "/etms/admin/ipcr-templates" },
+const NAV_GROUPS: { items: { label: string; icon: React.ReactNode; to: string; note?: string }[] }[] = [
+  {
+    items: [
+      { label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, to: "/etms/admin/dashboard" },
+      { label: "Tasks", icon: <ListChecks className="w-4 h-4" />, to: "/etms/admin/tasks" },
+      { label: "Calendar", icon: <Calendar className="w-4 h-4" />, to: "/etms/admin/calendar" },
+      { label: "Task Template", icon: <Bookmark className="w-4 h-4" />, to: "/etms/admin/templates" },
+    ],
+  },
+  {
+    items: [
+      { label: "Task Grouping", icon: <BarChart3 className="w-4 h-4" />, to: "/etms/admin/task-grouping" },
+      { label: "Generate IPCR Template", icon: <FileSpreadsheet className="w-4 h-4" />, to: "/etms/admin/ipcr-templates" },
+    ],
+  },
+  {
+    items: [
+      { label: "eLGU Project Task", icon: <Table2 className="w-4 h-4" />, to: "/etms/admin/elgu" },
+      { label: "TOD Tasks", icon: <Table2 className="w-4 h-4" />, to: "/etms/admin/tod" },
+      { label: "Send to Sheet", icon: <Table2 className="w-4 h-4" />, to: "/etms/admin/send-to-sheet" },
+      { label: "Sheets", icon: <Table2 className="w-4 h-4" />, to: "/etms/admin/sheets" },
+    ],
+  },
+  {
+    items: [
+      { label: "Users", icon: <Users className="w-4 h-4" />, to: "/etms/admin/users" },
+      { label: "Quick Links", icon: <Link2 className="w-4 h-4" />, to: "/etms/admin/quick-links" },
+    ],
+  },
 ];
 
 interface AdminLayoutProps {
@@ -53,6 +69,9 @@ const AdminLayout = ({ title, subtitle, children }: AdminLayoutProps) => {
   const unseenAssignedCount = useUnseenAssignedCount();
   // Mobile: the sidebar becomes an off-canvas drawer opened by the header hamburger.
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // "Users" is for super admins only; a group left with nothing is not drawn.
+  const navGroups = NAV_GROUPS.map(group => ({ ...group, items: group.items.filter(item => item.to !== "/etms/admin/users" || isSuperAdmin(user)) })).filter(group => group.items.length > 0);
 
   useEffect(() => { setMenuOpen(false); }, [pathname]);
   useEffect(() => {
@@ -94,38 +113,48 @@ const AdminLayout = ({ title, subtitle, children }: AdminLayoutProps) => {
           </span>
         </div>
 
-        <nav className="flex-1 px-3 py-4 flex flex-col gap-1">
-          {NAV_ITEMS.filter(item => item.to !== "/etms/admin/users" || isSuperAdmin(user)).map((item, index) => {
-            const isActive = pathname === item.to;
-            if (isIPCRComingSoon(item.to)) {
-              return (
-                <div key={item.label} aria-disabled="true" title="Coming soon" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground/60 cursor-not-allowed select-none">
-                  {item.icon}
-                  <span className="flex-1 min-w-0">{item.label}</span>
-                  <span className="ml-auto px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 text-[9px] font-bold uppercase tracking-wide whitespace-nowrap">Coming soon</span>
-                </div>
-              );
-            }
-            return (
-              <Link
-                key={item.label}
-                to={item.to}
-                style={{ transitionDelay: menuOpen ? `${80 + index * 40}ms` : "0ms" }}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-[colors,opacity,transform] duration-300 ${menuOpen ? "md:opacity-100 md:translate-x-0" : "md:opacity-0 md:-translate-x-3"} ${isActive
-                  ? "bg-[#0d8a92] text-white dark:bg-[#17b3ac]"
-                  : "text-muted-foreground hover:bg-[#0d8a92] hover:text-white dark:hover:bg-[#17b3ac]"
-                  }`}
-              >
-                {item.icon}
-                {item.label}
-                {item.to === "/etms/admin/tasks" && unseenAssignedCount > 0 && (
-                  <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-[#e0453c] text-white text-[10px] font-bold flex items-center justify-center">
-                    {unseenAssignedCount > 9 ? "9+" : unseenAssignedCount}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
+        <nav className="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto">
+          {navGroups.map((group, groupIndex) => (
+            <div key={`group-${groupIndex}`} className={groupIndex > 0 ? "mt-3 pt-3 border-t border-border" : undefined}>
+              <div className="flex flex-col gap-1">
+                {group.items.map(item => {
+                  const isActive = pathname === item.to;
+                  if (isIPCRComingSoon(item.to)) {
+                    return (
+                      <div key={item.label} aria-disabled="true" title="Coming soon" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground/60 cursor-not-allowed select-none">
+                        {item.icon}
+                        <span className="flex-1 min-w-0">{item.label}</span>
+                        <span className="ml-auto px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 text-[9px] font-bold uppercase tracking-wide whitespace-nowrap">Coming soon</span>
+                      </div>
+                    );
+                  }
+                  const order = navGroups.slice(0, groupIndex).reduce((sum, g) => sum + g.items.length, 0) + group.items.indexOf(item);
+                  return (
+                    <Link
+                      key={item.label}
+                      to={item.to}
+                      style={{ transitionDelay: menuOpen ? `${80 + order * 35}ms` : "0ms" }}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-[colors,opacity,transform] duration-300 ${menuOpen ? "md:opacity-100 md:translate-x-0" : "md:opacity-0 md:-translate-x-3"} ${isActive
+                        ? "bg-[#0d8a92] text-white dark:bg-[#17b3ac]"
+                        : "text-muted-foreground hover:bg-[#0d8a92] hover:text-white dark:hover:bg-[#17b3ac]"
+                        }`}
+                    >
+                      {item.icon}
+                      <span className="flex-1 min-w-0">
+                        {item.label}
+                        {item.note && <span className="block text-[10px] italic font-normal opacity-70 leading-tight">({item.note})</span>}
+                      </span>
+                      {item.to === "/etms/admin/tasks" && unseenAssignedCount > 0 && (
+                        <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#e0453c] text-white text-[10px] font-bold flex items-center justify-center">
+                          {unseenAssignedCount > 9 ? "9+" : unseenAssignedCount}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
         <div className="px-3 pb-5 border-t border-border pt-4 flex flex-col gap-2">

@@ -2,10 +2,11 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { createPortal } from "react-dom";
 import Swal from "sweetalert2";
-import { ArrowLeft, Check, ListPlus, ExternalLink, Link2, Plus, RefreshCw } from "lucide-react";
+import { ArrowLeft, Check, ListPlus, ExternalLink, Link2, Plus, RefreshCw, UserCog } from "lucide-react";
 import Modal from "../../components/ui/modal";
 import MultiSelect from "../../components/ui/multiselect";
 import CreateTaskDialog, { type CreateTaskValues } from "./CreateTaskDialog";
+import RowAccessDialog from "./RowAccessDialog";
 import SheetEntryForm from "./SheetEntryForm";
 import SheetTableView, { type SheetSort } from "./SheetTableView";
 import UserLayout from "../../screens/User/UserLayout";
@@ -114,6 +115,9 @@ export default function SheetTasksPage({ cardKey, title, subtitle, back, filterL
   // A saved copy is on screen and is being checked against the sheet in the background.
   const [refreshing, setRefreshing] = useState(false);
   const [syncedAt, setSyncedAt] = useState<number | null>(null);
+  // Set when an admin limited what this person sees of the sheet.
+  const [access, setAccess] = useState<{ conditions?: { column: string; values: string[] }[]; match?: "all" | "any"; assigned?: boolean } | null>(null);
+  const [showAccess, setShowAccess] = useState(false);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   // Newest first: the last row of the sheet is the latest one.
@@ -132,6 +136,7 @@ export default function SheetTasksPage({ cardKey, title, subtitle, back, filterL
     viewers: { provincial: { id: number; name: string }[]; focal: { id: number; name: string }[] };
     members: { id: number; name: string; detail?: string }[];
   } | null>(null);
+  const readOnly = card?.level === "assigned";
   const taskBase = admin ? "/etms/admin/tasks" : "/etms/tasks";
   const [opening, setOpening] = useState(false);
   const [preload, setPreload] = useState<{ target: SheetTarget; schema: SheetSchema } | null>(null);
@@ -165,7 +170,7 @@ export default function SheetTasksPage({ cardKey, title, subtitle, back, filterL
   const autoSynced = useRef(false);
   async function load(mode: "sync" | "open") {
     if (!targetId || loading || refreshing || !tab) return;
-    const key = `${targetId}:${tab}`;
+    const key = `${user?.id ?? 0}:${targetId}:${tab}`;
     const saved = await getCachedTable(key);
     if (saved) { setTable(arranged(saved.table, moveColumns)); setSyncedAt(saved.at); }
     // Full-screen only when there is nothing to show yet; with a saved copy the check runs quietly.
@@ -177,6 +182,7 @@ export default function SheetTasksPage({ cardKey, title, subtitle, back, filterL
       if (result.unchanged) {
         if (saved) { void putCachedTable(key, { ...saved, at }); setSyncedAt(at); }
       } else {
+        setAccess(result.access ?? null);
         setTable(arranged(result, moveColumns));
         setSyncedAt(at);
         void putCachedTable(key, { table: result, version: result.version, at });
@@ -196,7 +202,7 @@ export default function SheetTasksPage({ cardKey, title, subtitle, back, filterL
     setTab(next);
     rememberTab(cardKey, next);
     setError("");
-    const saved = targetId ? await getCachedTable(`${targetId}:${next}`) : null;
+    const saved = targetId ? await getCachedTable(`${user?.id ?? 0}:${targetId}:${next}`) : null;
     setTable(saved ? arranged(saved.table, moveColumns) : null);
     setSyncedAt(saved?.at ?? null);
   }
@@ -388,8 +394,9 @@ export default function SheetTasksPage({ cardKey, title, subtitle, back, filterL
           </div>
           {card?.target && (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button type="button" className="etm-button" onClick={() => void openEntry()} disabled={opening}>{opening ? <RefreshCw size={16} className="etm-form-spinner" /> : <Plus size={16} />} {opening ? "Opening…" : "Add entry"}</button>
+              {!readOnly && <button type="button" className="etm-button" onClick={() => void openEntry()} disabled={opening}>{opening ? <RefreshCw size={16} className="etm-form-spinner" /> : <Plus size={16} />} {opening ? "Opening…" : "Add entry"}</button>}
               <a href={card.url} target="_blank" rel="noreferrer" className="etm-button ghost"><ExternalLink size={15} /> Open the sheet</a>
+              {isAdmin && table && <button type="button" className="etm-button ghost" onClick={() => setShowAccess(true)} title="Decide which rows a person may see"><UserCog size={15} /> Who sees what</button>}
               {isAdmin && <button type="button" className="etm-button ghost" onClick={() => setEditingUrl(value => !value)}><Link2 size={15} /> Change link</button>}
             </div>
           )}
@@ -455,9 +462,17 @@ export default function SheetTasksPage({ cardKey, title, subtitle, back, filterL
                 {activeFilters > 0 && <button type="button" className="etm-button ghost" style={{ minHeight: 40 }} onClick={() => setFilters({})}>Clear filters ({activeFilters})</button>}
               </div>
             )}
+            {access && (access.assigned || access.conditions?.length) && (
+              <p className="etm-panel" style={{ margin: "0 0 14px", padding: "10px 14px", fontSize: 13, color: "var(--etm-ink)" }}>
+                {access.assigned && <>You see only the rows of the tasks assigned to you. </>}
+                {access.conditions?.length ? <>You see only the rows where {access.conditions.map((item, index) => (
+                  <span key={item.column}>{index ? (access.match === "any" ? " or " : " and ") : ""}<strong>{item.column}</strong> is {item.values.map((value, position) => <span key={value}>{position ? ", " : ""}<strong>{value}</strong></span>)}</span>
+                ))}.</> : null}
+              </p>
+            )}
             {!table && !loading && !error && <p style={{ color: "var(--etm-muted)" }}>Choose a tab, then press Sync to load it from the sheet.</p>}
             {table && <SheetTableView table={table} rows={rows} sort={sort} onSort={sortBy} latestColumn={latestColumn}
-              action={taskFrom ? {
+              action={taskFrom && !readOnly ? {
                 label: "Task",
                 render: row => {
                   const titlePosition = table.headers.findIndex(header => normalize(header.label) === normalize(taskFrom.title));
@@ -477,6 +492,9 @@ export default function SheetTasksPage({ cardKey, title, subtitle, back, filterL
           <SheetEntryForm embedded fixedTargetId={card.target} initialTab={tab} preload={preload} onSent={() => { setAdding(false); schemaMemory.delete(`${targetId}:${tab}`); }} />
           </div>
         </Modal>
+      )}
+      {showAccess && card?.target && table && (
+        <RowAccessDialog targetId={card.target} page={card.page} headers={table.headers} rows={table.rows} defaultColumn="Assigned Personnel" onClose={() => setShowAccess(false)} />
       )}
       {pendingTask && (
         <CreateTaskDialog

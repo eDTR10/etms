@@ -17,10 +17,12 @@ interface MultiSelectProps {
   placeholder?: string;
   // Draws the open list over the page (not inside its parent), so a dialog or a scrolling box cannot cut it off.
   portal?: boolean;
+  // Opens the list in place, pushing what is below it down (for use inside a window, where a floating list can get hidden).
+  inline?: boolean;
 }
 
 // A dropdown of checkboxes with a search box: pick any number of options; the button shows how many are picked.
-export default function MultiSelect({ label, options, selected, onChange, placeholder = "All", portal = false }: MultiSelectProps) {
+export default function MultiSelect({ label, options, selected, onChange, placeholder = "All", portal = false, inline = false }: MultiSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const root = useRef<HTMLDivElement>(null);
@@ -63,6 +65,10 @@ export default function MultiSelect({ label, options, selected, onChange, placeh
     const needle = query.trim().toLowerCase();
     return needle ? options.filter(option => `${option.name} ${option.detail ?? ""}`.toLowerCase().includes(needle)) : options;
   }, [options, query]);
+  // With nothing typed, what is already picked is listed first, under its own heading, so it is easy to see and undo.
+  const grouped = !query.trim() && selected.length > 0 && visible.some(option => !chosen.has(option.id));
+  const pickedOptions = grouped ? visible.filter(option => chosen.has(option.id)) : [];
+  const restOptions = grouped ? visible.filter(option => !chosen.has(option.id)) : visible;
   const toggle = (id: number) => onChange(chosen.has(id) ? selected.filter(item => item !== id) : [...selected, id]);
   const summary = selected.length === 0 ? placeholder : selected.length === 1 ? (options.find(option => option.id === selected[0])?.name ?? "1 selected") : `${selected.length} selected`;
 
@@ -76,8 +82,8 @@ export default function MultiSelect({ label, options, selected, onChange, placeh
       </button>
       {open && (() => {
         const list = (
-          <div className={`etm-multi-menu ${portal ? "portal" : ""}`} id={menuId} ref={menu}
-            style={portal ? { position: "fixed", zIndex: 100000, left: box?.left ?? 0, width: box?.width, ...(box?.top !== undefined ? { top: box.top } : { bottom: box?.bottom }), visibility: box ? "visible" : "hidden" } : undefined}>
+          <div className={`etm-multi-menu ${portal && !inline ? "portal" : ""} ${inline ? "inline" : ""}`} id={menuId} ref={menu}
+            style={portal && !inline ? { position: "fixed", zIndex: 100000, left: box?.left ?? 0, width: box?.width, ...(box?.top !== undefined ? { top: box.top } : { bottom: box?.bottom }), visibility: box ? "visible" : "hidden" } : undefined}>
           <div className="etm-multi-search">
             <Search size={14} />
             <input ref={search} value={query} onChange={event => setQuery(event.target.value)} placeholder={`Search ${label.toLowerCase()}…`} aria-label={`Search ${label}`} />
@@ -88,19 +94,30 @@ export default function MultiSelect({ label, options, selected, onChange, placeh
             <button type="button" onClick={() => onChange(query ? selected.filter(id => !visible.some(option => option.id === id)) : [])} disabled={!selected.length}>Clear</button>
           </div>
           <div className="etm-multi-list" role="listbox" aria-multiselectable="true">
-            {visible.length ? visible.map(option => {
-              const on = chosen.has(option.id);
+            {(() => {
+              const row = (option: { id: number; name: string; detail?: string }) => {
+                const on = chosen.has(option.id);
+                return (
+                  <button type="button" key={option.id} role="option" aria-selected={on} className={`etm-multi-option ${on ? "on" : ""}`} onClick={() => toggle(option.id)}>
+                    <span className="etm-multi-box">{on && <Check size={12} strokeWidth={3} />}</span>
+                    <span className="etm-multi-text"><span>{option.name}</span>{option.detail && <small>{option.detail}</small>}</span>
+                  </button>
+                );
+              };
+              if (!visible.length) return <p className="etm-multi-none">Nothing matches.</p>;
               return (
-                <button type="button" key={option.id} role="option" aria-selected={on} className={`etm-multi-option ${on ? "on" : ""}`} onClick={() => toggle(option.id)}>
-                  <span className="etm-multi-box">{on && <Check size={12} strokeWidth={3} />}</span>
-                  <span className="etm-multi-text"><span>{option.name}</span>{option.detail && <small>{option.detail}</small>}</span>
-                </button>
+                <>
+                  {grouped && <p className="etm-multi-heading">Selected ({pickedOptions.length})</p>}
+                  {pickedOptions.map(row)}
+                  {grouped && <p className="etm-multi-heading">All options</p>}
+                  {restOptions.map(row)}
+                </>
               );
-            }) : <p className="etm-multi-none">Nothing matches.</p>}
+            })()}
           </div>
           </div>
         );
-        return portal ? createPortal(list, document.body) : list;
+        return portal && !inline ? createPortal(list, document.body) : list;
       })()}
     </div>
   );

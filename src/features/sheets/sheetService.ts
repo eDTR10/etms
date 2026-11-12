@@ -39,7 +39,17 @@ export interface SheetSchema {
 
 // What the server answers for a tab: the rows (with a `version` of their content), or just "unchanged" when the caller already
 // holds that version.
-export type SheetTableResult = (SheetTable & { version: string; unchanged?: undefined }) | { unchanged: true; version: string; tab: string; tabs: string[] };
+export type SheetTableResult = (SheetTable & { version: string; unchanged?: undefined; access?: { conditions?: { column: string; values: string[] }[]; match?: "all" | "any"; assigned?: boolean } }) | { unchanged: true; version: string; tab: string; tabs: string[] };
+
+// A person limited to some rows of a sheet (see the server's SheetRowRule).
+export interface SheetRowRule {
+  id: number;
+  user: number;
+  user_name: string;
+  // Every condition: a column holds one of some values. A row must satisfy all of them, or any one when `match` is "any".
+  conditions: { column: string; values: string[] }[];
+  match: "all" | "any";
+}
 
 export interface SheetEntry {
   id: number;
@@ -64,6 +74,8 @@ export interface ProjectCard {
   url: string;
   // The tab the page opens on (set by an admin).
   default_tab: string;
+  // 'full', or 'assigned': can only see the rows of tasks assigned to them (and cannot add or create anything).
+  level: "full" | "assigned";
   // That project's name in the directory: tasks made from this page's sheet go under it.
   project_name: string;
 }
@@ -78,6 +90,10 @@ export interface SheetTable {
 export const sheetService = {
   projectCards: async () => (await api.get<{ allowed: boolean; pages: string[]; cards: ProjectCard[] }>("etm/sheet-targets/project-cards/")).data,
   taskViewers: async (page: string) => (await api.get<{ provincial: { id: number; name: string }[]; focal: { id: number; name: string }[] }>("etm/sheet-targets/task-viewers/", { params: { page } })).data,
+  pageAccess: async (page: string) => (await api.get<{ users: number[] }>("etm/sheet-targets/page-access/", { params: { page } })).data.users,
+  setPageAccess: async (page: string, users: number[]) => (await api.post<{ users: number[] }>("etm/sheet-targets/page-access/", { page, users })).data.users,
+  rules: async (id: number) => (await api.get<SheetRowRule[]>(`etm/sheet-targets/${id}/rules/`)).data,
+  setRule: async (id: number, input: { user: number; conditions: { column: string; values: string[] }[]; match: "all" | "any" }) => (await api.post(`etm/sheet-targets/${id}/rules/`, input)).data,
   setCardUrl: async (key: string, url: string) => (await api.post<SheetTarget>("etm/sheet-targets/set-card-url/", { key, url })).data,
   setCardDefaultTab: async (key: string, default_tab: string) => (await api.post<SheetTarget>("etm/sheet-targets/set-card-url/", { key, default_tab })).data,
   tabs: async (id: number, refresh = false) => (await api.get<{ tabs: string[] }>(`etm/sheet-targets/${id}/tabs/`, { params: refresh ? { refresh: 1 } : {} })).data.tabs,

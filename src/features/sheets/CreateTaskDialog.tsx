@@ -105,7 +105,7 @@ export default function CreateTaskDialog({ initialTitle, summary, members, provi
         </div>
 
         <div style={{ display: "grid", gap: 6 }}>
-          <MultiSelect label="Assign to others" options={members} selected={assignees} onChange={setAssignees} placeholder="Nobody else" portal />
+          <MultiSelect label="Assign to others" options={members} selected={assignees} onChange={setAssignees} placeholder="Nobody else" inline />
           <small style={{ color: "var(--etm-muted)" }}>They are notified, and can work on the task.</small>
         </div>
 

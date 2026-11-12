@@ -61,7 +61,7 @@ export default function BulkTagDialog({ count, offices, onClose, onApply }: Bulk
         </label>
 
         <div style={{ display: "grid", gap: 10 }}>
-          <MultiSelect label="Projects" options={offices} selected={projects} onChange={setProjects} placeholder="None picked" portal />
+          <MultiSelect label="Projects" options={offices} selected={projects} onChange={setProjects} placeholder="None picked" inline />
           <div style={{ display: "grid", gap: 8 }}>
             {MODES.map(item => (
               <label key={item.value} style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: saving ? "default" : "pointer", color: "var(--etm-ink)" }}>
