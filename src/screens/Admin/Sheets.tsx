@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { ExternalLink, Pencil, Plus, Table2 } from "lucide-react";
+import { ExternalLink, Pencil, PlugZap, Plus, Table2 } from "lucide-react";
 import Swal from "sweetalert2";
 import AdminLayout from "./AdminLayout";
 import Modal from "../../components/ui/modal";
@@ -7,6 +7,9 @@ import { sheetService, type SheetTarget, type SheetTargetInput } from "../../fea
 import { taskError } from "../../features/tasks/taskService";
 import "../../features/tasks/etm-base.css";
 import "../Etm/etm-app.css";
+
+// The project pages (see the server's sheet_cards.py) a connected sheet belongs to.
+const PAGE_NAMES: Record<string, string> = { "tod-tasks": "TOD Tasks", "elgu-ta": "eLGU Technical Assistance", "elgu-training": "eLGU Training", "elgu-refresher": "eLGU Refresher Training" };
 
 const blank = (): SheetTargetInput => ({ name: "", url: "", header_row: 1, tab_mode: "month", fixed_tab: "", is_enabled: true });
 
@@ -82,7 +85,7 @@ export default function Sheets() {
   }
 
   return (
-    <AdminLayout title="Sheets" subtitle="Google Sheets that tasks can be sent to.">
+    <AdminLayout title="Sheets" subtitle="The Google Sheets connected to eTMS.">
       <div className="etm-reports">
         <section className="etm-report-heading">
           <div>
@@ -90,30 +93,40 @@ export default function Sheets() {
             <h2>Connected sheets</h2>
             <p>
               Share each sheet with{" "}
-              <strong>{account?.email ?? (account ? "(the eTMS Google account is not set up on the server yet)" : "…")}</strong>{" "}
-              as an <strong>Editor</strong>, then connect it here. Sending only adds a new line at the bottom; nothing can be deleted from eTMS.
+              <strong style={{ color: "var(--etm-ink)", wordBreak: "break-all" }}>{account?.email ?? (account ? "(the eTMS Google account is not set up on the server yet)" : "…")}</strong>{" "}
+              as an <strong style={{ color: "var(--etm-ink)" }}>Editor</strong>, then connect it here. eTMS only ever adds a new line at the bottom; nothing is deleted from a sheet.
             </p>
           </div>
           <button type="button" className="etm-button" onClick={() => setDialog({})}><Plus size={16} /> Connect a sheet</button>
         </section>
         {error && <p className="etm-report-error">{error}</p>}
-        <div style={{ display: "grid", gap: 10 }}>
-          {targets.map(target => (
-            <div key={target.id} className="etm-panel" style={{ padding: 14, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between", opacity: target.is_enabled ? 1 : 0.6 }}>
-              <div>
-                <strong>{target.name}</strong>{!target.is_enabled && <span style={{ marginLeft: 8, fontSize: 12 }}>(off)</span>}
-                <div style={{ fontSize: 12.5, color: "var(--etm-muted)" }}>
-                  {target.tab_mode === "month" ? "A tab per month" : `Tab “${target.fixed_tab}”`} · titles on row {target.header_row}
+        <div style={{ display: "grid", gap: 12 }}>
+          {targets.map(target => {
+            const page = PAGE_NAMES[target.key];
+            let host = "";
+            try { host = new URL(target.url).hostname; } catch { /* not a link */ }
+            return (
+              <div key={target.id} className="etm-panel" style={{ padding: 16, display: "flex", flexWrap: "wrap", gap: 14, alignItems: "center", opacity: target.is_enabled ? 1 : 0.6, color: "var(--etm-ink)" }}>
+                <span style={{ display: "grid", placeItems: "center", width: 44, height: 44, borderRadius: 12, background: "rgba(23, 179, 172, .14)", color: "var(--etm-primary)", flexShrink: 0 }}><Table2 size={22} /></span>
+                <div style={{ flex: "1 1 260px", minWidth: 0, display: "grid", gap: 3 }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+                    <strong style={{ fontSize: 15.5, color: "var(--etm-ink)" }}>{target.name}</strong>
+                    {page && <span className="etm-badge">{page} page</span>}
+                    {!target.is_enabled && <span className="etm-badge">Off</span>}
+                  </div>
+                  <small style={{ color: "var(--etm-muted)" }}>
+                    {page ? "People pick the tab on the page" : target.tab_mode === "month" ? "A tab for each month" : `Tab “${target.fixed_tab}”`} · column titles on row {target.header_row}{host ? ` · ${host}` : ""}
+                  </small>
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                  <a href={target.url} target="_blank" rel="noreferrer" className="etm-button ghost"><ExternalLink size={15} /> Open</a>
+                  <button type="button" className="etm-button ghost" onClick={() => void checkSheet(target)}><PlugZap size={15} /> Test</button>
+                  <button type="button" className="etm-button ghost" onClick={() => setDialog({ target })}><Pencil size={15} /> Edit</button>
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <a href={target.url} target="_blank" rel="noreferrer" className="etm-button ghost"><ExternalLink size={15} /> Open</a>
-                <button type="button" className="etm-button ghost" onClick={() => void checkSheet(target)}>Test</button>
-                <button type="button" className="etm-button ghost" onClick={() => setDialog({ target })}><Pencil size={15} /> Edit</button>
-              </div>
-            </div>
-          ))}
-          {!targets.length && !error && <p>No sheet is connected yet.</p>}
+            );
+          })}
+          {!targets.length && !error && <p className="etm-panel" style={{ padding: 16, margin: 0 }}>No sheet is connected yet.</p>}
         </div>
       </div>
       {dialog && <SheetDialog target={dialog.target} onClose={() => setDialog(null)} onSave={save} />}

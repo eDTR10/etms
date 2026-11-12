@@ -40,7 +40,6 @@ const NAV_GROUPS: { title?: string; items: { label: string; icon: React.ReactNod
     items: [
       { label: "Task Grouping", icon: <BarChart3 className="w-4 h-4" />, to: "/etms/reports", note: "for IPCR purposes" },
       { label: "Generate IPCR", icon: <FileSpreadsheet className="w-4 h-4" />, to: "/etms/ipcr" },
-      { label: "Send to Sheet", icon: <Table2 className="w-4 h-4" />, to: "/etms/send-to-sheet" },
     ],
   },
   {

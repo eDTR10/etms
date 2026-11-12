@@ -44,7 +44,6 @@ const NAV_GROUPS: { items: { label: string; icon: React.ReactNode; to: string; n
     items: [
       { label: "eLGU Project Task", icon: <Table2 className="w-4 h-4" />, to: "/etms/admin/elgu" },
       { label: "TOD Tasks", icon: <Table2 className="w-4 h-4" />, to: "/etms/admin/tod" },
-      { label: "Send to Sheet", icon: <Table2 className="w-4 h-4" />, to: "/etms/admin/send-to-sheet" },
       { label: "Sheets", icon: <Table2 className="w-4 h-4" />, to: "/etms/admin/sheets" },
     ],
   },
