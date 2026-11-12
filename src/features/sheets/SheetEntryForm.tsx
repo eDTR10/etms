@@ -5,6 +5,7 @@ import Swal from "sweetalert2";
 import { useAuth } from "../../screens/Auth/AuthContext";
 import { taskError } from "../tasks/taskService";
 import type { Task } from "../tasks/types";
+import MultiSelect from "../../components/ui/multiselect";
 import { sheetService, type SheetColumn, type SheetEntry, type SheetSchema, type SheetTarget } from "./sheetService";
 
 const MONTHS = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];
@@ -29,6 +30,35 @@ function matchOption(column: SheetColumn, text: string): string | null {
     ?? null;
 }
 
+// The dropdown choice that is this person (their first and last name both written in it), else their name as it is.
+function matchPerson(column: SheetColumn, person: string): string {
+  if (!column.options.length) return person;
+  const words = person.toLowerCase().split(/[^a-z0-9\u00f1]+/).filter(Boolean);
+  if (words.length < 2) return matchOption(column, person) ?? person;
+  const first = words[0], last = words[words.length - 1];
+  const hit = (option: string) => { const have = option.toLowerCase().split(/[^a-z0-9\u00f1]+/); return have.includes(first) && have.includes(last); };
+  return column.options.find(option => option.toLowerCase() === person.toLowerCase()) ?? column.options.find(hit) ?? matchOption(column, person) ?? person;
+}
+
+// A value as the sheet shows it, put the way the form's own input wants it (a date as yyyy-mm-dd, a time as 24-hour hh:mm).
+function forInput(column: SheetColumn, text: string): string {
+  const value = text.trim();
+  if (column.kind === "date") {
+    const match = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+    if (match) return `${match[3].length === 2 ? 2000 + Number(match[3]) : match[3]}-${match[1].padStart(2, "0")}-${match[2].padStart(2, "0")}`;
+  }
+  if (column.kind === "time") {
+    const match = value.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s?(am|pm)?$/i);
+    if (match) {
+      let hours = Number(match[1]);
+      if (match[3]?.toLowerCase() === "pm" && hours < 12) hours += 12;
+      if (match[3]?.toLowerCase() === "am" && hours === 12) hours = 0;
+      return `${String(hours).padStart(2, "0")}:${match[2]}`;
+    }
+  }
+  return value;
+}
+
 // What eTMS already knows about the task, put into the sheet's columns by their titles.
 function prefill(columns: SheetColumn[], task: Task | null | undefined, person: string, nextNumber: number | null): Values {
   const out: Values = {};
@@ -40,7 +70,8 @@ function prefill(columns: SheetColumn[], task: Task | null | undefined, person: 
   };
   const numberColumn = find(columns, /^no\.?$/);
   if (numberColumn && nextNumber !== null) out[numberColumn.index] = String(nextNumber);
-  put(/assisted by|^responsible/, person);
+  const assistedBy = find(columns, /assisted by|^responsible/);
+  if (assistedBy && person) out[assistedBy.index] = matchPerson(assistedBy, person);
   if (task) {
     put(/requestor|requester/, task.requestor);
     put(/^province/, task.location_province, true);
@@ -113,9 +144,15 @@ interface SheetEntryFormProps {
   preload?: { target: SheetTarget; schema: SheetSchema };
   task?: Task | null;
   groupedTaskId?: number | null;
+  // Instead of sending a line to the sheet, hand the filled-in fields to `onSave` (the page decides what to do with them).
+  // The numbering and link columns are left out: `extra` (shown above the fields) stands in for the link.
+  // `onSave` also gets the same fields ready to write to the sheet ({column index: text}) and the tab they are for.
+  // `initial` (values by column index, as the sheet shows them) starts the form on an existing row: with `keepAll` every column is
+  // shown, an emptied one is sent as empty (to clear it), and `fixedTab` keeps it on the row's own tab.
+  collect?: { extra?: React.ReactNode; submitLabel: string; initial?: Record<number, string>; keepAll?: boolean; fixedTab?: boolean; onSave: (entries: { column: SheetColumn; value: string }[], payload: Record<number, string>, tab: string) => Promise<void> };
 }
 
-export default function SheetEntryForm({ initialTargetId = null, fixedTargetId = null, initialTab = "", onSent, embedded = false, preload, task = null, groupedTaskId = null }: SheetEntryFormProps) {
+export default function SheetEntryForm({ initialTargetId = null, fixedTargetId = null, initialTab = "", onSent, embedded = false, preload, task = null, groupedTaskId = null, collect }: SheetEntryFormProps) {
   const { user } = useAuth();
   const person = user ? `${user.first_name} ${user.last_name}`.trim() : "";
   const [targets, setTargets] = useState<SheetTarget[]>(() => preload ? [preload.target] : []);
@@ -123,7 +160,7 @@ export default function SheetEntryForm({ initialTargetId = null, fixedTargetId =
   const [tab, setTab] = useState(preload?.schema.tab ?? initialTab);
   const tabChosen = useRef(!!initialTab);
   const [schema, setSchema] = useState<SheetSchema | null>(preload?.schema ?? null);
-  const [values, setValues] = useState<Values>(() => preload ? prefill(preload.schema.columns, task, person, preload.schema.next_number) : {});
+  const [values, setValues] = useState<Values>(() => !preload ? {} : collect?.initial ? Object.fromEntries(preload.schema.columns.map(column => [column.index, forInput(column, collect.initial?.[column.index] ?? "")])) : prefill(preload.schema.columns, task, person, preload.schema.next_number));
   const preloaded = useRef(!!preload);
   const touched = useRef(new Set<number>());
   const [loading, setLoading] = useState(!preload);
@@ -132,6 +169,33 @@ export default function SheetEntryForm({ initialTargetId = null, fixedTargetId =
   const [sending, setSending] = useState(false);
   const [previous, setPrevious] = useState<SheetEntry[]>([]);
   const target = useMemo(() => targets.find(item => item.id === targetId) ?? null, [targets, targetId]);
+
+  // Collecting for a task: the form starts on the current month's tab (when the sheet has one)...
+  const startedOnMonth = useRef(false);
+  useEffect(() => {
+    if (!collect || startedOnMonth.current || !schema) return;
+    startedOnMonth.current = true;
+    const now = MONTHS[new Date().getMonth()];
+    if (!collect.fixedTab && schema.tabs.includes(now) && schema.tab !== now && !tabChosen.current) setTab(now);
+  }, [collect, schema]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ...and the recent entries it offers for the long answers also come from the month before, so a new month is not empty.
+  const [recent, setRecent] = useState<Record<string, string[]>>({});
+  useEffect(() => {
+    if (!collect || !target || !schema) return;
+    const position = MONTHS.indexOf(schema.tab.toUpperCase());
+    const before = position < 0 ? "" : MONTHS[(position + 11) % 12];
+    const name = schema.tabs.find(item => item.toUpperCase() === before);
+    if (!name) { setRecent({}); return; }
+    let cancelled = false;
+    sheetService.schema(target.id, name).then(other => {
+      if (cancelled) return;
+      const found: Record<string, string[]> = {};
+      other.columns.forEach(column => { found[column.label.trim().toLowerCase()] = column.suggestions; });
+      setRecent(found);
+    }).catch(() => { if (!cancelled) setRecent({}); });
+    return () => { cancelled = true; };
+  }, [collect, target, schema?.tab]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (preload) return;
@@ -209,8 +273,42 @@ export default function SheetEntryForm({ initialTargetId = null, fixedTargetId =
     });
   }
 
+  // What is shown to fill in: with `collect`, not the sheet's own numbering and link columns.
+  const shown = columns.filter(column => !column.auto && !(collect && !collect.keepAll && (/^no\.?$/i.test(column.label.trim()) || /^link/i.test(column.label.trim()))));
+  // In the Technical Assistance form the LGU comes first and the province follows from it.
+  const fillable = (() => {
+    if (!collect) return shown;
+    const place = shown.findIndex(column => /lgu name|locality|city|municipality/.test(column.label.toLowerCase()));
+    const province = shown.findIndex(column => /^province/.test(column.label.toLowerCase()));
+    if (place < 0 || province < 0 || place < province) return shown;
+    const reordered = shown.filter((_, position) => position !== place);
+    reordered.splice(province, 0, shown[place]);
+    return reordered;
+  })();
+
   async function send() {
     if (!target || !schema || sending) return;
+    if (collect) {
+      const entries = fillable.map(column => ({ column, value: (values[column.index] ?? "").trim() })).filter(entry => entry.value || collect.keepAll);
+      if (!entries.some(entry => entry.value)) { setError("Fill in at least one field."); return; }
+      const payload: Record<number, string> = {};
+      columns.forEach(column => {
+        if (column.auto) return;
+        const value = (values[column.index] ?? "").trim();
+        if (!value && !collect.keepAll) return;
+        payload[column.index] = column.kind === "date" && value ? sheetDate(value) : value;
+      });
+      setSending(true);
+      setError("");
+      try {
+        await collect.onSave(entries, payload, schema.tab);
+      } catch (caught) {
+        setError(taskError(caught));
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
     const payload: Record<number, string> = {};
     columns.forEach(column => {
       if (column.auto) return;
@@ -252,21 +350,35 @@ export default function SheetEntryForm({ initialTargetId = null, fixedTargetId =
 
   function field(column: SheetColumn) {
     const value = values[column.index] ?? "";
+    const lowered = column.label.toLowerCase();
+    // The province follows the LGU that is picked, so it is not typed in by hand.
+    const locked = !!collect && /^province/.test(lowered);
+    // What was typed in this column this month, then last month.
+    const suggestions = collect && /issues|concern|technical assistance provided|remarks/.test(lowered)
+      ? [...new Set([...column.suggestions, ...(recent[column.label.trim().toLowerCase()] ?? [])])]
+      : column.suggestions;
+    const today = () => {
+      const now = new Date();
+      const two = (number: number) => String(number).padStart(2, "0");
+      setValue(column, column.kind === "time" ? `${two(now.getHours())}:${two(now.getMinutes())}` : `${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())}`);
+    };
     const id = `sheet-col-${column.index}`;
-    const common = { id, disabled: sending, value, onChange: (event: { target: { value: string } }) => setValue(column, event.target.value) };
+    const common = { id, disabled: sending || locked, value, onChange: (event: { target: { value: string } }) => setValue(column, event.target.value) };
     let control;
     if (column.kind === "select") {
-      control = (
-        <select {...common}>
-          <option value="">—</option>
-          {column.options.map(option => <option key={option} value={option}>{option}</option>)}
-          {value && !column.options.includes(value) && <option value={value}>{value}</option>}
-        </select>
+      // The same searchable dropdown as everywhere else, with the sheet's own choices (a value typed earlier that is not one of them is kept).
+      const names = value && !column.options.includes(value) ? [...column.options, value] : column.options;
+      const options = names.map((name, position) => ({ id: position, name }));
+      return (
+        <div key={column.index} style={{ minWidth: 0 }}>
+          <MultiSelect single portal disabled={locked} label={column.label.split(/\r?\n/)[0].trim()} options={options} selected={value ? [names.indexOf(value)] : []} placeholder="—"
+            onChange={ids => setValue(column, ids.length ? names[ids[0]] ?? "" : "")} />
+        </div>
       );
     } else if (column.kind === "checkbox") {
       control = <input id={id} type="checkbox" disabled={sending} checked={value === "TRUE"} onChange={event => setValue(column, event.target.checked ? "TRUE" : "")} style={{ width: 18, height: 18 }} />;
     } else if (column.kind === "long") {
-      control = <SuggestTextarea id={id} value={value} onChange={next => setValue(column, next)} suggestions={column.suggestions} disabled={sending} rows={embedded ? 2 : 3} compact={embedded} />;
+      control = <SuggestTextarea id={id} value={value} onChange={next => setValue(column, next)} suggestions={suggestions} disabled={sending} rows={embedded ? 2 : 3} compact={embedded} />;
     } else if (column.kind === "date") {
       control = <input {...common} type="date" />;
     } else if (column.kind === "time") {
@@ -274,13 +386,15 @@ export default function SheetEntryForm({ initialTargetId = null, fixedTargetId =
     } else if (column.kind === "number") {
       control = <input {...common} type="number" min={0} step="any" />;
     } else {
-      control = <input {...common} type="text" list={column.suggestions.length ? `${id}-list` : undefined} autoComplete="off" />;
+      control = <input {...common} type="text" list={suggestions.length ? `${id}-list` : undefined} autoComplete="off" />;
     }
     return (
       <label key={column.index} htmlFor={id} style={column.kind === "long" ? { gridColumn: embedded ? "span 2" : "1 / -1" } : undefined}>
-        {column.label}
+        {column.kind === "date" || column.kind === "time"
+          ? <span style={{ display: "flex", alignItems: "center", gap: 6 }}>{column.label}<button type="button" className="etm-quick-fill" onClick={today} disabled={sending}>{column.kind === "time" ? "Now" : "Today"}</button></span>
+          : column.label}
         {control}
-        {column.kind !== "long" && column.suggestions.length > 0 && <datalist id={`${id}-list`}>{column.suggestions.map(suggestion => <option key={suggestion} value={suggestion} />)}</datalist>}
+        {column.kind !== "long" && suggestions.length > 0 && <datalist id={`${id}-list`}>{suggestions.map(suggestion => <option key={suggestion} value={suggestion} />)}</datalist>}
       </label>
     );
   }
@@ -298,7 +412,7 @@ export default function SheetEntryForm({ initialTargetId = null, fixedTargetId =
         </label>}
         {schema && (
           <label className="etm-field-label" style={{ minWidth: 180 }}>Tab
-            <select className="etm-select" value={schema.tab} disabled={sending || loadingSchema} onChange={event => { tabChosen.current = true; setTab(event.target.value); }}>
+            <select className="etm-select" value={schema.tab} disabled={sending || loadingSchema || !!collect?.fixedTab} onChange={event => { tabChosen.current = true; setTab(event.target.value); }}>
               {schema.tabs.map(name => <option key={name} value={name}>{name}</option>)}
             </select>
           </label>
@@ -316,9 +430,10 @@ export default function SheetEntryForm({ initialTargetId = null, fixedTargetId =
 
       {schema && (
         <>
+          {collect?.extra}
           <form className="etm-report-form" onSubmit={event => { event.preventDefault(); void send(); }}
             style={{ display: "grid", gridTemplateColumns: embedded ? "repeat(auto-fill, minmax(190px, 1fr))" : "repeat(auto-fill, minmax(230px, 1fr))", gap: embedded ? "8px 12px" : 12 }}>
-            {columns.filter(column => !column.auto).map(field)}
+            {fillable.map(field)}
           </form>
           {autoColumns.length > 0 && (
             <p style={{ margin: 0, fontSize: 12.5, color: "var(--etm-muted)" }}>
@@ -327,7 +442,7 @@ export default function SheetEntryForm({ initialTargetId = null, fixedTargetId =
           )}
           <div style={{ display: "flex", justifyContent: "flex-end" }}>
             <button type="button" className="etm-button" onClick={() => void send()} disabled={sending || loadingSchema}>
-              <Send size={16} /> {sending ? "Sending…" : "Send to sheet"}
+              <Send size={16} /> {sending ? (collect ? "Saving…" : "Sending…") : (collect?.submitLabel ?? "Send to sheet")}
             </button>
           </div>
         </>

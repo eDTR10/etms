@@ -293,6 +293,7 @@ select option { background-color: var(--etm-surface, #fff); color: var(--etm-ink
 /* Checkbox dropdown with search (components/ui/multiselect.tsx). */
 .etm-multi { position: relative; display: grid; gap: 6px; min-width: 220px; }
 .etm-multi-trigger { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px; padding: 0 12px; border: 1px solid var(--etm-border); border-radius: 10px; background: var(--etm-surface-alt); color: var(--etm-ink); font: inherit; font-size: 14px; font-weight: 600; text-align: left; cursor: pointer; transition: border-color .15s ease, box-shadow .15s ease; }
+.etm-multi-trigger:disabled { opacity: .6; cursor: not-allowed; }
 .etm-multi-trigger:hover { border-color: color-mix(in srgb, var(--etm-primary) 55%, var(--etm-border)); }
 .etm-multi-trigger:focus-visible, .etm-multi-trigger[aria-expanded="true"] { outline: none; border-color: var(--etm-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--etm-primary) 22%, transparent); }
 .etm-multi-trigger.active { border-color: color-mix(in srgb, var(--etm-primary) 70%, var(--etm-border)); }
@@ -312,6 +313,7 @@ select option { background-color: var(--etm-surface, #fff); color: var(--etm-ink
 .etm-multi-option:hover { background: var(--etm-surface-alt); }
 .etm-multi-option.on { font-weight: 600; }
 .etm-multi-box { display: grid; place-items: center; flex: none; width: 18px; height: 18px; border: 1.5px solid var(--etm-border); border-radius: 5px; color: #fff; transition: background .12s ease, border-color .12s ease; }
+.etm-multi-box.round { border-radius: 999px; }
 .etm-multi-option.on .etm-multi-box { border-color: var(--etm-primary); background: var(--etm-primary); }
 .etm-multi-none { margin: 0; padding: 14px; color: var(--etm-muted); font-size: 13px; text-align: center; }
 

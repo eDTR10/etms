@@ -19,10 +19,13 @@ interface MultiSelectProps {
   portal?: boolean;
   // Opens the list in place, pushing what is below it down (for use inside a window, where a floating list can get hidden).
   inline?: boolean;
+  // Pick one option (not several): choosing closes the list, choosing it again clears it.
+  single?: boolean;
+  disabled?: boolean;
 }
 
 // A dropdown of checkboxes with a search box: pick any number of options; the button shows how many are picked.
-export default function MultiSelect({ label, options, selected, onChange, placeholder = "All", portal = false, inline = false }: MultiSelectProps) {
+export default function MultiSelect({ label, options, selected, onChange, placeholder = "All", portal = false, inline = false, single = false, disabled = false }: MultiSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const root = useRef<HTMLDivElement>(null);
@@ -69,15 +72,18 @@ export default function MultiSelect({ label, options, selected, onChange, placeh
   const grouped = !query.trim() && selected.length > 0 && visible.some(option => !chosen.has(option.id));
   const pickedOptions = grouped ? visible.filter(option => chosen.has(option.id)) : [];
   const restOptions = grouped ? visible.filter(option => !chosen.has(option.id)) : visible;
-  const toggle = (id: number) => onChange(chosen.has(id) ? selected.filter(item => item !== id) : [...selected, id]);
+  const toggle = (id: number) => {
+    if (single) { onChange(chosen.has(id) ? [] : [id]); setOpen(false); return; }
+    onChange(chosen.has(id) ? selected.filter(item => item !== id) : [...selected, id]);
+  };
   const summary = selected.length === 0 ? placeholder : selected.length === 1 ? (options.find(option => option.id === selected[0])?.name ?? "1 selected") : `${selected.length} selected`;
 
   return (
     <div className="etm-multi" ref={root}>
       <span className="etm-field-label">{label}</span>
-      <button type="button" ref={trigger} className={`etm-multi-trigger ${selected.length ? "active" : ""}`} aria-haspopup="listbox" aria-expanded={open} aria-controls={menuId} onClick={() => setOpen(value => !value)}>
+      <button type="button" ref={trigger} className={`etm-multi-trigger ${selected.length ? "active" : ""}`} aria-haspopup="listbox" aria-expanded={open} aria-controls={menuId} disabled={disabled} onClick={() => setOpen(value => !value)}>
         <span className="etm-multi-summary">{summary}</span>
-        {selected.length > 0 && <span className="etm-multi-count">{selected.length}</span>}
+        {selected.length > 0 && !single && <span className="etm-multi-count">{selected.length}</span>}
         <ChevronDown size={16} className="etm-multi-chevron" />
       </button>
       {open && (() => {
@@ -90,16 +96,16 @@ export default function MultiSelect({ label, options, selected, onChange, placeh
             {query && <button type="button" aria-label="Clear search" onClick={() => setQuery("")}><X size={13} /></button>}
           </div>
           <div className="etm-multi-actions">
-            <button type="button" onClick={() => onChange(Array.from(new Set([...selected, ...visible.map(option => option.id)])))} disabled={!visible.length}>Select {query ? "shown" : "all"}</button>
+            {single ? <span /> : <button type="button" onClick={() => onChange(Array.from(new Set([...selected, ...visible.map(option => option.id)])))} disabled={!visible.length}>Select {query ? "shown" : "all"}</button>}
             <button type="button" onClick={() => onChange(query ? selected.filter(id => !visible.some(option => option.id === id)) : [])} disabled={!selected.length}>Clear</button>
           </div>
-          <div className="etm-multi-list" role="listbox" aria-multiselectable="true">
+          <div className="etm-multi-list" role="listbox" aria-multiselectable={!single}>
             {(() => {
               const row = (option: { id: number; name: string; detail?: string }) => {
                 const on = chosen.has(option.id);
                 return (
                   <button type="button" key={option.id} role="option" aria-selected={on} className={`etm-multi-option ${on ? "on" : ""}`} onClick={() => toggle(option.id)}>
-                    <span className="etm-multi-box">{on && <Check size={12} strokeWidth={3} />}</span>
+                    <span className={`etm-multi-box ${single ? "round" : ""}`}>{on && <Check size={12} strokeWidth={3} />}</span>
                     <span className="etm-multi-text"><span>{option.name}</span>{option.detail && <small>{option.detail}</small>}</span>
                   </button>
                 );

@@ -39,7 +39,7 @@ export interface SheetSchema {
 
 // What the server answers for a tab: the rows (with a `version` of their content), or just "unchanged" when the caller already
 // holds that version.
-export type SheetTableResult = (SheetTable & { version: string; unchanged?: undefined; access?: { conditions?: { column: string; values: string[] }[]; match?: "all" | "any"; assigned?: boolean } }) | { unchanged: true; version: string; tab: string; tabs: string[] };
+export type SheetTableResult = (SheetTable & { version: string; unchanged?: undefined; access?: { conditions?: { column: string; values: string[] }[]; match?: "all" | "any"; assigned?: boolean } }) | { unchanged: true; version: string; tab: string; tabs: string[]; editable?: number[] };
 
 // A person limited to some rows of a sheet (see the server's SheetRowRule).
 export interface SheetRowRule {
@@ -85,6 +85,8 @@ export interface SheetTable {
   tabs: string[];
   headers: { index: number; label: string }[];
   rows: { row: number; cells: string[] }[];
+  // The row numbers this person may edit (the rows whose "Assisted by" is them).
+  editable?: number[];
 }
 
 export const sheetService = {
@@ -106,5 +108,7 @@ export const sheetService = {
   schema: async (id: number, tab?: string) => (await api.get<SheetSchema>(`etm/sheet-targets/${id}/schema/`, { params: tab ? { tab } : {} })).data,
   send: async (id: number, input: { tab: string; values: Record<number, string>; task?: number | null; grouped_task?: number | null }) =>
     (await api.post<SheetEntry & { link: string }>(`etm/sheet-targets/${id}/send/`, input)).data,
+  updateRow: async (id: number, input: { tab: string; row: number; values: Record<number, string> }) =>
+    (await api.post<{ row: number; tab: string; link: string }>(`etm/sheet-targets/${id}/update-row/`, input)).data,
   entries: async (params: { task?: number; grouped_task?: number; target?: number } = {}) => (await api.get<SheetEntry[]>("etm/sheet-entries/", { params })).data,
 };
