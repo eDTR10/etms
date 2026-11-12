@@ -50,6 +50,15 @@ const UserDocuments  = lazy(() => import("./screens/User/Documents.tsx"));
 const UserProfile    = lazy(() => import("./screens/User/Profile.tsx"));
 const UserTemplates  = lazy(() => import("./screens/User/Templates.tsx"));
 const UserQuickLinks = lazy(() => import("./screens/User/QuickLinks.tsx"));
+const UserElgu = lazy(() => import("./screens/User/Elgu.tsx"));
+const UserTod = lazy(() => import("./screens/User/TodTasks.tsx"));
+const AdminTod = lazy(() => import("./screens/User/TodTasks.tsx").then(module => ({ default: module.AdminTodTasks })));
+const AdminElgu = lazy(() => import("./screens/User/Elgu.tsx").then(module => ({ default: module.AdminElgu })));
+const AdminElguTA = lazy(() => import("./screens/User/ElguTechnicalAssistance.tsx").then(module => ({ default: module.AdminElguTechnicalAssistance })));
+const UserElguTA = lazy(() => import("./screens/User/ElguTechnicalAssistance.tsx"));
+const UserSendToSheet = lazy(() => import("./screens/User/SendToSheet.tsx"));
+const AdminSendToSheet = lazy(() => import("./screens/User/SendToSheet.tsx").then(module => ({ default: module.AdminSendToSheet })));
+const AdminSheets = lazy(() => import("./screens/Admin/Sheets.tsx"));
 const UserGenerateIPCR = lazy(() => import("./screens/User/GenerateIPCR.tsx"));
 const UserIPCREditor = lazy(() => import("./screens/User/IPCREditor.tsx"));
 
@@ -127,6 +136,22 @@ const router = createBrowserRouter([
     element: <ProtectedRoute><Suspense fallback={<Loader />}><UserQuickLinks /></Suspense></ProtectedRoute>,
   },
   {
+    path: "/etms/elgu",
+    element: <ProtectedRoute><Suspense fallback={<Loader />}><UserElgu /></Suspense></ProtectedRoute>,
+  },
+  {
+    path: "/etms/tod",
+    element: <ProtectedRoute><Suspense fallback={<Loader />}><UserTod /></Suspense></ProtectedRoute>,
+  },
+  {
+    path: "/etms/elgu/technical-assistance",
+    element: <ProtectedRoute><Suspense fallback={<Loader />}><UserElguTA /></Suspense></ProtectedRoute>,
+  },
+  {
+    path: "/etms/send-to-sheet",
+    element: <ProtectedRoute><Suspense fallback={<Loader />}><UserSendToSheet /></Suspense></ProtectedRoute>,
+  },
+  {
     path: "/etms/reports",
     element: <ProtectedRoute><Suspense fallback={<Loader />}><UserReports /></Suspense></ProtectedRoute>,
   },
@@ -187,6 +212,26 @@ const router = createBrowserRouter([
   {
     path: "/etms/admin/templates",
     element: <AdminRoute><Suspense fallback={<Loader />}><AdminTemplates /></Suspense></AdminRoute>,
+  },
+  {
+    path: "/etms/admin/send-to-sheet",
+    element: <AdminRoute><Suspense fallback={<Loader />}><AdminSendToSheet /></Suspense></AdminRoute>,
+  },
+  {
+    path: "/etms/admin/elgu",
+    element: <AdminRoute><Suspense fallback={<Loader />}><AdminElgu /></Suspense></AdminRoute>,
+  },
+  {
+    path: "/etms/admin/elgu/technical-assistance",
+    element: <AdminRoute><Suspense fallback={<Loader />}><AdminElguTA /></Suspense></AdminRoute>,
+  },
+  {
+    path: "/etms/admin/tod",
+    element: <AdminRoute><Suspense fallback={<Loader />}><AdminTod /></Suspense></AdminRoute>,
+  },
+  {
+    path: "/etms/admin/sheets",
+    element: <AdminRoute><Suspense fallback={<Loader />}><AdminSheets /></Suspense></AdminRoute>,
   },
   {
     path: "/etms/admin/quick-links",

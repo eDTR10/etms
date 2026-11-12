@@ -14,6 +14,7 @@ import {
   Users,
   BarChart3,
   ArrowLeftRight,
+  Table2,
 } from "lucide-react";
 import { isIPCRComingSoon } from "../../features/ipcr/IPCRComingSoon";
 import { ModeToggle } from "../../components/mode-toggle";
@@ -32,6 +33,10 @@ const NAV_ITEMS = [
   { label: "Task Grouping", icon: <BarChart3 className="w-4 h-4" />, to: "/etms/admin/task-grouping" },
   { label: "Users", icon: <Users className="w-4 h-4" />, to: "/etms/admin/users" },
   { label: "Quick Links", icon: <Link2 className="w-4 h-4" />, to: "/etms/admin/quick-links" },
+  { label: "eLGU Project Task", icon: <Table2 className="w-4 h-4" />, to: "/etms/admin/elgu" },
+  { label: "TOD Tasks", icon: <Table2 className="w-4 h-4" />, to: "/etms/admin/tod" },
+  { label: "Send to Sheet", icon: <Table2 className="w-4 h-4" />, to: "/etms/admin/send-to-sheet" },
+  { label: "Sheets", icon: <Table2 className="w-4 h-4" />, to: "/etms/admin/sheets" },
   { label: "Generate IPCR Template", icon: <FileSpreadsheet className="w-4 h-4" />, to: "/etms/admin/ipcr-templates" },
 ];
 

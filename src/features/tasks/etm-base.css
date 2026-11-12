@@ -279,3 +279,42 @@ select option { background-color: var(--etm-surface, #fff); color: var(--etm-ink
 .swal2-popup select.etm-swal-field { cursor: pointer; }
 .swal2-popup .etm-swal-field:focus { outline: none; border-color: var(--etm-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--etm-primary) 22%, transparent); }
 .swal2-popup .etm-swal-field::placeholder { color: var(--etm-muted); }
+
+/* Shared dropdown / text field / caption look (use .etm-select, .etm-input and .etm-field-label anywhere in the app). */
+.etm-field-label { display: grid; gap: 6px; color: var(--etm-muted); font-size: 11.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+.etm-select, .etm-input { box-sizing: border-box; width: 100%; min-height: 40px; padding: 0 12px; border: 1px solid var(--etm-border); border-radius: 10px; background-color: var(--etm-surface-alt); color: var(--etm-ink); font: inherit; font-size: 14px; font-weight: 600; letter-spacing: 0; text-transform: none; transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease; }
+.etm-input::placeholder { color: var(--etm-muted); font-weight: 500; opacity: .85; }
+.etm-select { appearance: none; -webkit-appearance: none; padding-right: 38px; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3ad' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; background-size: 16px; }
+.etm-select:hover:not(:disabled), .etm-input:hover:not(:disabled) { border-color: color-mix(in srgb, var(--etm-primary) 55%, var(--etm-border)); }
+.etm-select:focus, .etm-input:focus { outline: none; border-color: var(--etm-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--etm-primary) 22%, transparent); }
+.etm-select:disabled, .etm-input:disabled { opacity: .6; cursor: not-allowed; }
+.etm-select option { font-weight: 500; }
+
+/* Checkbox dropdown with search (components/ui/multiselect.tsx). */
+.etm-multi { position: relative; display: grid; gap: 6px; min-width: 220px; }
+.etm-multi-trigger { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px; padding: 0 12px; border: 1px solid var(--etm-border); border-radius: 10px; background: var(--etm-surface-alt); color: var(--etm-ink); font: inherit; font-size: 14px; font-weight: 600; text-align: left; cursor: pointer; transition: border-color .15s ease, box-shadow .15s ease; }
+.etm-multi-trigger:hover { border-color: color-mix(in srgb, var(--etm-primary) 55%, var(--etm-border)); }
+.etm-multi-trigger:focus-visible, .etm-multi-trigger[aria-expanded="true"] { outline: none; border-color: var(--etm-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--etm-primary) 22%, transparent); }
+.etm-multi-trigger.active { border-color: color-mix(in srgb, var(--etm-primary) 70%, var(--etm-border)); }
+.etm-multi-summary { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.etm-multi-trigger:not(.active) .etm-multi-summary { color: var(--etm-muted); font-weight: 500; }
+.etm-multi-count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--etm-primary); color: #fff; font-size: 11px; font-weight: 700; }
+.etm-multi-chevron { flex: none; color: var(--etm-muted); }
+.etm-multi-menu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 60; width: max(100%, 300px); border: 1px solid var(--etm-border); border-radius: 12px; background: var(--etm-surface); box-shadow: 0 16px 38px rgba(0, 0, 0, .38); overflow: hidden; }
+.etm-multi-search { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--etm-border); color: var(--etm-muted); }
+.etm-multi-search input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; color: var(--etm-ink); font: inherit; font-size: 13.5px; }
+.etm-multi-search button { display: grid; place-items: center; border: 0; background: transparent; color: var(--etm-muted); cursor: pointer; }
+.etm-multi-actions { display: flex; justify-content: space-between; padding: 6px 12px; border-bottom: 1px solid var(--etm-border); }
+.etm-multi-actions button { border: 0; background: transparent; color: var(--etm-primary); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.etm-multi-actions button:disabled { opacity: .4; cursor: default; }
+.etm-multi-list { max-height: 260px; overflow-y: auto; padding: 4px; }
+.etm-multi-option { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--etm-ink); font: inherit; font-size: 13.5px; text-align: left; cursor: pointer; }
+.etm-multi-option:hover { background: var(--etm-surface-alt); }
+.etm-multi-option.on { font-weight: 600; }
+.etm-multi-box { display: grid; place-items: center; flex: none; width: 18px; height: 18px; border: 1.5px solid var(--etm-border); border-radius: 5px; color: #fff; transition: background .12s ease, border-color .12s ease; }
+.etm-multi-option.on .etm-multi-box { border-color: var(--etm-primary); background: var(--etm-primary); }
+.etm-multi-none { margin: 0; padding: 14px; color: var(--etm-muted); font-size: 13px; text-align: center; }
+
+.etm-multi-menu.portal { z-index: 2000; max-height: 420px; text-align: left; }
+.etm-multi-text { display: grid; gap: 1px; min-width: 0; }
+.etm-multi-text small { color: var(--etm-muted); font-size: 11.5px; font-weight: 500; }

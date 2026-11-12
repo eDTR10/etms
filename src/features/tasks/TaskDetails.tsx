@@ -4,6 +4,8 @@ import { createPortal } from "react-dom";
 import { isAxiosError } from "axios";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useNavigate } from "react-router-dom";
+import { Table2 } from "lucide-react";
+import { isUserView } from "./taskService";
 import Swal from "sweetalert2";
 import { AlertTriangle, ArrowRightLeft, Bold, CalendarDays, Check, CheckCheck, ChevronRight, Circle, ClipboardList, Clock3, Copy, Download, Edit3, ExternalLink, Link2, FileText, Flag, Folder, GripVertical, History, Italic, List, Loader2, MessageSquare, Paperclip, Pencil, Plus, Repeat, Reply, Search, Send, SmilePlus, Trash2, Underline, User, UserPlus, Users, X } from "lucide-react";
 import MentionField from "./MentionField";
@@ -1158,6 +1160,12 @@ function useHighlightFlash<T extends HTMLElement>(active: boolean) {
   return ref;
 }
 
+// Opens "Send to Sheet" with this task's details already filled in.
+function SendToSheetButton({ taskId, disabled }: { taskId: number; disabled?: boolean }) {
+  const navigate = useNavigate();
+  return <button type="button" className="etm-button ghost" disabled={disabled} onClick={() => navigate(`${isUserView() ? "/etms" : "/etms/admin"}/send-to-sheet?task=${taskId}`)}><Table2 size={16} />Send to Sheet</button>;
+}
+
 function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = false, onProgress, onEditProgress, onDeleteProgress, onAddRemark, onEditRemark, onDeleteRemark, onReactRemark, onAddRemarkReply, onAddSubtaskRemark, onEditSubtaskRemark, onDeleteSubtaskRemark, onReactSubtaskRemark, onAddSubtaskRemarkReply, onSetSubtaskStatus, onAddSubtask, onEditSubtask, onDeleteSubtask, onSetSubtaskCompletion, onReorderSubtasks, onAssignSubtask, onLinkSubtaskDocument, onUnlinkSubtaskDocument, onComplete, onTurnover, assignableMembers, onAddRemarkAttachment, onDeleteRemarkAttachment, onAddSubtaskRemarkAttachment, onDeleteSubtaskRemarkAttachment, onMarkCompletionSeen, onMarkViewed, initialSubtaskId, highlightHeader = false, highlightRemarks = false, page = false }: Omit<TaskDetailsProps, "open">) {
   const fieldId = useId();
   const [taskInfoOpen, setTaskInfoOpen] = useState(false);
@@ -1377,7 +1385,7 @@ function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = 
       )}
       {task.my_role === "Assignee" && <p className="etm-details-assignee-note" role="note"><Users size={14} />You can see this whole task, but you can only work on the subtask{task.subtasks.some(item => item.can_complete && item.assignee) ? "s" : ""} assigned to you. The others are read-only.</p>}
       {task.can_edit && onComplete && !task.is_completed && <button type="button" className={`etm-button primary small etm-details-complete ${page ? "page" : ""}`} onClick={() => void markComplete()} disabled={completing}>{completing ? <Loader2 size={14} className="etm-form-spinner" /> : <CheckCheck size={14} />}Mark as complete</button>}
-      {task.is_completed && <div className={`etm-details-complete etm-details-complete-actions ${page ? "page" : ""}`}><button type="button" className="etm-button ghost" onClick={onDuplicate} disabled={saving || duplicating}>{duplicating ? <Loader2 size={16} className="etm-form-spinner" /> : <Copy size={16} />}{duplicating ? "Duplicating…" : "Duplicate task"}</button>{task.can_edit && <button type="button" className="etm-button primary" onClick={onEdit} disabled={saving}><Edit3 size={16} />Edit task</button>}</div>}
+      {task.is_completed && <div className={`etm-details-complete etm-details-complete-actions ${page ? "page" : ""}`}><button type="button" className="etm-button ghost" onClick={onDuplicate} disabled={saving || duplicating}>{duplicating ? <Loader2 size={16} className="etm-form-spinner" /> : <Copy size={16} />}{duplicating ? "Duplicating…" : "Duplicate task"}</button><SendToSheetButton taskId={task.id} disabled={saving} />{task.can_edit && <button type="button" className="etm-button primary" onClick={onEdit} disabled={saving}><Edit3 size={16} />Edit task</button>}</div>}
       {task.revert_turnover_to && !task.is_completed && (
         <button type="button" className="etm-button ghost small etm-details-turnover" disabled={reverting} onClick={() => void returnTask()} title={`Currently with ${task.revert_turnover_to}`}>
           {reverting ? <Loader2 size={14} className="etm-form-spinner" /> : <ArrowRightLeft size={14} />}{task.is_creator ? "Revert turnover" : "Return this task to me"}
@@ -1513,6 +1521,7 @@ function TaskDetailsContent({ task, onClose, onEdit, onDuplicate, duplicating = 
     {(!page || !task.is_completed) && <div className="etm-details-footer">
       {!page && <button type="button" className="etm-button ghost" onClick={onClose}>Close</button>}
       {!task.is_completed && <button type="button" className="etm-button ghost" onClick={onDuplicate} disabled={saving || duplicating}>{duplicating ? <Loader2 size={16} className="etm-form-spinner" /> : <Copy size={16} />}{duplicating ? "Duplicating…" : "Duplicate task"}</button>}
+      <SendToSheetButton taskId={task.id} disabled={saving} />
       {!task.is_completed && task.can_edit && <button type="button" className="etm-button primary" onClick={onEdit} disabled={saving}><Edit3 size={16} />Edit task</button>}
     </div>}
   </>;

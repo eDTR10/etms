@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Loader2, Pencil, Plus, Search, Trash2, Users } from "lucide-react";
+import MultiSelect from "../../components/ui/multiselect";
+import { Loader2, Pencil, Plus, Search, Tags, Trash2, Users } from "lucide-react";
 import Swal from "sweetalert2";
 import AdminLayout from "./AdminLayout";
 import Modal from "../../components/ui/modal";
 import { useAuth } from "../Auth/AuthContext";
 import { taskService } from "../../features/tasks/taskService";
 import { SortTh, useTableSort } from "../../features/tasks/useTableSort";
+import { useRowSelection } from "../../features/tasks/useRowSelection";
+import BulkTagDialog, { type BulkTagValues } from "../../features/users/BulkTagDialog";
 import { roleLabel, USER_ROLES, userError, userService, type ManagedUser, type ManagedUserInput, ETMS_ROLES, etmsRolesLabel } from "../../features/users/userService";
 import type { Project } from "../../features/tasks/types";
 import "../../features/tasks/etm-base.css";
@@ -145,6 +148,8 @@ function UsersContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [officeFilter, setOfficeFilter] = useState<number[]>([]);
+  const [projectFilter, setProjectFilter] = useState<number[]>([]);
   const [editing, setEditing] = useState<ManagedUser | "new" | null>(null);
 
   useEffect(() => {
@@ -160,9 +165,12 @@ function UsersContent() {
   const projectNames = (user: ManagedUser) => (user.projects ?? []).map(id => officeName.get(id) ?? `#${id}`).join(", ");
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return users;
-    return users.filter(user => `${user.first_name} ${user.last_name} ${user.email} ${user.position} ${roleLabel(user.role)} ${projectNames(user)}`.toLowerCase().includes(query));
-  }, [users, search]);
+    return users.filter(user => {
+      if (officeFilter.length && !(user.office && officeFilter.includes(user.office))) return false;
+      if (projectFilter.length && !(user.projects ?? []).some(id => projectFilter.includes(id))) return false;
+      return !query || `${user.first_name} ${user.last_name} ${user.email} ${user.position} ${roleLabel(user.role)} ${projectNames(user)}`.toLowerCase().includes(query);
+    });
+  }, [users, search, officeFilter, projectFilter]);
   const { sorted, sort, toggle } = useTableSort(filtered, {
     name: user => `${user.last_name} ${user.first_name}`,
     email: user => user.email,
@@ -173,6 +181,50 @@ function UsersContent() {
     role: user => roleLabel(user.role),
     status: user => user.is_active ? 1 : 0,
   });
+
+  // People ticked in the table (only ever the ones currently shown).
+  const sortedIds = useMemo(() => sorted.map(user => user.id), [sorted]);
+  const selection = useRowSelection(sortedIds);
+  const [tagging, setTagging] = useState(false);
+
+  // Sets the office and adds / replaces / removes projects for every ticked person (a few requests at a time).
+  async function applyTags(values: BulkTagValues, progress: (done: number) => void) {
+    const targets = users.filter(user => selection.selectedIds.includes(user.id));
+    const queue = [...targets];
+    const updated = new Map<number, ManagedUser>();
+    const failures: string[] = [];
+    let unchanged = 0;
+    let done = 0;
+    const same = (left: number[], right: number[]) => left.length === right.length && left.every(id => right.includes(id));
+    const worker = async () => {
+      for (let user = queue.shift(); user; user = queue.shift()) {
+        const projects = new Set(user.projects ?? []);
+        if (values.projectMode === "replace") { projects.clear(); values.projects.forEach(id => projects.add(id)); }
+        else if (values.projectMode === "add") values.projects.forEach(id => projects.add(id));
+        else values.projects.forEach(id => projects.delete(id));
+        const patch: Partial<ManagedUserInput> = {};
+        if (values.office !== undefined && values.office !== user.office) patch.office = values.office;
+        if (!same([...projects], user.projects ?? [])) patch.projects = [...projects];
+        try {
+          if (Object.keys(patch).length) updated.set(user.id, await userService.update(user.id, patch));
+          else unchanged += 1;
+        } catch (caught) {
+          failures.push(`${`${user.first_name} ${user.last_name}`.trim() || user.email}: ${userError(caught)}`);
+        }
+        done += 1;
+        progress(done);
+      }
+    };
+    await Promise.all([worker(), worker(), worker()]);
+    setUsers(current => current.map(user => updated.get(user.id) ?? user));
+    setTagging(false);
+    selection.clear();
+    void Swal.fire({
+      title: failures.length ? "Tagged, with problems" : "Tagged",
+      html: `${updated.size} updated${unchanged ? `, ${unchanged} already as asked` : ""}${failures.length ? `.<br/><small>${failures.slice(0, 5).map(text => text.replace(/</g, "&lt;")).join("<br/>")}${failures.length > 5 ? `<br/>…and ${failures.length - 5} more` : ""}</small>` : "."}`,
+      icon: failures.length ? "warning" : "success",
+    });
+  }
 
   const onSaved = (saved: ManagedUser, created: boolean) => {
     setUsers(current => created ? [...current, saved] : current.map(item => item.id === saved.id ? saved : item));
@@ -214,17 +266,29 @@ function UsersContent() {
       {error && <p className="etm-report-error">{error}</p>}
       {loading ? <p className="etm-empty-row">Loading users…</p> : !error && (
         <>
-          <div className="etm-filter-bar">
+          <div className="etm-filter-bar" style={{ alignItems: "flex-end" }}>
+            <MultiSelect label="Office" options={offices} selected={officeFilter} onChange={setOfficeFilter} placeholder="All offices" />
+            <MultiSelect label="Projects" options={offices} selected={projectFilter} onChange={setProjectFilter} placeholder="All projects" />
             <div className="etm-filter-search">
               <Search size={15} />
               <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search by name, email, position or role…" aria-label="Search users" />
             </div>
             <span className="etm-tasks-table-unassigned">{filtered.length} of {users.length} user{users.length === 1 ? "" : "s"}</span>
           </div>
+          {selection.count > 0 && (
+            <div className="etm-panel" role="region" aria-label="Bulk actions" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, padding: "10px 14px", margin: "0 0 12px" }}>
+              <strong style={{ color: "var(--etm-ink)" }}>{selection.count} selected</strong>
+              <button type="button" className="etm-button" style={{ minHeight: 36 }} onClick={() => setTagging(true)}><Tags size={15} /> Tag office &amp; projects</button>
+              <button type="button" className="etm-button ghost" style={{ minHeight: 36 }} onClick={selection.clear}>Clear</button>
+            </div>
+          )}
           <section className="etm-panel etm-table-wrap">
             <table className="etm-tasks-table etm-report-table">
               <thead><tr>
-                <SortTh sortKey="name" sort={sort} onSort={toggle}>Name</SortTh>
+                <SortTh sortKey="name" sort={sort} onSort={toggle} leading={
+                  <input type="checkbox" aria-label="Select everyone shown" checked={selection.isAllSelected}
+                    ref={el => { if (el) el.indeterminate = selection.isSomeSelected; }} onChange={selection.toggleAll} />
+                }>Name</SortTh>
                 <SortTh sortKey="email" sort={sort} onSort={toggle}>Email</SortTh>
                 <SortTh sortKey="position" sort={sort} onSort={toggle}>Position</SortTh>
                 <SortTh sortKey="office" sort={sort} onSort={toggle}>Office</SortTh>
@@ -239,7 +303,9 @@ function UsersContent() {
                   const isSelf = user.id === currentUser?.id;
                   return (
                     <tr key={user.id}>
-                      <td className="etm-tasks-table-details-col">{`${user.first_name} ${user.last_name}`.trim() || "—"}{isSelf && <span className="etm-badge" style={{ marginLeft: 8 }}>You</span>}</td>
+                      <td className="etm-tasks-table-details-col">
+                        <input type="checkbox" aria-label={`Select ${user.email}`} checked={selection.isSelected(user.id)} onChange={() => selection.toggle(user.id)} style={{ marginRight: 10, verticalAlign: "middle" }} />
+                        {`${user.first_name} ${user.last_name}`.trim() || "—"}{isSelf && <span className="etm-badge" style={{ marginLeft: 8 }}>You</span>}</td>
                       <td>{user.email}</td>
                       <td>{user.position || <span className="etm-tasks-table-unassigned">Not set</span>}</td>
                       <td>{user.office ? officeName.get(user.office) ?? `#${user.office}` : <span className="etm-tasks-table-unassigned">None</span>}</td>
@@ -260,6 +326,7 @@ function UsersContent() {
         </>
       )}
 
+      {tagging && <BulkTagDialog count={selection.count} offices={offices} onClose={() => setTagging(false)} onApply={applyTags} />}
       {editing && <UserFormModal user={editing} offices={offices} isSelf={editing !== "new" && editing.id === currentUser?.id} onClose={() => setEditing(null)} onSaved={onSaved} />}
     </div>
   );

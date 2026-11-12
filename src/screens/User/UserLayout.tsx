@@ -13,10 +13,12 @@ import {
   Link2,
   FileSpreadsheet,
   ArrowLeftRight,
+  Table2,
 } from "lucide-react";
 import { isIPCRComingSoon } from "../../features/ipcr/IPCRComingSoon";
 import { ModeToggle } from "../../components/mode-toggle";
 import { useAuth } from "../Auth/AuthContext";
+import { sheetService } from "../../features/sheets/sheetService";
 import { isAdmin } from "../Auth/roles";
 import NotificationBell from "../../features/notifications/NotificationBell";
 import { useUnseenAssignedCount } from "../../features/tasks/useUnseenAssignedCount";
@@ -38,6 +40,7 @@ const NAV_GROUPS: { title?: string; items: { label: string; icon: React.ReactNod
     items: [
       { label: "Task Grouping", icon: <BarChart3 className="w-4 h-4" />, to: "/etms/reports", note: "for IPCR purposes" },
       { label: "Generate IPCR", icon: <FileSpreadsheet className="w-4 h-4" />, to: "/etms/ipcr" },
+      { label: "Send to Sheet", icon: <Table2 className="w-4 h-4" />, to: "/etms/send-to-sheet" },
     ],
   },
   {
@@ -58,6 +61,14 @@ interface UserLayoutProps {
 // ── Layout ────────────────────────────────────────────────────────────────
 const UserLayout = ({ title, subtitle, children }: UserLayoutProps) => {
   const { pathname } = useLocation();
+  // People of the eLGU project get one more page.
+  const [projectPages, setProjectPages] = useState<string[]>([]);
+  useEffect(() => { sheetService.projectCards().then(result => setProjectPages(result.pages)).catch(() => setProjectPages([])); }, []);
+  const projectItems = [
+    ...(projectPages.includes("elgu") ? [{ label: "eLGU Project Task", icon: <Table2 className="w-4 h-4" />, to: "/etms/elgu" }] : []),
+    ...(projectPages.includes("tod") ? [{ label: "TOD Tasks", icon: <Table2 className="w-4 h-4" />, to: "/etms/tod" }] : []),
+  ];
+  const navGroups: typeof NAV_GROUPS = projectItems.length ? [...NAV_GROUPS.slice(0, 2), { items: projectItems }, ...NAV_GROUPS.slice(2)] : NAV_GROUPS;
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const unseenAssignedCount = useUnseenAssignedCount();
@@ -103,7 +114,7 @@ const UserLayout = ({ title, subtitle, children }: UserLayoutProps) => {
         </div>
         {/* Nav links */}
         <nav className="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto">
-          {NAV_GROUPS.map((group, groupIndex) => (
+          {navGroups.map((group, groupIndex) => (
             <div key={group.title ?? `group-${groupIndex}`} className={groupIndex > 0 ? "mt-3 pt-3 border-t border-border" : undefined}>
               {group.title && (
                 <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">{group.title}</p>
@@ -120,7 +131,7 @@ const UserLayout = ({ title, subtitle, children }: UserLayoutProps) => {
                       </div>
                     );
                   }
-                  const order = NAV_GROUPS.slice(0, groupIndex).reduce((sum, g) => sum + g.items.length, 0) + group.items.indexOf(item);
+                  const order = navGroups.slice(0, groupIndex).reduce((sum, g) => sum + g.items.length, 0) + group.items.indexOf(item);
                   return (
                     <Link
                       key={item.label}

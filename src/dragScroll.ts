@@ -1,8 +1,9 @@
-// Click-and-drag horizontal scrolling for every `.etm-table-wrap`, so wide tables can be panned without reaching
+// Click-and-drag horizontal scrolling for every table holder (`.etm-table-wrap`, and `.etm-sheet-scroll` of the synced sheets), so wide tables can be panned without reaching
 // for the scroll bar at the bottom. Drags that start on controls, text fields or links are left alone, and a drag
 // swallows the click that follows it so rows are not opened by accident.
 const INTERACTIVE = "a, button, input, select, textarea, label, [role='button'], [contenteditable='true'], [data-touch-drag]";
 const THRESHOLD = 5;
+const HOLDER = ".etm-table-wrap, .etm-sheet-scroll";
 
 export function installTableDragScroll() {
   let wrap: HTMLElement | null = null;
@@ -13,7 +14,7 @@ export function installTableDragScroll() {
   document.addEventListener("pointerdown", event => {
     if (event.pointerType !== "mouse" || event.button !== 0) return;
     const target = event.target as Element | null;
-    const found = target?.closest?.(".etm-table-wrap") as HTMLElement | null;
+    const found = target?.closest?.(HOLDER) as HTMLElement | null;
     // The invisible link stretched over every table cell (it makes the whole row open the task) is not a control
     // the user is aiming at — a drag that starts on it is still a drag of the table.
     const control = target?.closest(INTERACTIVE);
@@ -35,7 +36,7 @@ export function installTableDragScroll() {
 
   // Dragging from a link would otherwise start the browser's own "drag this link" gesture and cancel ours.
   document.addEventListener("dragstart", event => {
-    if (wrap && (event.target as Element | null)?.closest?.(".etm-table-wrap") === wrap) event.preventDefault();
+    if (wrap && (event.target as Element | null)?.closest?.(HOLDER) === wrap) event.preventDefault();
   });
 
   const end = () => {
