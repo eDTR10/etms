@@ -83,6 +83,7 @@
 .etm-sheet-task-btn { display: inline-grid; place-items: center; width: 34px; height: 34px; border: 1px solid color-mix(in srgb, var(--etm-primary) 55%, var(--etm-border)); border-radius: 9px; background: rgba(23, 179, 172, .1); color: var(--etm-primary); cursor: pointer; transition: background .12s ease, transform .12s ease; }
 .etm-sheet-task-btn:hover:not(:disabled) { background: rgba(23, 179, 172, .22); transform: translateY(-1px); }
 .etm-sheet-task-btn:disabled { opacity: .6; cursor: default; }
+.etm-sheet-task-btn.wide { width: auto; min-width: 34px; padding: 0 10px; gap: 5px; grid-auto-flow: column; font-size: 12px; font-weight: 600; text-decoration: none; white-space: nowrap; }
 .etm-sheet-task-btn.done { border-color: transparent; background: rgba(23, 179, 172, .18); }
 
 /* Whole-screen loading while a project page reads the sheet's tabs or syncs a tab. */

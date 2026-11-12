@@ -31,12 +31,14 @@ interface SheetTableViewProps {
   // The column the newest-first order follows (where each row was logged), if the sheet has one.
   latestColumn: number | null;
   // A button at the left of every row (e.g. "Create task").
+  // Tick boxes: the row numbers picked, and how to change them.
+  select?: { picked: Set<number>; onToggle: (row: number) => void; onToggleMany: (rows: number[], on: boolean) => void };
   action?: { label: string; render: (row: SheetTable["rows"][number], cells: SheetTable["rows"][number]["cells"]) => React.ReactNode };
 }
 
 // Reads a sheet's rows as a clean, paged table: long text wraps, short columns stay on one line, links become small
 // buttons and ticked boxes become a check mark. Click a column title to sort by it.
-export default function SheetTableView({ table, rows, sort, onSort, latestColumn, action }: SheetTableViewProps) {
+export default function SheetTableView({ table, rows, sort, onSort, latestColumn, action, select }: SheetTableViewProps) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const pages = Math.max(1, Math.ceil(rows.length / pageSize));
@@ -56,12 +58,15 @@ export default function SheetTableView({ table, rows, sort, onSort, latestColumn
   const visible = rows.slice(start, start + pageSize);
   const sortIcon = (key: "row" | number) => !(sort.key === key || (sort.key === "latest" && (latestColumn === null ? key === "row" : key === latestColumn))) ? <ArrowUpDown size={12} className="etm-sheet-sort idle" /> : sort.dir === "asc" ? <ArrowUp size={12} className="etm-sheet-sort" /> : <ArrowDown size={12} className="etm-sheet-sort" />;
 
+  const pageAllOn = !!select && visible.length > 0 && visible.every(row => select.picked.has(row.row));
+
   return (
     <div className="etm-sheet-card">
       <div className="etm-sheet-scroll">
         <table className={`etm-sheet-table ${action ? "has-action" : ""}`}>
           <thead>
             <tr>
+              {select && <th className="etm-sheet-action" style={{ width: 36 }}><input type="checkbox" checked={pageAllOn} onChange={event => select.onToggleMany(visible.map(row => row.row), event.target.checked)} aria-label="Select every row on this page" title="Select every row on this page" /></th>}
               {action && <th className="etm-sheet-action">{action.label}</th>}
               <th className="etm-sheet-rownum" aria-sort={sort.key === "row" || (sort.key === "latest" && latestColumn === null) ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}>
                 <button type="button" className="etm-sheet-sortbtn" onClick={() => onSort(-1)} title="Sort by the order in the sheet">Row {sortIcon("row")}</button>
@@ -76,6 +81,7 @@ export default function SheetTableView({ table, rows, sort, onSort, latestColumn
           <tbody>
             {visible.map(row => (
               <tr key={row.row}>
+                {select && <td className="etm-sheet-action"><input type="checkbox" checked={select.picked.has(row.row)} onChange={() => select.onToggle(row.row)} aria-label={`Select row ${row.row}`} /></td>}
                 {action && <td className="etm-sheet-action">{action.render(row, row.cells)}</td>}
                 <td className="etm-sheet-rownum">{row.row}</td>
                 {row.cells.map((cell, position) => {
@@ -88,7 +94,7 @@ export default function SheetTableView({ table, rows, sort, onSort, latestColumn
                 })}
               </tr>
             ))}
-            {!rows.length && <tr><td colSpan={table.headers.length + (action ? 2 : 1)} className="etm-sheet-none">Nothing found.</td></tr>}
+            {!rows.length && <tr><td colSpan={table.headers.length + (action ? 2 : 1) + (select ? 1 : 0)} className="etm-sheet-none">Nothing found.</td></tr>}
           </tbody>
         </table>
       </div>
